@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.srm.gps</groupId>
+    <artifactId>gps-streaming-platform</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>gps-streaming-platform</name>
+    <description>GPS streaming platform: device frames -> (Kafka or direct) -> processing -> Spring Boot + Hibernate -> PostgreSQL</description>
+
+    <!--
+        Each module has exactly one responsibility, so a problem can be debugged in one place:
+          gps-configuration : topic names, consumer group names, message formats (no framework code)
+          gps-connectivity  : every connection to the outside world (MySQL source, Kafka, PostgreSQL entities)
+          gps-processing    : the processing logic: validation + movement calculation (plain Java)
+          gps-application   : the runnable Spring Boot service that wires the modules into the Kafka or the direct flow
+    -->
+    <modules>
+        <module>gps-configuration</module>
+        <module>gps-connectivity</module>
+        <module>gps-processing</module>
+        <module>gps-application</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.srm.gps</groupId>
+                <artifactId>gps-configuration</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.srm.gps</groupId>
+                <artifactId>gps-connectivity</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.srm.gps</groupId>
+                <artifactId>gps-processing</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

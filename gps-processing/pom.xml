@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.srm.gps</groupId>
+        <artifactId>gps-streaming-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>gps-processing</artifactId>
+    <name>gps-processing</name>
+    <description>The GPS processing logic: validates raw frames and calculates movement. Plain Java, no framework.</description>
+
+    <!--
+        This module is deliberately plain Java: no Spring, no Kafka, no database.
+        It takes a raw frame in and gives a processed position (or a rejection) out,
+        so the same logic is used by the Kafka flow and by the direct flow,
+        and every rule can be unit-tested without starting anything.
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-configuration</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

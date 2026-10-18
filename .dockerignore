@@ -1,0 +1,10 @@
+# Files Docker must NOT copy into the build: secrets, build output, docs, local scripts.
+local-secrets.properties
+.env
+**/target/
+docs/
+infrastructure/
+*.log
+.idea/
+.vscode/
+*.iml

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPS Engine</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6ec;
+    --accent: #2563eb; --good: #15803d; --warn: #b45309; --bad: #b91c1c; --chip: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1218; --panel: #171b23; --text: #e6e9ef; --muted: #98a2b3; --line: #2a303b;
+      --accent: #60a5fa; --good: #4ade80; --warn: #fbbf24; --bad: #f87171; --chip: #1e2635;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 12px; white-space: nowrap; }
+  .muted { color: var(--muted); }
+  .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  a { color: var(--accent); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .kpi .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: stretch; }
+  .box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .box.topic { border-style: dashed; }
+  .box .name { font-weight: 600; font-size: 13px; }
+  .box .rate { font-size: 18px; font-weight: 650; }
+  input, button { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  svg.spark { width: 120px; height: 28px; display: block; }
+  svg.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+  .bar { height: 6px; background: var(--chip); border-radius: 3px; min-width: 60px; }
+  .bar > span { display: block; height: 6px; background: var(--accent); border-radius: 3px; }
+  pre { margin: 0; white-space: pre-wrap; font-size: 12px; }
+  @media (max-width: 640px) { header, main { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>GPS Engine</h1>
+    <span class="chip" id="flow">flow: …</span>
+    <span class="chip muted" id="updated">…</span>
+  </div>
+  <div class="row">
+    <a id="kafkaUi" href="#" target="_blank" rel="noopener">Kafka UI</a>
+    <a id="redisInsight" href="#" target="_blank" rel="noopener">RedisInsight</a>
+    <a href="/actuator/health" target="_blank" rel="noopener">Health</a>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Simulator (stands in for the device parser)</h2>
+    <div class="row">
+      <label>Vehicles <input id="vehicleCount" type="number" min="1" max="1500" value="150" style="width:90px"></label>
+      <button class="primary" id="startButton">Start fleet</button>
+      <button id="stopButton">Stop</button>
+      <span id="simulatorStatus" class="muted"></span>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="panel">
+    <h2>The pipeline right now (messages per second)</h2>
+    <div class="flow" id="pipeline"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Producers: who writes what</h2>
+    <table id="producers"></table>
+  </section>
+
+  <section class="panel">
+    <h2>Topics</h2>
+    <div id="kafkaProblem" class="warn"></div>
+    <table id="topics"></table>
+  </section>
+
+  <section class="panel">
+    <h2>Consumers: load, members and lag</h2>
+    <table id="consumers"></table>
+  </section>
+
+  <section class="panel">
+    <h2>Devices: filter by IMEI</h2>
+    <div class="row" style="margin-bottom:10px">
+      <input id="imeiFilter" placeholder="part of an IMEI, e.g. 0867" style="width:260px">
+      <span class="muted" id="deviceCount"></span>
+    </div>
+    <div id="deviceDetail" style="margin-bottom:10px"></div>
+    <table id="devices"></table>
+  </section>
+</main>
+
+<script>
+const host = window.location.hostname;
+document.getElementById('kafkaUi').href = `http://${host}:8085`;
+document.getElementById('redisInsight').href = `http://${host}:8001`;
+
+const SHORT = {
+  RAW_FRAME_PRODUCER: 'P1 frames', PROCESSED_POSITION_PRODUCER: 'P2 processed', REJECTED_FRAME_PRODUCER: 'P3 rejected',
+  RAW_FRAME_PROCESSING: 'processing', POSITION_STORAGE: 'storage', LIVE_LOCATION: 'live location',
+  REJECTED_FRAME_LOGGER: 'rejected log', DIRECT_PROCESSING: 'direct'
+};
+
+const fmt = n => n == null ? '–' : Number(n).toLocaleString();
+const rate = n => (n ?? 0).toFixed(1);
+const ago = t => {
+  if (!t) return '<span class="muted">never</span>';
+  const s = Math.round((Date.now() - new Date(t)) / 1000);
+  return s < 3 ? '<span class="good">now</span>' : `${s}s ago`;
+};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function spark(values) {
+  const max = Math.max(1, ...values);
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * 120},${28 - (v / max) * 26 - 1}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 120 28" preserveAspectRatio="none"><polyline points="${points}"/></svg>`;
+}
+
+function partitions(map) {
+  const entries = Object.entries(map || {});
+  if (!entries.length) return '<span class="muted">–</span>';
+  const total = entries.reduce((sum, [, v]) => sum + v, 0) || 1;
+  return entries.map(([p, v]) =>
+    `<div style="display:flex;gap:6px;align-items:center;white-space:nowrap"><span class="muted" style="width:40px">${p === '-1' ? 'direct' : 'p' + p}</span>
+     <div class="bar" style="width:60px;min-width:60px"><span style="width:${(v / total) * 100}%"></span></div><span>${fmt(v)}</span></div>`).join('');
+}
+
+function render(o) {
+  document.getElementById('flow').textContent = 'flow: ' + o.processingFlow;
+  document.getElementById('updated').textContent = 'updated ' + new Date(o.generatedAt).toLocaleTimeString();
+
+  const s = o.simulator;
+  document.getElementById('simulatorStatus').innerHTML =
+    `${s.running ? '<span class="good">● running</span>' : '<span class="muted">○ stopped</span>'}
+     · ${fmt(s.vehicleCount)} vehicles · ${fmt(s.framesSent)} frames · round ${s.round}/${s.roundsPerDrive} · drive ${s.driveNumber}
+     · ${esc(s.lastMessage)}`;
+
+  const p = Object.fromEntries(o.producers.map(x => [x.stage, x]));
+  const c = Object.fromEntries(o.consumers.map(x => [x.load.stage, x]));
+  const totalLag = o.consumers.reduce((sum, x) => sum + x.totalLag, 0);
+  const incoming = o.processingFlow === 'direct' ? o.directFlow.messagesPerSecond : p.RAW_FRAME_PRODUCER.messagesPerSecond;
+  const devices = o.processingFlow === 'direct' ? o.directFlow.devicesSeen : p.RAW_FRAME_PRODUCER.devicesSeen;
+  const kpis = [
+    ['Frames in / s', rate(incoming)],
+    ['Devices reporting', fmt(devices)],
+    ['Stored positions (PostgreSQL)', fmt(o.storedPositions)],
+    ['Vehicles with live position (Redis)', o.redisProblem ? '<span class="bad">Redis down</span>' : fmt(o.vehiclesWithLivePosition)],
+    ['Total consumer lag', `<span class="${totalLag > 1000 ? 'warn' : 'good'}">${fmt(totalLag)}</span>`],
+    ['Rejected frames', fmt(o.processingFlow === 'direct' ? c.REJECTED_FRAME_LOGGER.load.totalMessages : p.REJECTED_FRAME_PRODUCER.totalMessages)],
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(([label, value]) =>
+    `<div class="kpi"><div class="value">${value}</div><div class="label">${label}</div></div>`).join('');
+
+  const box = (name, value, sub, topic) =>
+    `<div class="box ${topic ? 'topic' : ''}"><div class="name">${name}</div><div class="rate">${value}</div><div class="muted">${sub}</div></div>`;
+  if (o.processingFlow === 'direct') {
+    document.getElementById('pipeline').innerHTML =
+      box('Simulator', rate(o.directFlow.messagesPerSecond), 'frames/s') +
+      box('Direct processing', rate(o.directFlow.messagesPerSecond), 'validate + movement') +
+      box('Storage → PostgreSQL', rate(c.POSITION_STORAGE.load.messagesPerSecond), 'positions/s') +
+      box('Live location → Redis', rate(c.LIVE_LOCATION.load.messagesPerSecond), 'updates/s') +
+      box('Rejected → log', rate(c.REJECTED_FRAME_LOGGER.load.messagesPerSecond), 'rejections/s');
+  } else {
+    document.getElementById('pipeline').innerHTML =
+      box('P1 Simulator', rate(p.RAW_FRAME_PRODUCER.messagesPerSecond), 'frames/s') +
+      box('gps.raw-device-frames', fmt(c.RAW_FRAME_PROCESSING.totalLag), 'lag', true) +
+      box('Processing consumer', rate(c.RAW_FRAME_PROCESSING.load.messagesPerSecond), 'frames/s') +
+      box('P2 → gps.processed-positions', rate(p.PROCESSED_POSITION_PRODUCER.messagesPerSecond), 'positions/s', true) +
+      box('Storage → PostgreSQL', rate(c.POSITION_STORAGE.load.messagesPerSecond), `lag ${fmt(c.POSITION_STORAGE.totalLag)}`) +
+      box('Live location → Redis', rate(c.LIVE_LOCATION.load.messagesPerSecond), `lag ${fmt(c.LIVE_LOCATION.totalLag)}`) +
+      box('P3 → gps.rejected-frames', rate(p.REJECTED_FRAME_PRODUCER.messagesPerSecond), 'rejections/s', true) +
+      box('Rejected logger', rate(c.REJECTED_FRAME_LOGGER.load.messagesPerSecond), `lag ${fmt(c.REJECTED_FRAME_LOGGER.totalLag)}`);
+  }
+
+  document.getElementById('producers').innerHTML =
+    `<tr><th>Producer</th><th>Writes to topic</th><th class="num">msg/s</th><th>last 60 s</th><th class="num">total</th>
+     <th class="num">failures</th><th class="num">devices</th><th>per partition</th><th>last message</th></tr>` +
+    o.producers.map(x => `<tr><td><b>${esc(x.label)}</b></td><td><code>${esc(x.topic)}</code></td>
+      <td class="num">${rate(x.messagesPerSecond)}</td><td>${spark(x.lastMinutePerSecond)}</td><td class="num">${fmt(x.totalMessages)}</td>
+      <td class="num ${x.failures ? 'bad' : ''}">${fmt(x.failures)}</td><td class="num">${fmt(x.devicesSeen)}</td>
+      <td>${partitions(x.messagesByPartition)}</td><td>${ago(x.lastMessageAt)}</td></tr>`).join('');
+
+  document.getElementById('kafkaProblem').textContent = o.kafkaProblem || '';
+  document.getElementById('topics').innerHTML = o.topics.length
+    ? `<tr><th>Topic</th><th class="num">partitions</th><th>offsets per partition (oldest → newest)</th>
+       <th class="num">messages kept</th><th class="num">ever written</th></tr>` +
+      o.topics.map(t => `<tr><td><code>${esc(t.name)}</code></td><td class="num">${t.partitions.length}</td>
+        <td>${t.partitions.map(pp => `<span class="chip">p${pp.partition}: ${fmt(pp.earliestOffset)} → ${fmt(pp.latestOffset)}</span>`).join(' ')}</td>
+        <td class="num">${fmt(t.messagesKept)}</td><td class="num">${fmt(t.messagesEverWritten)}</td></tr>`).join('')
+    : '';
+
+  document.getElementById('consumers').innerHTML =
+    `<tr><th>Consumer</th><th>Group / topic</th><th>State</th><th>Members → partitions</th><th class="num">msg/s</th>
+     <th>last 60 s</th><th class="num">eaten</th><th class="num">failures</th><th>load per partition</th><th>lag per partition</th><th class="num">total lag</th></tr>` +
+    o.consumers.map(x => `<tr><td><b>${esc(x.load.label)}</b></td>
+      <td><code>${esc(x.load.consumerGroup)}</code><br><span class="muted">${esc(x.load.topic)}</span></td>
+      <td>${x.groupState === 'STABLE' ? '<span class="good">STABLE</span>' : esc(x.groupState)}</td>
+      <td style="white-space:nowrap">${x.members
+          .map(m => ({ number: Number(m.clientId.split('-').pop()), partitions: m.assignedPartitions.map(tp => 'p' + tp.split('-').pop()) }))
+          .sort((a, b) => a.partitions.join().localeCompare(b.partitions.join()))
+          .map(m => `<div title="${esc(m.number)}">consumer ${esc(m.number)} → ${m.partitions.join(', ')}</div>`).join('') || '<span class="muted">–</span>'}</td>
+      <td class="num">${rate(x.load.messagesPerSecond)}</td><td>${spark(x.load.lastMinutePerSecond)}</td>
+      <td class="num">${fmt(x.load.totalMessages)}</td><td class="num ${x.load.failures ? 'bad' : ''}">${fmt(x.load.failures)}</td>
+      <td>${partitions(x.load.messagesByPartition)}</td>
+      <td style="white-space:nowrap">${x.partitions.map(pp => `<div><span class="chip ${pp.lag > 500 ? 'warn' : ''}">p${pp.partition}: ${fmt(pp.lag)}</span></div>`).join('') || '<span class="muted">–</span>'}</td>
+      <td class="num">${fmt(x.totalLag)}</td></tr>`).join('');
+}
+
+async function refreshOverview() {
+  try {
+    const response = await fetch('/api/engine/overview');
+    render(await response.json());
+  } catch (problem) {
+    document.getElementById('updated').textContent = 'service not reachable';
+  }
+}
+
+async function refreshDevices() {
+  const filter = document.getElementById('imeiFilter').value.trim();
+  const devices = await (await fetch('/api/engine/devices?imei=' + encodeURIComponent(filter))).json();
+  document.getElementById('deviceCount').textContent = `${devices.length} device(s)${devices.length >= 300 ? ' (first 300)' : ''}`;
+  const stages = devices.length ? Object.keys(devices[0].messagesByStage) : [];
+  document.getElementById('devices').innerHTML = devices.length
+    ? `<tr><th>IMEI</th><th class="num">partition</th>${stages.map(st => `<th class="num">${SHORT[st] || st}</th>`).join('')}</tr>` +
+      devices.map(d => `<tr><td><a href="#" data-imei="${esc(d.imei)}">${esc(d.imei)}</a></td><td class="num">p${d.partition}</td>
+        ${stages.map(st => `<td class="num">${fmt(d.messagesByStage[st])}</td>`).join('')}</tr>`).join('')
+    : '<tr><td class="muted">No device has sent anything yet. Start the fleet.</td></tr>';
+}
+
+async function showDevice(imei) {
+  const d = await (await fetch('/api/engine/devices/' + encodeURIComponent(imei))).json();
+  const live = d.livePosition || {};
+  document.getElementById('deviceDetail').innerHTML =
+    `<div class="box"><div class="name">Device ${esc(d.imei)} · always on partition p${d.partition}</div>
+     <div class="row" style="margin-top:6px">${Object.entries(d.messagesByStage).map(([st, n]) => `<span class="chip">${SHORT[st] || st}: ${fmt(n)}</span>`).join('')}</div>
+     <pre style="margin-top:8px">${Object.keys(live).length ? esc(JSON.stringify(live, null, 2)) : 'No live position in Redis yet.'}</pre></div>`;
+}
+
+document.getElementById('devices').addEventListener('click', event => {
+  const link = event.target.closest('a[data-imei]');
+  if (link) { event.preventDefault(); showDevice(link.dataset.imei); }
+});
+let filterTimer;
+document.getElementById('imeiFilter').addEventListener('input', () => { clearTimeout(filterTimer); filterTimer = setTimeout(refreshDevices, 300); });
+document.getElementById('startButton').addEventListener('click', async () => {
+  const count = document.getElementById('vehicleCount').value || 150;
+  await fetch('/api/simulator/start?vehicleCount=' + encodeURIComponent(count), { method: 'POST' });
+  refreshOverview();
+});
+document.getElementById('stopButton').addEventListener('click', async () => {
+  await fetch('/api/simulator/stop', { method: 'POST' });
+  refreshOverview();
+});
+
+refreshOverview();
+refreshDevices();
+setInterval(refreshOverview, 2000);
+setInterval(refreshDevices, 5000);
+</script>
+</body>
+</html>

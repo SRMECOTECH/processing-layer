@@ -1,0 +1,12 @@
+# Real passwords for the local machine - never commit
+local-secrets.properties
+.env
+
+# Build output
+target/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/

@@ -1,0 +1,92 @@
+# GPS streaming service configuration.
+# Passwords are NOT kept here: they are read from local-secrets.properties (git-ignored),
+# see local-secrets.example.properties for the expected keys.
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gps-streaming-service
+  config:
+    # Works whether the service is started from the project root or from the gps-application folder.
+    import: optional:file:./local-secrets.properties,optional:file:../local-secrets.properties
+
+  # The NEW database owned by this service (PostgreSQL). Tables come from Flyway (db/migration).
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gps_tracking
+    username: gps_app
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway creates the tables; Hibernate only checks that the entities match them.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      # A brand-new consumer group starts from the oldest message instead of only new ones.
+      auto-offset-reset: earliest
+
+  # The dashboard page changes with every release: make browsers always ask for the current version.
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
+  # Redis: latest position of every vehicle + engine load counters (browse with RedisInsight).
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# The EXISTING smart_truck MySQL database - read-only source of real GPS pings.
+smart-truck:
+  database:
+    url: jdbc:mysql://localhost:3306/smart_truck
+
+gps:
+  # How a raw frame travels through the service:
+  #   kafka  : frame -> Kafka -> processing consumer -> Kafka -> storage consumer -> PostgreSQL  (needs Kafka running)
+  #   direct : frame -> processing -> PostgreSQL in one call, no Kafka at all                    (Kafka may be stopped)
+  # Override at start-up:  --gps.processing-flow=direct
+  processing-flow: kafka
+  simulator:
+    # 150 different vehicles, one ping each every 2 s = 75 frames per second.
+    vehicle-count: 150
+    pings-per-vehicle: 500
+    minimum-pings-per-trip: 200
+    delay-between-rounds-millis: 2000
+    # Stamp frames with the current time and keep driving the trips back and forth, so data keeps coming.
+    replay-as-live: true
+    repeat-forever: true
+    start-when-application-starts: false
+
+# Log classification: every line shows WHICH stage wrote it, for WHICH device, from WHICH partition/offset:
+#   WARN [stage=position-storage imei=0861000000000002 p=2 o=1534] ...
+# Filter one device:   ... | Select-String "imei=0861000000000002"      one consumer: ... | Select-String "stage=live-location"
+# Engine load summary every 30 s:  ... | Select-String "ENGINE"
+# Per-message debug lines: set LOGGING_LEVEL_COM_SRM_GPS=DEBUG
+logging:
+  pattern:
+    level: "%5p [stage=%X{stage:-none} imei=%X{imei:--} p=%X{partition:--} o=%X{offset:--}]"
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # http://localhost:8080/actuator/health also shows whether PostgreSQL ("db") is UP. Local development only.
+      show-details: always

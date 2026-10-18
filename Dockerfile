@@ -1,0 +1,34 @@
+# Builds the GPS streaming service into a small image, in two stages:
+#   1. "build"   : a full JDK + Maven compile the code and produce gps-streaming-service.jar
+#   2. "runtime" : only a Java runtime and that one jar - no source code, no Maven, no JDK
+#
+# Build it:  docker build -t gps-streaming-service .
+# (docker compose builds it for you - see docker-compose.yml)
+
+# ---------- stage 1: build ----------
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /workspace
+
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+COPY gps-configuration gps-configuration
+COPY gps-connectivity gps-connectivity
+COPY gps-processing gps-processing
+COPY gps-application gps-application
+
+# The cache mount keeps downloaded Maven libraries between builds, so a rebuild after a code change is fast.
+RUN --mount=type=cache,target=/root/.m2 \
+    chmod +x mvnw && ./mvnw -B -q -DskipTests package
+
+# ---------- stage 2: runtime ----------
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+# Do not run as root inside the container.
+RUN useradd --system --uid 1001 gps
+USER gps
+
+COPY --from=build /workspace/gps-application/target/gps-streaming-service.jar gps-streaming-service.jar
+
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/gps-streaming-service.jar"]
