@@ -1,6 +1,6 @@
 # Processing Layer – GPS Streaming Platform 🚚📡
 
-> **Ek line mein:** 150 trucks ka GPS data aata hai → Kafka mein line lagta hai → Spring Boot usko check karta hai, saaf karta hai → PostgreSQL mein save hota hai aur Redis mein "abhi truck kahan hai" wala live board update hota hai. Aur ek **engine dashboard** hai jahan har producer, topic, consumer live dikhta hai.
+> **Ek line mein:** 150 trucks ka GPS data aata hai → Kafka mein line lagta hai → Spring Boot usko check karta hai, saaf karta hai → PostgreSQL mein save hota hai, Redis mein "abhi truck kahan hai" wala live board update hota hai, aur trip service "kab chali, kab ruki, kitna chali" likhti hai. Aur ek **engine dashboard** hai jahan har producer, topic, consumer live dikhta hai.
 
 Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (main khud bhi 6 mahine baad 😅) padh ke poora project samajh jaye. Har cheez jo is project mein use hui hai, uska **kya**, **kyun** aur **kaise** neeche hai.
 
@@ -24,17 +24,18 @@ Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (
 12. [Master data: IMEI → gaadi → company](#12-master-data-imei--gaadi--company)
 13. [Simulator – nakli trucks jo asli jaise chalte hain](#13-simulator--nakli-trucks-jo-asli-jaise-chalte-hain)
 14. [Redis – live board](#14-redis--live-board)
-15. [Engine dashboard aur REST APIs](#15-engine-dashboard-aur-rest-apis)
-16. [Classified logs – har line bataye kaun, kis truck ka, kahan se](#16-classified-logs--har-line-bataye-kaun-kis-truck-ka-kahan-se)
-17. [Maven modules – har module ka ek hi kaam](#17-maven-modules--har-module-ka-ek-hi-kaam)
-18. [Passwords aur secrets kaise sambhale](#18-passwords-aur-secrets-kaise-sambhale)
-19. [Docker se chalao (recommended)](#19-docker-se-chalao-recommended)
-20. [Bina Docker ke chalao (Windows, D:\dev)](#20-bina-docker-ke-chalao-windows-ddev)
-21. [Windows ke nakhre (quirks)](#21-windows-ke-nakhre-quirks)
-22. [Kuch toot jaye to kahan dekhein (troubleshooting)](#22-kuch-toot-jaye-to-kahan-dekhein-troubleshooting)
-23. [Aage kya banana hai – roadmap](#23-aage-kya-banana-hai--roadmap)
-24. [Interview ke tricky sawaal](#24-interview-ke-tricky-sawaal)
-25. [Mental model – yaad rakhne ke liye](#25-mental-model--yaad-rakhne-ke-liye)
+15. [Trips aur stops – gps-trip-service](#15-trips-aur-stops--gps-trip-service)
+16. [Engine dashboard aur REST APIs](#16-engine-dashboard-aur-rest-apis)
+17. [Classified logs – har line bataye kaun, kis truck ka, kahan se](#17-classified-logs--har-line-bataye-kaun-kis-truck-ka-kahan-se)
+18. [Maven modules – har module ka ek hi kaam](#18-maven-modules--har-module-ka-ek-hi-kaam)
+19. [Passwords aur secrets kaise sambhale](#19-passwords-aur-secrets-kaise-sambhale)
+20. [Docker se chalao (recommended)](#20-docker-se-chalao-recommended)
+21. [Bina Docker ke chalao (Windows, D:\dev)](#21-bina-docker-ke-chalao-windows-ddev)
+22. [Windows ke nakhre (quirks)](#22-windows-ke-nakhre-quirks)
+23. [Kuch toot jaye to kahan dekhein (troubleshooting)](#23-kuch-toot-jaye-to-kahan-dekhein-troubleshooting)
+24. [Aage kya banana hai – roadmap](#24-aage-kya-banana-hai--roadmap)
+25. [Interview ke tricky sawaal](#25-interview-ke-tricky-sawaal)
+26. [Mental model – yaad rakhne ke liye](#26-mental-model--yaad-rakhne-ke-liye)
 
 ---
 
@@ -44,10 +45,11 @@ Socho ek **dhaba kitchen** hai 🍛:
 
 - Peeche ke darwaze se **kachchi sabzi** aati hai → ye hai **GPS device ka raw data** (abhi simulator bhejta hai, baad mein asli device parser bhejega).
 - Ek **helper** sabzi dhota hai, check karta hai. Achhi sabzi **saaf tray** mein, sadi hui **reject wali balti** mein → ye hai **processing consumer**.
-- Saaf tray se **do log apni apni copy** uthate hain:
+- Saaf tray se **teen log apni apni copy** uthate hain:
   - **Munshi** register mein likhta hai → **PostgreSQL** mein save.
   - **Waiter** board pe likhta hai "kaun table pe kya chal raha hai" → **Redis** mein live location.
-- Teesra banda reject balti dekh ke likhta hai **kyun phenka** → **rejected frame logger**.
+  - **Hisaab wala** apni diary mein likhta hai "gaadi kab chali, kab ruki, kitna chali" → **trip service** (PostgreSQL `gps_trip`, `gps_stop`).
+- Ek aur banda reject balti dekh ke likhta hai **kyun phenka** → **rejected frame logger**.
 
 Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 
@@ -104,16 +106,16 @@ P1  GPS device simulator ──► gps.raw-device-frames   (key = IMEI, 3 partit
                          │                                     │
 P2                       ▼  (achha)                   P3       ▼  (kharab)
           gps.processed-positions                     gps.rejected-frames
-           │                     │                             │
- group gps-position-       group gps-live-            group gps-rejected-
- storage-service (3)       location-service (3)       frame-logger (1)
-           ▼                     ▼                             ▼
-   PostgreSQL gps_position   Redis: har gaadi ki          log line, reason ke saath
-   (IMEI → gaadi → company   latest position + GEO set
-    READING ke time ka)
+           │                     │                    │        │
+ group gps-position-       group gps-live-     group gps-trip-   group gps-rejected-
+ storage-service (3)       location-service (3) service (3)      frame-logger (1)
+           ▼                     ▼                    ▼        ▼
+   PostgreSQL gps_position   Redis: har gaadi ki   PostgreSQL   log line, reason ke saath
+   (IMEI → gaadi → company   latest position       gps_trip +
+    READING ke time ka)      + GEO set             gps_stop
 ```
 
-**Ginti yaad rakho: 3 topics, 3 producers, 4 consumer groups.**
+**Ginti yaad rakho: 3 topics, 3 producers, 5 consumer groups.**
 
 ---
 
@@ -158,11 +160,12 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 | C2 | `gps-position-storage-service` | `gps.processed-positions` | Position save karo | PostgreSQL `gps_position` |
 | C3 | `gps-live-location-service` | `gps.processed-positions` | Har gaadi ki **sirf latest** position rakho | Redis |
 | C4 | `gps-rejected-frame-logger` | `gps.rejected-frames` | Reject reason log karo | Service ka log |
+| C5 | `gps-trip-service` | `gps.processed-positions` | Trips aur stops pehchano (section 15) | PostgreSQL `gps_trip`, `gps_stop` |
 
 ### Group ka asli funda (sabse important Kafka concept)
 
-- **Alag groups → har group ko HAR message milta hai.** C2 aur C3 dono ko topic 2 ki poori copy milti hai. Dono ka apna **bookmark (offset)** hai. Redis slow hai to PostgreSQL wala ruka nahi rehta.
-- **Ek hi group ke andar → kaam baant jaata hai.** Ek partition ek time pe group ke sirf ek consumer ke paas jaata hai. Humare paas 3 partitions hain aur `concurrency = 3`, to C1, C2, C3 – teeno **3 threads** chalate hain, ek thread ek partition. 4th thread daaloge to wo bas baitha rahega, kaam nahi milega.
+- **Alag groups → har group ko HAR message milta hai.** C2, C3 aur C5 teeno ko topic 2 ki poori copy milti hai. Dono ka apna **bookmark (offset)** hai. Redis slow hai to PostgreSQL wala ruka nahi rehta.
+- **Ek hi group ke andar → kaam baant jaata hai.** Ek partition ek time pe group ke sirf ek consumer ke paas jaata hai. Humare paas 3 partitions hain aur `concurrency = 3`, to C1, C2, C3, C5 – sab **3 threads** chalate hain, ek thread ek partition. 4th thread daaloge to wo bas baitha rahega, kaam nahi milega.
 - **C4 ek hi thread** – reject kam aate hain.
 
 > Desi version: do alag offices ko akhbaar ki **apni apni photocopy** milti hai (alag groups). Ek office ke andar teen clerk **pages baant** lete hain (same group).
@@ -257,7 +260,8 @@ Ye thread-safe kyun hai? Ek IMEI → ek partition → ek thread. Ek device ko ka
 3. **Toota hua message skip.** Invalid JSON ya database rule tootna (`DataIntegrityViolationException`) – retry se theek nahi hoga, to log karke turant skip, taaki peeche wale messages block na hon.
 4. **Idempotent storage.** Kafka ek message do baar de sakta hai. `gps_position` mein `UNIQUE (imei, recorded_at)` hai aur save se pehle `existsByImeiAndRecordedAt` check hota hai – ek reading ek hi baar save hoti hai.
 5. **Live location mein purana naye ko replace nahi karta.** Late ya replay reading Redis ki newer position ko overwrite nahi karti.
-6. **Direct flow mein Redis best-effort hai.** PostgreSQL asli record hai, Redis sirf fast copy – Redis ki hichki log hoti hai, frame fail nahi hota.
+6. **Direct flow mein Redis aur trips best-effort hain.** `gps_position` asli record hai – Redis ya trip detection ki hichki log hoti hai, frame fail nahi hota.
+7. **Trip service: state + trip ek hi transaction mein.** Har reading pe `vehicle_motion_state` ka update `WHERE last_recorded_at < :recordedAt` se guarded hai. Dobara aayi reading → 0 rows update → rollback, kuch nahi likha. Isse "message do baar aaya" ka asar **exactly-once** jaisa hota hai (section 15).
 
 ---
 
@@ -272,12 +276,16 @@ Tables Flyway banata hai (`gps-application/src/main/resources/db/migration`), Hi
 | `device` | Tracking device, sirf `imei` se pehchana jata hai. Kind: GPS, FUEL, TEMPERATURE, DOOR, OBD |
 | `device_assignment` | Device kis gaadi mein **kab se kab tak** laga tha (`valid_from` – `valid_to`) |
 | `gps_position` | Processed readings + `tenant_code` + `vehicle_registration_no`. Unique `(imei, recorded_at)` |
+| `vehicle_motion_state` | Trip service ki yaaddasht: har device ki ek row – chal rahi hai ya khadi, last reading kab ki, pichhle 3 minute ki readings (`reading_window` jsonb) |
+| `gps_trip` | Ek trip: start/end time + jagah, distance, duration, max/avg speed, `status` OPEN/CLOSED. Unique `(imei, start_recorded_at)` |
+| `gps_stop` | Ek stop (gaadi khadi): start/end, jagah, duration. Unique `(imei, start_recorded_at)` |
+| `gps_trip_late_reading` | Jo reading late aayi aur trip service ne skip ki – ek baar note hoti hai (baad wale "repair job" ki list) |
 
 **Kuch design decisions:**
 - **Period mein store, "current vehicle" nahi.** Late reading ko us gaadi se match karna hai jisme device **reading ke time** laga tha, aaj wali gaadi se nahi.
 - **Exclusion constraint** (`btree_gist` extension): `EXCLUDE USING gist (device_id WITH =, tstzrange(valid_from, valid_to) WITH &&)` – ek device ek time pe sirf ek gaadi mein. Database khud guarantee karta hai.
 - `gps_position` mein tenant/vehicle **readable code** hain, foreign key nahi – telemetry fast likhi jaati hai aur baad mein time-series store (ClickHouse) mein jayegi.
-- **Applied Flyway file kabhi edit mat karo** – checksum mismatch pe service start hi nahi hogi. Naya `V3__...sql` banao.
+- **Applied Flyway file kabhi edit mat karo** – checksum mismatch pe service start hi nahi hogi. Naya `V5__...sql` banao (V3, V4 trip service ke hain).
 - Indexes: `(vehicle_registration_no, recorded_at DESC)` aur `stored_at DESC`.
 
 ---
@@ -335,7 +343,61 @@ Saari key names ek jagah: `RedisKeyNames.java`.
 
 ---
 
-## 15. Engine dashboard aur REST APIs
+## 15. Trips aur stops – gps-trip-service
+
+Pehla "downstream" consumer: `gps.processed-positions` padh ke batata hai **gaadi kab chali, kab ruki, kitna chali**. Logic Traccar (open-source GPS server) ke `NewMotionProcessor` se port kiya hai – production mein saalon se chal raha hai – aur Traccar ki do galtiyan yahan nahi hain (neeche dekho).
+
+**Teen settings** (`application.yml` → `gps.trips`, Traccar ke defaults):
+
+| Setting | Default | Matlab |
+|---|---|---|
+| `min-distance-meters` | 200 | Jahan ruki thi wahan se 200 m door gayi → **trip shuru** |
+| `min-duration-seconds` | 180 | 3 minute tak koi reading 200 m door nahi → **ruk gayi** (stop) |
+| `stop-gap-seconds` | 3600 | 1 ghante se zyada device chup → trip **chup hone se pehle wali reading** pe band |
+
+**Kaise sochta hai (desi version):**
+- **Khadi gaadi:** "Jahan ruki thi wahan se 200 m door gayi kya?" Haan → trip shuru. Start time **peeche khiska ke** wahan rakhta hai jahan gaadi sach mein chalna shuru hui thi (pichhli readings dekh ke), wahan nahi jahan 200 m poore hue.
+- **Chalti gaadi:** "Pichhle 3 minute ki koi reading abhi wali se 200 m door hai?" Nahi → gaadi ruk gayi, trip band, stop shuru.
+- Ye **distance** pe chalta hai, har reading ke `MOVING/STOPPED` pe nahi. Isliye khadi gaadi ka GPS jitter (10-50 m idhar udhar) kabhi fake trip nahi banata.
+- **Chup device (gap > 1 ghanta):** trip aakhri reading pe band. Agar is beech gaadi saaf saaf kahin aur pahunch gayi (200 m se zyada, theek speed pe) to stop → trip → stop record hota hai.
+- **Device doosri gaadi mein lag gaya** (`device_assignment` badla) → khuli trip band. Ek trip kabhi do gaadiyon ki nahi hoti. Tenant/gaadi har reading ke **apne time** wale assignment se aate hain.
+
+**Code kahan hai:**
+
+| Kya | Kahan |
+|---|---|
+| Pure function `updateState(state, reading, settings)` → naya state + events + trips + stops. Spring nahi, DB nahi | `gps-processing/.../trip/TripMotionProcessor.java` |
+| Uske tests – Traccar wali drive ka replay (reading 10 pe MOVING, reading 40 pe STOPPED), late reading, gap, jitter, gaadi badalna | `gps-processing/src/test/.../trip/TripMotionProcessorTest.java` |
+| Kafka listener (group `gps-trip-service`, 3 threads) | `gps-connectivity/.../kafka/TripDetectionListener.java` |
+| Ek reading = ek transaction | `gps-application/.../trip/TripDetectionService.java` |
+| SQL (guarded upserts) | `VehicleMotionStateStore`, `TripAndStopStore` |
+| Tables | `V3__create_vehicle_motion_state_table.sql`, `V4__create_gps_trip_and_gps_stop_tables.sql` |
+
+**Ek reading ka safar (ek transaction):**
+1. `vehicle_motion_state` se device ki state padho.
+2. Reading `last_recorded_at` se nayi nahi hai → **skip**. Late reading (`arrivedOutOfOrder`) ho to `gps_trip_late_reading` mein ek baar note + us trip ka `late_reading_count` +1. Distance mein kuch nahi judta.
+3. Pure function naya state + badli hui trips/stops nikalta hai.
+4. State save – `WHERE last_recorded_at < :recordedAt`. 0 rows = kisi aur delivery ne pehle hi laga diya → rollback, aage kuch nahi likhna.
+5. Trips aur stops `(imei, start_recorded_at)` pe **upsert**. Khuli trip (`OPEN`) har reading pe lambi hoti hai; band hone pe `CLOSED`.
+
+**Traccar ki galtiyan jo yahan nahi hongi:**
+- Traccar ne ek 5 minute late reading se trip ka distance **-1020 m** bana diya tha (odometer end − start). Yahan distance = in-order readings ke `distanceFromPreviousMeters` ka **jod**, late reading kuch nahi jodti, aur table mein `CHECK (distance_m >= 0)` bhi hai.
+- Traccar mein unique key nahi hai, to same reading do baar save ho gayi. Yahan `UNIQUE (imei, start_recorded_at)` + guarded state update.
+
+**Dekho kya bana:**
+```powershell
+Invoke-RestMethod http://localhost:8080/api/trips/count
+Invoke-RestMethod "http://localhost:8080/api/trips?imei=0861000000000001"
+Invoke-RestMethod "http://localhost:8080/api/stops?imei=0861000000000001&from=2026-10-19T00:00:00Z&to=2026-10-20T00:00:00Z"
+docker compose logs gps-service | Select-String "stage=trip-detection"    # "started a trip" / "stopped" lines
+```
+Dashboard pe naya box: **Trips & stops → PostgreSQL** (msg/s aur lag).
+
+**Abhi nahi hai (aage):** `gps.events` topic pe `DEVICE_MOVING/STOPPED` events (roadmap step 3), per-vehicle/tenant settings, aur late readings wali trips ko `gps_position` se dobara calculate karne wala repair job.
+
+---
+
+## 16. Engine dashboard aur REST APIs
 
 **Dashboard** (http://localhost:8080) har 2 second refresh:
 - **Producers:** msg/sec, 60 second ki sparkline, total, failures, devices, har partition ka load.
@@ -357,6 +419,9 @@ Load counters (`PipelineMetrics`, `StageCounters`) memory mein hain – har mess
 | `GET /api/gps-positions/count` | DB mein kitni positions |
 | `GET /api/gps-positions/recently-stored` | Last 20 saved |
 | `GET /api/vehicles/{registrationNo}/latest-position` | Gaadi ki latest position |
+| `GET /api/trips?imei=…&from=…&to=…` | Trips jo is period se overlap karti hain (imei na do to sab devices, from/to na do to last 24 ghante) |
+| `GET /api/stops?imei=…&from=…&to=…` | Stops, same rules |
+| `GET /api/trips/count` | Kitni trips/stops OPEN aur CLOSED |
 | `GET /actuator/health` | DB + Redis UP/DOWN |
 
 Try karo – ek kharab frame:
@@ -368,7 +433,7 @@ Log mein dikhega: `Frame rejected: Latitude 95.0 is outside -90..90`.
 
 ---
 
-## 16. Classified logs – har line bataye kaun, kis truck ka, kahan se
+## 17. Classified logs – har line bataye kaun, kis truck ka, kahan se
 
 Message handle hote waqt `PipelineLogContext` MDC mein stage, IMEI, partition, offset daal deta hai. Log pattern har line pe print karta hai:
 
@@ -385,7 +450,7 @@ Har message ki debug line chahiye: `LOGGING_LEVEL_COM_SRM_GPS=DEBUG`.
 
 ---
 
-## 17. Maven modules – har module ka ek hi kaam
+## 18. Maven modules – har module ka ek hi kaam
 
 Kuch toota → kis module mein dekhna hai, turant pata.
 
@@ -393,8 +458,8 @@ Kuch toota → kis module mein dekhna hai, turant pata.
 |---|---|---|
 | `gps-configuration` | Topic, group, flow, stage, Redis key ke naam; message formats (records); JSON. **Plain Java** | Do hisse ek naam ya JSON field pe agree nahi kar rahe |
 | `gps-connectivity` | Bahar ki duniya se har connection: smart_truck reader, Kafka publishers/listeners/retry/inspector, Redis stores, Hibernate entities + repositories, load counters | Kuch connect/read/write nahi ho raha |
-| `gps-processing` | Processing logic: `GpsFrameProcessor` + `step/` + `rule/`. **Plain Java, poora unit tested** | Frames reject ho rahe ya distance/status galat |
-| `gps-application` | Spring Boot service: dono flows, simulator, master data, storage, live location, engine API + dashboard, Flyway migrations | Hisso ke beech ka flow galat hai |
+| `gps-processing` | Processing logic: `GpsFrameProcessor` + `step/` + `rule/`, aur trip detection `trip/`. **Plain Java, poora unit tested** | Frames reject ho rahe, distance/status galat, ya trip galat jagah shuru/band |
+| `gps-application` | Spring Boot service: dono flows, simulator, master data, storage, live location, trips, engine API + dashboard, Flyway migrations | Hisso ke beech ka flow galat hai |
 
 ```
 processing-layer/
@@ -403,7 +468,8 @@ processing-layer/
 ├─ gps-connectivity/    kafka/ (publishers, listeners, retry, topics, inspector)  redis/  database/  smarttruck/
 │                       flow/ (@OnlyInKafkaFlow, @OnlyInDirectFlow)  monitoring/ (metrics, MDC log context)
 ├─ gps-processing/      GpsFrameProcessor, step/ (validate, movement, previous reading), rule/ (validation, movement, distance)
-├─ gps-application/     flow/ (kafka, direct)  simulator/  masterdata/  storage/  livelocation/  rejection/
+│                       trip/ (TripMotionProcessor: trips aur stops, pure function)
+├─ gps-application/     flow/ (kafka, direct)  simulator/  masterdata/  storage/  livelocation/  trip/  rejection/
 │                       processing/  engine/  api/  resources/ (application.yml, db/migration, static/index.html)
 ├─ infrastructure/      windows/ (Kafka, PostgreSQL setup + start/stop)  docker/ (.env banane ki script)
 ├─ docs/                LEARNING_GUIDE.md, ENGINE_AND_DOCKER_GUIDE.md (English, aur bhi gehraai)
@@ -415,7 +481,7 @@ processing-layer/
 
 ---
 
-## 18. Passwords aur secrets kaise sambhale
+## 19. Passwords aur secrets kaise sambhale
 
 - `application.yml` mein **koi password nahi**.
 - `local-secrets.properties` (git-ignored) mein passwords – template: `local-secrets.example.properties`.
@@ -424,7 +490,7 @@ processing-layer/
 
 ---
 
-## 19. Docker se chalao (recommended)
+## 20. Docker se chalao (recommended)
 
 **Containers:**
 
@@ -474,7 +540,7 @@ Dusra image naam chahiye to `.env` mein `GPS_SERVICE_IMAGE=...` set karo.
 
 ---
 
-## 20. Bina Docker ke chalao (Windows, D:\dev)
+## 21. Bina Docker ke chalao (Windows, D:\dev)
 
 | Software | Version | Kahan |
 |---|---|---|
@@ -501,7 +567,7 @@ Tests: `.\mvnw.cmd test`
 
 ---
 
-## 21. Windows ke nakhre (quirks)
+## 22. Windows ke nakhre (quirks)
 
 - **`SocketException: Invalid argument: connect`** – Java ka unix-domain socket temp folder wala issue. Start scripts `-Djdk.net.unixdomain.tmpdir=D:\dev\data\tmp` pass karte hain. Kafka CLI tools ke liye `$env:KAFKA_OPTS` mein yahi flag daalo.
 - PostgreSQL portable hai, `psql` nahi hai – check karna ho to Python `psycopg2` chalta hai.
@@ -509,21 +575,21 @@ Tests: `.\mvnw.cmd test`
 
 ---
 
-## 22. Kuch toot jaye to kahan dekhein (troubleshooting)
+## 23. Kuch toot jaye to kahan dekhein (troubleshooting)
 
 | Kya dikh raha | Kahan dekho |
 |---|---|
-| `SocketException: Invalid argument: connect` | Upar section 21 |
+| `SocketException: Invalid argument: connect` | Upar section 22 |
 | Start pe Flyway ya "Schema-validation" error | `db/migration/*.sql` aur `gps-connectivity/.../database/entity` match nahi kar rahe |
 | Dashboard: ek consumer ka lag badhta ja raha | Wo consumer fail ho raha – uska `failures` badh raha hoga, log mein `stage=<wo consumer>` errors |
 | Dashboard: "Redis down" | `/actuator/health` → `redis`; Redis (ya `redis` container) start karo |
 | Simulator status "Failed: Send failed" | Kafka band hai – start karo |
-| Simulator "Failed: ... Access denied" Docker mein | Section 19, smart_truck wala part |
+| Simulator "Failed: ... Access denied" Docker mein | Section 20, smart_truck wala part |
 | Position save hui par vehicle/tenant khali | Us device ka `device_assignment` reading ke time ko cover nahi karta |
 
 ---
 
-## 23. Aage kya banana hai – roadmap
+## 24. Aage kya banana hai – roadmap
 
 Ye repo ab **starting point** hai. Agla kaam: Kafka ke baad processing layer ke **attachable modules** (plug-in consumers). Idea – railway junction: main track = topic, har naya platform = ek naya consumer group. Naya module jodna = ek Maven module + ek config line, baaki kuch nahi badlega.
 
@@ -542,13 +608,13 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 | 3 | **Speed violation** – 1 min lagatar > 60 km/h, device speed vs lat/lon se calculated speed cross-check, alert ek baar | 60 nahi, 1 alert |
 | 4 | **Stoppage** – ignition ON + < 2-3 km/h; ignition OFF → points neutralise (fake km nahi) | Khadi gaadi 0 km jode |
 | 5 | **Nested geofencing** – City → Depot → Loading bay, ENTER/EXIT | Events sahi |
-| 6 | **Trip detection** (master table) + **Kalman filter** se cumulative distance | Trip km route se match |
+| 6 | **Trip detection** (master table) + **Kalman filter** se cumulative distance – pehla version ban gaya: `gps-trip-service` (section 15) | Trip km route se match |
 | 7 | **Waypoint** + **route deviation** | Deviation alert |
 | 8 | Stoppage reason agent – weather (Open-Meteo) / traffic, alag consumer, hot path mein nahi | Stoppage pe reason |
 
 ---
 
-## 24. Interview ke tricky sawaal
+## 25. Interview ke tricky sawaal
 
 1. **Ek truck ke frames order mein kaise rehte hain?** Key = IMEI → same partition → group mein ek partition ek thread. Order partition ke andar guaranteed hai.
 2. **C2 aur C3 same topic padhte hain, ek doosre ko slow kyun nahi karte?** Alag groups, alag offsets. Dono ko poori copy milti hai.
@@ -559,13 +625,15 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 7. **Late ping (network wapas aaya)?** `arrivedOutOfOrder` – history mein jaata hai, live state/distance nahi bigadta.
 8. **Flink kyun hataya?** 150 trucks ke liye Spring kaafi; ek kam system chalana, ek jagah debug. Jo chhoda: Flink ka managed state, windows, exactly-once – interview mein ye honestly bolo.
 9. **Device ek gaadi se doosri mein shift hua to purani readings?** `device_assignment` periods mein hai – reading ke time wali gaadi milti hai.
+10. **Trip ka distance kabhi negative kyun nahi hoga?** Distance in-order readings ke legs ka jod hai, "end odometer − start" nahi. Late reading skip hoti hai (sirf ginti), aur DB mein `CHECK (distance_m >= 0)`.
+11. **Trip service ko same reading do baar mili to?** State update `WHERE last_recorded_at < :recordedAt` – doosri baar 0 rows, transaction rollback. Trip `(imei, start_recorded_at)` pe upsert, to duplicate row ban hi nahi sakti.
 
 ---
 
-## 25. Mental model – yaad rakhne ke liye 🧠
+## 26. Mental model – yaad rakhne ke liye 🧠
 
-> **3 trays, 3 producers, 4 kaam.**
-> Raw tray → 1 cleaner (jo agli do trays bhi bharta hai) → saaf tray ko 2 alag log padhte hain (DB aur Redis) → reject tray ko 1 logger.
+> **3 trays, 3 producers, 5 kaam.**
+> Raw tray → 1 cleaner (jo agli do trays bhi bharta hai) → saaf tray ko 3 alag log padhte hain (DB, Redis, trip diary) → reject tray ko 1 logger.
 > **Key = IMEI = order. Alag group = poori copy. Same group = kaam ka batwara.**
 
 Har application ko kaise start/stop/check karein aur uski main files kaunsi hain: [docs/APPLICATIONS_GUIDE.md](docs/APPLICATIONS_GUIDE.md).
