@@ -18,6 +18,9 @@ public final class KafkaConsumerGroupNames {
     /** Reads processed positions and keeps the latest position of every vehicle in Redis. */
     public static final String LIVE_LOCATION = "gps-live-location-service";
 
+    /** Reads processed positions, detects trips and stops, and keeps them in PostgreSQL. */
+    public static final String TRIP_DETECTION = "gps-trip-service";
+
     /** Reads rejected frames and writes them to the service log. */
     public static final String REJECTED_FRAME_LOGGER = "gps-rejected-frame-logger";
 

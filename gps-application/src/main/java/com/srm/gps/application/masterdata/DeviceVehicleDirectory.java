@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,7 +24,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DeviceVehicleDirectory {
 
     /** The vehicle of a device during one assignment period. validTo = null: still fitted. */
-    public record VehicleOfDevice(String vehicleRegistrationNo, String tenantCode, Instant validFrom, Instant validTo) {
+    public record VehicleOfDevice(UUID assignmentId, String vehicleRegistrationNo, String tenantCode,
+                                  Instant validFrom, Instant validTo) {
         boolean covers(Instant moment) {
             return !moment.isBefore(validFrom) && (validTo == null || moment.isBefore(validTo));
         }
@@ -52,7 +54,7 @@ public class DeviceVehicleDirectory {
     private static VehicleOfDevice toVehicleOfDevice(DeviceAssignment assignment) {
         Vehicle vehicle = assignment.getVehicle();
         Tenant owner = vehicle.getOwnerTenant();
-        return new VehicleOfDevice(vehicle.getRegistrationNo(), owner == null ? null : owner.getCode(),
+        return new VehicleOfDevice(assignment.getId(), vehicle.getRegistrationNo(), owner == null ? null : owner.getCode(),
                 assignment.getValidFrom(), assignment.getValidTo());
     }
 }

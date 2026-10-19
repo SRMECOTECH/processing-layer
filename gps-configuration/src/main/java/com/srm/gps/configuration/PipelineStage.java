@@ -20,10 +20,12 @@ public enum PipelineStage {
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.POSITION_STORAGE),
     LIVE_LOCATION(Kind.CONSUMER, "Keep latest position per vehicle in Redis",
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.LIVE_LOCATION),
+    TRIP_DETECTION(Kind.CONSUMER, "Detect trips and stops, keep them in PostgreSQL",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.TRIP_DETECTION),
     REJECTED_FRAME_LOGGER(Kind.CONSUMER, "Log rejected frames with the reason",
             KafkaTopicNames.REJECTED_FRAMES, KafkaConsumerGroupNames.REJECTED_FRAME_LOGGER),
 
-    DIRECT_PROCESSING(Kind.DIRECT, "Direct flow: process, store and update live location in one call",
+    DIRECT_PROCESSING(Kind.DIRECT, "Direct flow: process, store, update live location and trips in one call",
             null, null);
 
     public enum Kind { PRODUCER, CONSUMER, DIRECT }

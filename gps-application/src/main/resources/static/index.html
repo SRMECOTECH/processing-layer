@@ -119,7 +119,7 @@ document.getElementById('redisInsight').href = `http://${host}:8001`;
 const SHORT = {
   RAW_FRAME_PRODUCER: 'P1 frames', PROCESSED_POSITION_PRODUCER: 'P2 processed', REJECTED_FRAME_PRODUCER: 'P3 rejected',
   RAW_FRAME_PROCESSING: 'processing', POSITION_STORAGE: 'storage', LIVE_LOCATION: 'live location',
-  REJECTED_FRAME_LOGGER: 'rejected log', DIRECT_PROCESSING: 'direct'
+  TRIP_DETECTION: 'trips', REJECTED_FRAME_LOGGER: 'rejected log', DIRECT_PROCESSING: 'direct'
 };
 
 const fmt = n => n == null ? '–' : Number(n).toLocaleString();
@@ -180,6 +180,7 @@ function render(o) {
       box('Direct processing', rate(o.directFlow.messagesPerSecond), 'validate + movement') +
       box('Storage → PostgreSQL', rate(c.POSITION_STORAGE.load.messagesPerSecond), 'positions/s') +
       box('Live location → Redis', rate(c.LIVE_LOCATION.load.messagesPerSecond), 'updates/s') +
+      box('Trips & stops → PostgreSQL', rate(c.TRIP_DETECTION.load.messagesPerSecond), 'readings/s') +
       box('Rejected → log', rate(c.REJECTED_FRAME_LOGGER.load.messagesPerSecond), 'rejections/s');
   } else {
     document.getElementById('pipeline').innerHTML =
@@ -189,6 +190,7 @@ function render(o) {
       box('P2 → gps.processed-positions', rate(p.PROCESSED_POSITION_PRODUCER.messagesPerSecond), 'positions/s', true) +
       box('Storage → PostgreSQL', rate(c.POSITION_STORAGE.load.messagesPerSecond), `lag ${fmt(c.POSITION_STORAGE.totalLag)}`) +
       box('Live location → Redis', rate(c.LIVE_LOCATION.load.messagesPerSecond), `lag ${fmt(c.LIVE_LOCATION.totalLag)}`) +
+      box('Trips & stops → PostgreSQL', rate(c.TRIP_DETECTION.load.messagesPerSecond), `lag ${fmt(c.TRIP_DETECTION.totalLag)}`) +
       box('P3 → gps.rejected-frames', rate(p.REJECTED_FRAME_PRODUCER.messagesPerSecond), 'rejections/s', true) +
       box('Rejected logger', rate(c.REJECTED_FRAME_LOGGER.load.messagesPerSecond), `lag ${fmt(c.REJECTED_FRAME_LOGGER.totalLag)}`);
   }

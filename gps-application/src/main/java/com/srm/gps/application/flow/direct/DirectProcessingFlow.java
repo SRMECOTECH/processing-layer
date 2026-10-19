@@ -4,6 +4,7 @@ import com.srm.gps.application.flow.RawGpsFrameSender;
 import com.srm.gps.application.livelocation.LiveLocationService;
 import com.srm.gps.application.rejection.RejectedGpsFrameLoggingService;
 import com.srm.gps.application.storage.GpsPositionStorageService;
+import com.srm.gps.application.trip.TripDetectionService;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.ProcessingFlowNames;
 import com.srm.gps.configuration.json.GpsMessageJson;
@@ -22,15 +23,16 @@ import org.springframework.stereotype.Component;
 /**
  * The direct flow: no Kafka at all. One method call does everything:
  *
- *   raw frame -> processing -> accepted: store in PostgreSQL, then update the live position in Redis
+ *   raw frame -> processing -> accepted: store in PostgreSQL, update the live position in Redis, then trips and stops
  *                           -> rejected: write to the log
  *
  * Same processing, storage and live-location code as the Kafka flow - only the transport differs.
  * The difference to remember: nothing is buffered. If PostgreSQL is down, send() fails
  * and the caller gets the error; in the Kafka flow the frame would wait in Kafka instead.
  *
- * The live position is best effort here: PostgreSQL is the record, Redis only a fast copy,
- * so a Redis hiccup is logged instead of failing the frame.
+ * The live position and the trips are best effort here: the stored position is the record,
+ * so a Redis or trip-detection hiccup is logged instead of failing the frame.
+ * (A reading the trip detection missed is simply not part of a trip; the next one carries on.)
  *
  * synchronized: one frame at a time, so frames of one device are always processed in order.
  */
@@ -47,6 +49,7 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
     public DirectProcessingFlow(GpsFrameProcessor gpsFrameProcessor,
                                 GpsPositionStorageService gpsPositionStorageService,
                                 LiveLocationService liveLocationService,
+                                TripDetectionService tripDetectionService,
                                 RejectedGpsFrameLoggingService rejectedGpsFrameLoggingService,
                                 PipelineMetrics metrics) {
         this.gpsFrameProcessor = gpsFrameProcessor;
@@ -62,6 +65,13 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
                 } catch (RuntimeException redisProblem) {
                     metrics.recordFailure(PipelineStage.LIVE_LOCATION);
                     LOG.warn("Live position not updated: {}", redisProblem.getMessage());
+                }
+                try {
+                    tripDetectionService.handle(position);
+                    metrics.recordMessage(PipelineStage.TRIP_DETECTION, position.imei(), -1);
+                } catch (RuntimeException tripProblem) {
+                    metrics.recordFailure(PipelineStage.TRIP_DETECTION);
+                    LOG.warn("Trips not updated: {}", tripProblem.getMessage());
                 }
             }
 

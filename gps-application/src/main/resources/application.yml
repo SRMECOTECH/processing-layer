@@ -68,6 +68,14 @@ gps:
     replay-as-live: true
     repeat-forever: true
     start-when-application-starts: false
+  # Trip and stop detection (consumer group gps-trip-service), Traccar's defaults:
+  #   a trip starts once the vehicle is min-distance away from where it stopped,
+  #   it stops when it stays within min-distance for min-duration,
+  #   and a silence longer than stop-gap ends the trip at the last reading before the silence.
+  trips:
+    min-distance-meters: 200
+    min-duration-seconds: 180
+    stop-gap-seconds: 3600
 
 # Log classification: every line shows WHICH stage wrote it, for WHICH device, from WHICH partition/offset:
 #   WARN [stage=position-storage imei=0861000000000002 p=2 o=1534] ...
