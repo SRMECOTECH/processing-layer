@@ -455,10 +455,20 @@ docker compose up -d postgres redis
 $env:GPS_PROCESSING_FLOW='direct'; docker compose up -d --no-deps --build gps-service
 ```
 
-**Docker Hub image:** `srmecotech/processing-layer` – build kiye bina seedha pull karo:
+**Docker Hub image (public):** https://hub.docker.com/r/srmecotech/processing-layer – tags `latest`, `0.1.0` (~188 MB). Build kiye bina seedha pull karke chalao:
 ```powershell
-docker pull srmecotech/processing-layer:latest
+docker compose pull gps-service          # srmecotech/processing-layer:latest le aata hai
+docker compose up -d --no-build          # baaki containers + Hub wali image
 ```
+Naya version Hub pe daalna (pehle `docker login`):
+```powershell
+docker compose build gps-service
+docker tag srmecotech/processing-layer:latest srmecotech/processing-layer:0.1.1
+docker push srmecotech/processing-layer:0.1.1; docker push srmecotech/processing-layer:latest
+```
+Dusra image naam chahiye to `.env` mein `GPS_SERVICE_IMAGE=...` set karo.
+
+✅ **Verified 2026-10-19 (Docker Desktop 29.8, is machine pe):** 5 containers up, health UP (db + redis), 150 gaadiyan, 75 msg/s, chaaron consumer groups STABLE, lag 0, failures 0, Redis mein 150 live positions – Hub wali image se bhi.
 
 **smart_truck Docker ke andar se:** container Windows ki MySQL tak `host.docker.internal:3306` se pahunchta hai. MySQL bole `Access denied for user ... @'172.x.x.x'` → user sirf `localhost` se allowed hai. smart_truck ke owner se ek **read-only** user maango jo Docker se connect ho sake, aur `local-secrets.properties` mein daal do.
 
@@ -557,5 +567,7 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 > **3 trays, 3 producers, 4 kaam.**
 > Raw tray → 1 cleaner (jo agli do trays bhi bharta hai) → saaf tray ko 2 alag log padhte hain (DB aur Redis) → reject tray ko 1 logger.
 > **Key = IMEI = order. Alag group = poori copy. Same group = kaam ka batwara.**
+
+Har application ko kaise start/stop/check karein aur uski main files kaunsi hain: [docs/APPLICATIONS_GUIDE.md](docs/APPLICATIONS_GUIDE.md).
 
 English mein aur gehraai chahiye to: [docs/LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md) (Kafka, flows, har module) aur [docs/ENGINE_AND_DOCKER_GUIDE.md](docs/ENGINE_AND_DOCKER_GUIDE.md) (Docker, dashboard, Redis, logs).

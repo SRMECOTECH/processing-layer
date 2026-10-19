@@ -101,7 +101,8 @@ services:
 
   gps-service:
     build: .
-    image: gps-streaming-service:local
+    # Built locally with --build, or pulled ready-made from Docker Hub: docker compose pull gps-service
+    image: ${GPS_SERVICE_IMAGE:-srmecotech/processing-layer:latest}
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
