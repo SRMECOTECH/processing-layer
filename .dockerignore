@@ -4,6 +4,7 @@ local-secrets.properties
 **/target/
 docs/
 infrastructure/
+gps-dashboard-ui/
 *.log
 .idea/
 .vscode/

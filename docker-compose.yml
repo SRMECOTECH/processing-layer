@@ -6,6 +6,7 @@
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
+#   dashboard    our Next.js web UI    PulseStream dashboard               http://localhost:3000
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
@@ -128,6 +129,17 @@ services:
       kafka:
         condition: service_healthy
         required: false              # the direct flow runs without Kafka
+
+  dashboard:
+    build: ./gps-dashboard-ui
+    image: ${GPS_DASHBOARD_IMAGE:-srmecotech/processing-layer-dashboard:latest}
+    environment:
+      # The dashboard's server calls the service inside the compose network; the browser only talks to the dashboard.
+      GPS_API_URL: http://gps-service:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gps-service
 
 volumes:
   gps-postgres-data:

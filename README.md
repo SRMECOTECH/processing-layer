@@ -59,6 +59,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 
 | Link | Kya dikhega |
 |---|---|
+| http://localhost:3000 | **PulseStream IoT console** (Next.js, `gps-dashboard-ui/`) – operations UI: Stream Processors, Business Rules & Alerts, Ingestion & DB Sink, Telemetry Analytics, Developer |
 | http://localhost:8080 | **Engine dashboard** – 3 producers, 3 topics, consumers, har partition ka load, lag, IMEI filter, simulator start/stop button |
 | http://localhost:8085 | **Kafka UI** (Docker mein) – topics, messages, key (= IMEI) se search, consumer groups |
 | http://localhost:8001 | **RedisInsight** (Docker mein) – `gps:` se shuru hone wali saari keys |
@@ -431,6 +432,27 @@ Invoke-RestMethod -Method Post http://localhost:8080/api/simulator/send-single-f
 ```
 Log mein dikhega: `Frame rejected: Latitude 95.0 is outside -90..90`.
 
+### PulseStream IoT console (Next.js) – `gps-dashboard-ui/`
+
+Operations ka web UI, Google Stitch wale "Fleet Telematics Analytics Platform" design se bana. YouTube jaisa layout: upar bar (menu, search, live Kafka rate, alerts, appearance), section tabs, aur har section ki apni left menu. Off-white background + navy accent – sliders icon se white/warm aur sky blue bhi chun sakte ho. Browser sirf dashboard (`:3000`) se baat karta hai, dashboard ka server `/api/*` ko service (`GPS_API_URL`, default `http://localhost:8080`) tak forward karta hai.
+
+| Section (tab) | Left menu ke sub-pages |
+|---|---|
+| **Stream Processors** | Pipeline overview, Vehicle state (Redis live), Speed violation, Stoppage & ignition, Nested geofencing, Waypoints & corridors, Kalman filter distance |
+| **Business Rules & Alerts** | Over-speed verification, Trip detection master, Route deviation, Dispatch & escalations, Ingest audit queue |
+| **Ingestion & DB Sink** | Schema validation gate, PostgreSQL sink, ClickHouse OLAP sink, Worker health & backpressure |
+| **Telemetry Analytics** | Live stream telemetry, Latency & backpressure, Violations & anomalies, Vehicle state & trip efficiency |
+| **Developer** | Engineering pages: engine overview, producers & consumers, trips/stops/readings, topics & storage |
+
+Har card pe likha hota hai data kahan se aaya: **Live** (service se) ya **Demo data** (backend abhi nahi banata – Redis rule config, AI traffic/weather, geofence, corridors, Kalman, ClickHouse, dispatch webhooks).
+
+```powershell
+cd gps-dashboard-ui
+npm install          # pehli baar
+npm run dev          # http://localhost:3000  (service :8080 pe chalni chahiye)
+```
+Docker mein `docker compose up -d --build` isko `dashboard` service ke naam se khud chala deta hai.
+
 ---
 
 ## 17. Classified logs – har line bataye kaun, kis truck ka, kahan se
@@ -521,7 +543,7 @@ docker compose up -d postgres redis
 $env:GPS_PROCESSING_FLOW='direct'; docker compose up -d --no-deps --build gps-service
 ```
 
-**Docker Hub image (public):** https://hub.docker.com/r/srmecotech/processing-layer – tags `latest`, `0.1.0` (~188 MB). Build kiye bina seedha pull karke chalao:
+**Docker Hub image (public):** https://hub.docker.com/r/srmecotech/processing-layer – tags `latest`, `0.1.1` (trips and stops), `0.1.0` (~188 MB). Build kiye bina seedha pull karke chalao:
 ```powershell
 docker compose pull gps-service          # srmecotech/processing-layer:latest le aata hai
 docker compose up -d --no-build          # baaki containers + Hub wali image

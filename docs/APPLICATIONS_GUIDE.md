@@ -33,6 +33,7 @@ Socho humari ek **courier company** hai:
 | 5 | **RedisInsight** | Redis ke andar dekhna (browser) | – | http://localhost:8001 | Docker only |
 | 6 | **Kafka UI** | Kafka ke andar dekhna (browser) | – | http://localhost:8085 | Docker only |
 | 7 | **gps-streaming-service** (Spring Boot) | Simulator, processing, storage, live location, logger, dashboard, API | http://localhost:8080 | http://localhost:8080 | Humara – **yahi asli app hai** |
+| 8 | **gps-dashboard-ui** (Next.js) | PulseStream IoT console – operations UI (4 sections + Developer), service ki APIs pe chalta hai | http://localhost:3000 (`npm run dev`) | http://localhost:3000 | Humara – sirf UI, service ke bina kuch nahi dikhata |
 
 **Kaun kis pe depend karta hai:**
 
