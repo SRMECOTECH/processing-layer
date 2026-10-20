@@ -31,7 +31,9 @@ public class DatabaseBackedPreviousReadingStore extends InMemoryPreviousReadingS
         }
 
         Optional<PreviousReading> fromDatabase = gpsPositionRepository.findFirstByImeiOrderByRecordedAtDesc(imei)
-                .map(stored -> new PreviousReading(stored.getRecordedAt(), stored.getLatitude(), stored.getLongitude()));
+                .map(stored -> new PreviousReading(stored.getRecordedAt(), stored.getLatitude(), stored.getLongitude(),
+                        stored.getTotalDistanceMeters() == null ? 0 : stored.getTotalDistanceMeters(),
+                        stored.getOdometerMeters()));
         fromDatabase.ifPresent(reading -> rememberLatestReading(imei, reading));
         return fromDatabase;
     }

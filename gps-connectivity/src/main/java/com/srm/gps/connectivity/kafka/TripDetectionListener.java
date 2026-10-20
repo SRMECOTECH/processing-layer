@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OnlyInKafkaFlow
-public class TripDetectionListener {
+public class TripDetectionListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.TRIP_DETECTION;
 

@@ -59,15 +59,62 @@ gps:
   # Override at start-up:  --gps.processing-flow=direct
   processing-flow: kafka
   simulator:
-    # 150 different vehicles, one ping each every 2 s = 75 frames per second.
     vehicle-count: 150
     pings-per-vehicle: 500
     minimum-pings-per-trip: 200
-    delay-between-rounds-millis: 2000
-    # Stamp frames with the current time and keep driving the trips back and forth, so data keeps coming.
+    # Re-stamp the trips around the current time and keep driving them back and forth, so data keeps coming.
     replay-as-live: true
     repeat-forever: true
     start-when-application-starts: false
+    # faithful: every ping keeps its real gap (about 1 minute in smart_truck), so speed from distance/time, the
+    #           60-second over-speed rule, 3-minute stops and idling are real. The replay starts catch-up-minutes
+    #           in the past and runs catch-up-speed-factor times faster until it reaches now, then real time
+    #           (150 vehicles: about 75 frames/s while catching up, about 2.5 frames/s live).
+    # compressed: the old way - one ping of every vehicle every delay-between-rounds-millis, stamped now.
+    timing: faithful
+    catch-up-minutes: 120
+    catch-up-speed-factor: 30
+    delay-between-rounds-millis: 2000
+    # smart_truck has no ignition or odometer, so the simulator adds them for a share of the devices
+    # (the rest exercise virtual ignition and GPS distance); idling drivers keep the engine on while standing.
+    devices-with-ignition: 0.5
+    devices-with-odometer: 0.5
+    idling-devices: 0.25
+  # Distance step (Traccar DistanceHandler + FilterHandler maxSpeed), see CalculateMovementStep.
+  distance:
+    jitter-meters: 10
+    jitter-max-speed-kmph: 5
+    max-implied-speed-kmph: 200
+    min-jump-meters: 500
+  # The four stream consumers after Kafka (speed violation, vehicle state, stoppage, ignition).
+  # Speed rules are NOT here: they live in Redis (gps:config:speed-rule:*) and are edited from the UI or
+  # PUT /api/speed/rules/{scope}; the default rule is created on first start.
+  stream:
+    history-length: 1000
+    stoppage:
+      radius-meters: 100
+      min-duration-seconds: 180
+      stationary-speed-kmph: 3
+      exit-confirm-readings: 2
+      max-gap-seconds: 1800
+      merge-gap-seconds: 180
+    ignition:
+      virtual-off-after-seconds: 300
+      idle-speed-kmph: 3
+      idle-alert-seconds: 300
+      virtual-debounce-readings: 2
+    vehicle-state:
+      gps-sigma-meters: 12
+      acceleration-sigma: 1.5
+    enrichment:
+      weather-enabled: true
+      weather-url: https://api.open-meteo.com/v1/forecast
+      tomtom-api-key: ${TOMTOM_API_KEY:}
+      traffic-radius-meters: 1000
+      timeout-millis: 3000
+  # "Empty DB" for demo practice (POST /api/admin/reset). Switch off anywhere that is not a demo.
+  admin:
+    reset-enabled: true
   # Trip and stop detection (consumer group gps-trip-service), Traccar's defaults:
   #   a trip starts once the vehicle is min-distance away from where it stopped,
   #   it stops when it stays within min-distance for min-duration,

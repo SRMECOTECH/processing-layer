@@ -61,6 +61,9 @@ public class GpsPositionStorageService implements ProcessedGpsPositionHandler {
                 position.distanceFromPreviousMeters(),
                 position.secondsSincePreviousReading(),
                 position.arrivedOutOfOrder(),
-                position.processedAt()));
+                position.processedAt())
+                .withDistanceDetails(position.totalDistanceMeters(),
+                        position.distanceSource() == null ? null : position.distanceSource().name(),
+                        position.ignition(), position.odometerMeters()));
     }
 }

@@ -81,6 +81,7 @@ function SearchBox() {
       .map((p) => ({ href: p.href, title: p.label, hint: p.section }));
     if (/^\d{3,}$/.test(q)) {
       pages.unshift({ href: `/stream/vehicle-state?imei=${q}`, title: `Vehicles with IMEI containing ${q}`, hint: "Vehicle State" });
+      pages.unshift({ href: `/stream/tracking?imei=${q}`, title: `Track vehicle ${q}`, hint: "Vehicle Tracking" });
     }
     return pages;
   }, [query]);

@@ -13,6 +13,7 @@ import java.time.Instant;
  * @param latitude             d_lat
  * @param longitude            d_long
  * @param speedKmph            i_speed
+ * @param distanceMeters       i_dist: smart_truck's own distance from the previous ping of the trip (metres)
  */
 public record SmartTruckGpsPing(
         long tripNumber,
@@ -22,5 +23,6 @@ public record SmartTruckGpsPing(
         Instant recordedAt,
         double latitude,
         double longitude,
-        int speedKmph) {
+        int speedKmph,
+        int distanceMeters) {
 }

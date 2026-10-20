@@ -3,6 +3,7 @@ package com.srm.gps.processing;
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.RejectedGpsFrame;
 import com.srm.gps.processing.step.CalculateMovementStep;
+import com.srm.gps.processing.step.DistanceSettings;
 import com.srm.gps.processing.step.PreviousReading;
 import com.srm.gps.processing.step.PreviousReadingStore;
 import com.srm.gps.processing.step.ValidateRawFrameStep;
@@ -35,11 +36,16 @@ import java.util.Optional;
 public final class GpsFrameProcessor {
 
     private final ValidateRawFrameStep validateRawFrameStep = new ValidateRawFrameStep();
-    private final CalculateMovementStep calculateMovementStep = new CalculateMovementStep();
+    private final CalculateMovementStep calculateMovementStep;
     private final PreviousReadingStore previousReadingStore;
 
     public GpsFrameProcessor(PreviousReadingStore previousReadingStore) {
+        this(previousReadingStore, DistanceSettings.defaults());
+    }
+
+    public GpsFrameProcessor(PreviousReadingStore previousReadingStore, DistanceSettings distanceSettings) {
         this.previousReadingStore = previousReadingStore;
+        this.calculateMovementStep = new CalculateMovementStep(distanceSettings);
     }
 
     public void process(String rawFrameJson, ProcessingResultHandler resultHandler) {
@@ -65,8 +71,10 @@ public final class GpsFrameProcessor {
 
                 // Step 3: remember it - but a late (older) reading must not replace the newest one we know about.
                 if (!position.arrivedOutOfOrder()) {
-                    previousReadingStore.rememberLatestReading(imei,
-                            new PreviousReading(position.recordedAt(), position.latitude(), position.longitude()));
+                    previousReadingStore.rememberLatestReading(imei, new PreviousReading(
+                            position.recordedAt(), position.latitude(), position.longitude(),
+                            position.totalDistanceMeters() == null ? 0 : position.totalDistanceMeters(),
+                            position.odometerMeters()));
                 }
             }
         }

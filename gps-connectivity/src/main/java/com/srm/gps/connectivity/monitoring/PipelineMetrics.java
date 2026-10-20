@@ -40,4 +40,11 @@ public class PipelineMetrics {
     public StageSnapshot snapshot(PipelineStage stage) {
         return countersByStage.get(stage).snapshot(stage, Instant.now());
     }
+
+    /** Starts every counter from 0 again (demo reset). */
+    public void reset() {
+        for (PipelineStage stage : PipelineStage.values()) {
+            countersByStage.put(stage, new StageCounters());
+        }
+    }
 }

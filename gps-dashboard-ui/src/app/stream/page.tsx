@@ -4,6 +4,7 @@ import { Activity, Network, Workflow } from "lucide-react";
 import { AreaChart } from "@/components/ops/charts";
 import { Card, Empty, PageTitle, Tag, Tile } from "@/components/ops/kit";
 import { FleetButton } from "@/components/simulator-control";
+import { EmptyDbButton } from "@/components/ops/empty-db";
 import { formatAgo, formatNumber, formatRate } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";
 import { STAGE, consumer, ingress, isHealthyGroupState, isKafkaFlow, producer, stageName, storage } from "@/lib/pipeline";
@@ -57,6 +58,7 @@ export default function PipelinePage() {
               </div>
             </div>
             <FleetButton />
+            <EmptyDbButton />
           </div>
         }
       >

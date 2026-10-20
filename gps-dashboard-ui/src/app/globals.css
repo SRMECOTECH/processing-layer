@@ -1273,6 +1273,207 @@ svg {
   color: #ffffff;
 }
 
+.btn.danger-soft {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.btn.danger-soft:hover {
+  background: color-mix(in srgb, var(--bad-soft) 75%, var(--bad) 12%);
+}
+
+/* modal */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(12, 20, 36, 0.36);
+  backdrop-filter: blur(2px);
+  animation: fade var(--fast) var(--ease) both;
+}
+
+.modal {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  animation: pop var(--medium) var(--ease) both;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.modal-list {
+  margin: 0;
+  padding: 12px 16px 12px 32px;
+  border-radius: 12px;
+  background: var(--tile);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.modal-list.warn {
+  margin-top: 12px;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* vehicle tracking window */
+
+.tracking {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.tracking-list {
+  position: sticky;
+  top: calc(var(--header-h) + 16px);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  max-height: calc(100vh - var(--header-h) - 40px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.tracking-list .input-box {
+  max-width: none;
+}
+
+.tracking-count {
+  font-size: 12px;
+}
+
+.tracking-rows {
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+
+.tracking-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.tracking-row:hover {
+  background: var(--hover);
+}
+
+.tracking-row.active {
+  background: var(--accent-soft);
+}
+
+.tracking-row-main {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.tracking-row-side {
+  display: grid;
+  justify-items: end;
+  font-size: 12px;
+}
+
+.tracking-row-side .faint {
+  font-size: 11px;
+}
+
+.cache-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.cache-field {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.cache-name {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.cache-value {
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+@media (max-width: 1100px) {
+  .tracking {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tracking-list {
+    position: static;
+    max-height: 340px;
+  }
+}
+
+/* form grid (speed rules) */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.form-grid .input-box {
+  max-width: none;
+}
+
 .field {
   display: grid;
   gap: 6px;

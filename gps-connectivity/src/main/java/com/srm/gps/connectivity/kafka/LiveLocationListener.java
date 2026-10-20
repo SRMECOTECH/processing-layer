@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OnlyInKafkaFlow
-public class LiveLocationListener {
+public class LiveLocationListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.LIVE_LOCATION;
 

@@ -51,7 +51,11 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
                                 LiveLocationService liveLocationService,
                                 TripDetectionService tripDetectionService,
                                 RejectedGpsFrameLoggingService rejectedGpsFrameLoggingService,
-                                PipelineMetrics metrics) {
+                                PipelineMetrics metrics,
+                                com.srm.gps.application.streaming.SpeedViolationService speedViolationService,
+                                com.srm.gps.application.streaming.VehicleStateService vehicleStateService,
+                                com.srm.gps.application.streaming.StoppageService stoppageService,
+                                com.srm.gps.application.streaming.IgnitionService ignitionService) {
         this.gpsFrameProcessor = gpsFrameProcessor;
         this.metrics = metrics;
         this.storeOrLogResult = new ProcessingResultHandler() {
@@ -72,6 +76,22 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
                 } catch (RuntimeException tripProblem) {
                     metrics.recordFailure(PipelineStage.TRIP_DETECTION);
                     LOG.warn("Trips not updated: {}", tripProblem.getMessage());
+                }
+                // The four stream consumers, in the order the Kafka flow usually finishes them; ignition first
+                // so the stoppage consumer sees this reading's virtual ignition.
+                bestEffort(PipelineStage.IGNITION, position, ignitionService::handle);
+                bestEffort(PipelineStage.VEHICLE_STATE, position, vehicleStateService::handle);
+                bestEffort(PipelineStage.SPEED_VIOLATION, position, speedViolationService::handle);
+                bestEffort(PipelineStage.STOPPAGE_DETECTION, position, stoppageService::handle);
+            }
+
+            private void bestEffort(PipelineStage stage, ProcessedGpsPosition position, java.util.function.Consumer<ProcessedGpsPosition> step) {
+                try {
+                    step.accept(position);
+                    metrics.recordMessage(stage, position.imei(), -1);
+                } catch (RuntimeException problem) {
+                    metrics.recordFailure(stage);
+                    LOG.warn("{} not updated: {}", stage.label(), problem.getMessage());
                 }
             }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useEffect, useState } from "react";
 import { Car, MapPinned } from "lucide-react";
@@ -107,7 +108,9 @@ function VehicleState() {
                   <tr key={v.imei} className={v.speedKmph > SPEED_LIMIT ? "flagged" : undefined}>
                     <td>
                       <span className={`dot ${v.moving ? "" : "muted"}`} />
-                      <span className="mono">{v.registrationNo || "Unassigned"}</span>
+                      <Link className="link mono" href={`/stream/tracking?imei=${v.imei}`} title="Open in the tracking window">
+                        {v.registrationNo || "Unassigned"}
+                      </Link>
                     </td>
                     <td className="mono muted">{v.imei}</td>
                     <td className="mono">

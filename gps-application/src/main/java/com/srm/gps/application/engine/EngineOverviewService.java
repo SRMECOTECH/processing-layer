@@ -37,7 +37,8 @@ import java.util.TreeSet;
 public class EngineOverviewService {
 
     private static final List<String> TOPICS = List.of(
-            KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS, KafkaTopicNames.REJECTED_FRAMES);
+            KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS, KafkaTopicNames.REJECTED_FRAMES,
+            KafkaTopicNames.VEHICLE_EVENTS);
     private static final long STORED_COUNT_CACHE_MILLIS = 5_000;
     private static final int MAXIMUM_DEVICES_LISTED = 300;
 

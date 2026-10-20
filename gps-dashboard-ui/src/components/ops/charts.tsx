@@ -12,7 +12,21 @@ export type AreaSeries = { name: string; values: number[]; strong?: boolean };
  * Two filled lines over the last minute (real per-second counts), averaged over `averageSeconds`
  * because the simulator sends each vehicle once per 2 s round. Hover reads any moment.
  */
-export function AreaChart({ series: raw, averageSeconds = 6, unit = "msg/s" }: { series: AreaSeries[]; averageSeconds?: number; unit?: string }) {
+export function AreaChart({
+  series: raw,
+  averageSeconds = 6,
+  unit = "msg/s",
+  axis,
+  pointLabel,
+}: {
+  series: AreaSeries[];
+  averageSeconds?: number;
+  unit?: string;
+  /** Labels under the chart (start, middle, end); defaults to seconds ago. */
+  axis?: [string, string, string];
+  /** Readout for a hovered point; defaults to "N s ago". */
+  pointLabel?: (index: number, length: number) => string;
+}) {
   const id = useId().replace(/:/g, "");
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -33,7 +47,7 @@ export function AreaChart({ series: raw, averageSeconds = 6, unit = "msg/s" }: {
             {s.name} <b className="mono">{formatRate(s.values[index] ?? 0)}</b> {unit}
           </span>
         ))}
-        <span className="muted">{hover === null ? "now" : `${length - index} s ago`}</span>
+        <span className="muted">{hover === null ? "now" : pointLabel ? pointLabel(index, length) : `${length - index} s ago`}</span>
       </div>
       <div
         className="area-plot"
@@ -73,9 +87,9 @@ export function AreaChart({ series: raw, averageSeconds = 6, unit = "msg/s" }: {
         </svg>
       </div>
       <div className="area-axis mono">
-        <span>T-{length}s</span>
-        <span>T-{Math.round(length / 2)}s</span>
-        <span className="accent-text">T-0s (current)</span>
+        <span>{axis ? axis[0] : `T-${length}s`}</span>
+        <span>{axis ? axis[1] : `T-${Math.round(length / 2)}s`}</span>
+        <span className="accent-text">{axis ? axis[2] : "T-0s (current)"}</span>
       </div>
     </div>
   );

@@ -18,6 +18,9 @@ public final class KafkaTopicNames {
     /** Frames the processing refused, together with the reason. Useful for debugging devices. */
     public static final String REJECTED_FRAMES = "gps.rejected-frames";
 
+    /** Events the stream consumers raise (over-speed, stoppage, ignition ...). Key = IMEI. */
+    public static final String VEHICLE_EVENTS = "gps.vehicle-events";
+
     /** Number of partitions per topic. Frames of one device always land in the same partition (keyed by IMEI). */
     public static final int PARTITIONS_PER_TOPIC = 3;
 

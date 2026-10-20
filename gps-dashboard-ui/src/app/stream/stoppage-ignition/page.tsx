@@ -1,139 +1,101 @@
 "use client";
 
-import { CloudRain, OctagonAlert, Power, Sparkles, TrafficCone } from "lucide-react";
-import { Card, DemoButton, Empty, PageTitle, Tag, Tile } from "@/components/ops/kit";
-import { formatCoordinate, formatDateTime, formatDuration, formatNumber, vehicleName } from "@/lib/format";
-import type { StopView, TripCounts } from "@/lib/types";
+import { CloudSun, OctagonAlert, Power, TrafficCone } from "lucide-react";
+import { EventTable } from "@/components/ops/events";
+import { Card, KeyValues, PageTitle, Segmented, Tile } from "@/components/ops/kit";
+import { formatNumber } from "@/lib/format";
+import type { EventTypeCount, VehicleEventView } from "@/lib/types";
 import { usePoll } from "@/lib/use-poll";
+import { useState } from "react";
+
+type View = "STOPPAGE" | "PARKED" | "IDLING" | "IGNITION_ON,IGNITION_OFF";
 
 export default function StoppagePage() {
-  const stops = usePoll<StopView[]>("/api/stops?limit=500", 5000);
-  const counts = usePoll<TripCounts>("/api/trips/count", 5000);
-  const standing = (stops.data ?? []).filter((s) => s.status === "OPEN");
-  const longest = [...standing].sort((a, b) => b.durationSeconds - a.durationSeconds).slice(0, 10);
+  const [view, setView] = useState<View>("STOPPAGE");
+  const summary = usePoll<EventTypeCount[]>("/api/events/summary", 5000);
+  const stoppages = usePoll<VehicleEventView[]>("/api/events?type=STOPPAGE&limit=300", 5000);
+  const listed = usePoll<VehicleEventView[]>(`/api/events?type=${view}&limit=40`, 4000);
+  const count = (type: string) => summary.data?.find((s) => s.type === type);
+
+  const verdicts = new Map<string, number>();
+  let weatherChecked: Record<string, unknown> | undefined;
+  for (const e of stoppages.data ?? []) {
+    const verdict = String(e.details.contextVerdict ?? "PENDING");
+    verdicts.set(verdict, (verdicts.get(verdict) ?? 0) + 1);
+    if (!weatherChecked && e.details.weather) weatherChecked = e.details.weather as Record<string, unknown>;
+  }
+  const justified = [...verdicts.entries()].filter(([v]) => v.startsWith("JUSTIFIED")).reduce((a, [, n]) => a + n, 0);
 
   return (
     <div className="stack">
       <PageTitle
         title="Stoppage and ignition"
-        subtitle="Stoppages are judged on time and distance travelled, then checked against traffic and weather. With the ignition off there is nothing to alarm on, so those points are neutralised."
+        subtitle="Stops are found from time and distance travelled (real-time speed, not just the speedometer). Engine on while standing is a stoppage alarm, checked by the traffic and weather agents; engine off is parking and is neutralised."
       />
 
-      <Card
-        icon={Power}
-        title="Vehicles standing now"
-        subtitle="Open stops from trip detection, longest first."
-        live
-      >
-        <div className="grid-3" style={{ marginBottom: 16 }}>
-          <Tile label="Standing now" value={counts.data?.openStops} big />
-          <Tile label="Stops recorded" value={counts.data?.closedStops} big />
-          <Tile label="Longest standing" value={longest[0] ? formatDuration(longest[0].durationSeconds) : undefined} big />
-        </div>
-        {longest.length === 0 ? (
-          <Empty>{stops.data ? "No vehicle is standing right now." : "Waiting for the service."}</Empty>
-        ) : (
-          <div className="data-table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Vehicle</th>
-                  <th>Since</th>
-                  <th className="right">Standing for</th>
-                  <th>Location</th>
-                  <th className="right">Readings</th>
-                </tr>
-              </thead>
-              <tbody>
-                {longest.map((s) => (
-                  <tr key={`${s.imei}-${s.startRecordedAt}`}>
-                    <td className="mono">{vehicleName(s.vehicleRegistrationNo, s.imei)}</td>
-                    <td className="muted">{formatDateTime(s.startRecordedAt)}</td>
-                    <td className="right mono">{formatDuration(s.durationSeconds)}</td>
-                    <td className="mono muted">{formatCoordinate(s.latitude, s.longitude)}</td>
-                    <td className="right mono">{formatNumber(s.readingCount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      <div className="grid-4">
+        <Tile label="Stoppages now (engine on)" value={count("STOPPAGE")?.openNow ?? 0} tone={(count("STOPPAGE")?.openNow ?? 0) > 0 ? "accent" : undefined} big foot={`${count("STOPPAGE")?.last24Hours ?? 0} in 24 hours`} />
+        <Tile label="Parked now (neutralised)" value={count("PARKED")?.openNow ?? 0} big foot={`${count("PARKED")?.last24Hours ?? 0} in 24 hours, no alarm`} />
+        <Tile label="Idling now" value={count("IDLING")?.openNow ?? 0} big foot="engine running, standing over 5 min" />
+        <Tile label="Ignition changes (24 h)" value={(count("IGNITION_ON")?.last24Hours ?? 0) + (count("IGNITION_OFF")?.last24Hours ?? 0)} big foot="device wire or virtual" />
+      </div>
 
-      <Card
-        icon={OctagonAlert}
-        title="Stoppage and ignition unit"
-        subtitle="AI traffic and ambient context enrichment"
-        monoSubtitle
-        badges={<Tag mono>Heuristic v4.1</Tag>}
-        live={false}
-      >
-        <div className="grid-2">
-          <div className="inner">
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <strong>Ignition state: ON</strong>
-              <Tag tone="ink">MONITORING</Tag>
-            </div>
-            <p className="muted" style={{ fontSize: 13 }}>
-              Vehicle active: evaluates movement thresholds (below 2 to 3 km/h continuously). Tracks dwell time against distance
-              travelled.
-            </p>
-            <p className="accent-text mono" style={{ marginTop: 10, fontSize: 12 }}>
-              Alert trigger: &gt; 180s stationary
-            </p>
-          </div>
-          <div className="inner">
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <strong>Ignition state: OFF</strong>
-              <Tag tone="neutral">AUTO-NEUTRALIZE</Tag>
-            </div>
-            <p className="muted" style={{ fontSize: 13 }}>
-              Auto-neutralises false stoppage alarms when the engine is intentionally shut down at depots or customer drop-offs.
-            </p>
-            <p className="mono" style={{ marginTop: 10, fontSize: 12 }}>
-              Suppression rate: 99.4% accuracy
-            </p>
-          </div>
-        </div>
-
-        <div className="inner" style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-            <strong>
-              <Sparkles size={15} style={{ verticalAlign: -2, marginRight: 6 }} />
-              Real-time AI enrichment status
-            </strong>
-            <span className="mono muted" style={{ fontSize: 12 }}>
-              API: OK (64ms)
+      <div className="grid-2">
+        <Card icon={TrafficCone} title="Why vehicles stopped" subtitle="Verdicts of the context agents on recent stoppages" live>
+          <KeyValues
+            rows={[
+              ["Explained by traffic", formatNumber(verdicts.get("JUSTIFIED_TRAFFIC") ?? 0)],
+              ["Explained by weather", formatNumber(verdicts.get("JUSTIFIED_WEATHER") ?? 0)],
+              ["Traffic and weather", formatNumber(verdicts.get("JUSTIFIED_TRAFFIC_AND_WEATHER") ?? 0)],
+              [<span className="bad" key="u">Unexplained (raised to HIGH)</span>, <span className="bad" key="n">{formatNumber(verdicts.get("UNEXPLAINED") ?? 0)}</span>],
+              ["Still being checked", formatNumber(verdicts.get("PENDING") ?? 0)],
+            ]}
+          />
+          <div className="card-foot">
+            <span>
+              {formatNumber(justified)} of {formatNumber(stoppages.data?.length ?? 0)} explained
             </span>
+            <span>Traffic: fleet vehicles with engine on within 1 km</span>
           </div>
-          <div className="grid-2">
-            <div className="tile" style={{ background: "var(--surface)" }}>
-              <div className="tile-label">
-                <span>Heavy congestion: Route 101</span>
-                <TrafficCone size={15} className="bad" />
-              </div>
-              <span className="muted" style={{ fontSize: 12.5 }}>
-                Validated: delay justified (average speed 4 km/h)
-              </span>
-            </div>
-            <div className="tile" style={{ background: "var(--surface)" }}>
-              <div className="tile-label">
-                <span>Heavy rain alert (14°C)</span>
-                <CloudRain size={15} className="tile-icon" />
-              </div>
-              <span className="muted" style={{ fontSize: 12.5 }}>
-                Low visibility mode: speeds capped at 50 km/h
-              </span>
-            </div>
-          </div>
-        </div>
+        </Card>
+        <Card icon={CloudSun} title="Weather agent" subtitle="Open-Meteo, current weather for the 0.1 degree cell of the stop (cached 10 min)" live>
+          {weatherChecked ? (
+            <KeyValues
+              rows={[
+                ["Area", <span className="mono" key="c">{String(weatherChecked.cell ?? "–")}</span>],
+                ["Weather", String(weatherChecked.description ?? "–")],
+                ["Temperature", `${weatherChecked.temperatureC ?? "–"} °C`],
+                ["Precipitation", `${weatherChecked.precipitationMm ?? 0} mm`],
+                ["Wind", `${weatherChecked.windKmph ?? 0} km/h`],
+                ["Severe enough to stop", weatherChecked.severe ? <span className="bad" key="s">yes</span> : "no"],
+              ]}
+            />
+          ) : (
+            <p className="muted">No stoppage has been checked yet.</p>
+          )}
+        </Card>
+      </div>
 
-        <div className="card-foot">
-          <span>
-            Suppressed alarms today: <b className="mono">1,412</b> parked units
-          </span>
-          <DemoButton>Configure logic rules</DemoButton>
-        </div>
+      <Card
+        icon={view === "STOPPAGE" ? OctagonAlert : Power}
+        title="Events"
+        subtitle="From consumer groups gps-stoppage-service and gps-ignition-service"
+        live
+        actions={
+          <Segmented<View>
+            label="Event type"
+            value={view}
+            onChange={setView}
+            options={[
+              ["STOPPAGE", "Stoppages"],
+              ["PARKED", "Parked"],
+              ["IDLING", "Idling"],
+              ["IGNITION_ON,IGNITION_OFF", "Ignition"],
+            ]}
+          />
+        }
+      >
+        <EventTable events={listed.data} showType={view === "IGNITION_ON,IGNITION_OFF"} />
       </Card>
     </div>
   );

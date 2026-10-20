@@ -140,3 +140,88 @@ export type TripCounts = {
   openStops: number;
   closedStops: number;
 };
+
+// ---- stream consumers (speed violation, vehicle state, stoppage, ignition)
+
+export type VehicleEventView = {
+  id: number;
+  imei: string;
+  vehicleRegistrationNo: string | null;
+  tenantCode: string | null;
+  type:
+    | "OVERSPEED"
+    | "SPEED_SENSOR_MISMATCH"
+    | "STOPPAGE"
+    | "PARKED"
+    | "IDLING"
+    | "IGNITION_ON"
+    | "IGNITION_OFF"
+    | "HARSH_ACCELERATION"
+    | "HARSH_BRAKING";
+  severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status: "OPEN" | "CLOSED";
+  startedAt: string;
+  endedAt: string | null;
+  latitude: number;
+  longitude: number;
+  detectedBy: string;
+  details: Record<string, unknown>;
+  updatedAt: string;
+};
+
+export type EventTypeCount = { type: string; last24Hours: number; openNow: number };
+
+export type SpeedRule = {
+  scope: string;
+  limitKmph: number;
+  minDurationSeconds: number;
+  minConsecutivePings: number;
+  hysteresisKmph: number;
+  toleranceKmph: number;
+  tolerancePercent: number;
+  maxGapSeconds: number;
+  windowPings: number;
+  requireGpsAgreement: boolean;
+  mismatchPings: number;
+};
+
+export type ActiveSpeedEpisode = {
+  imei: string;
+  phase: "CANDIDATE" | "VIOLATING";
+  episodeStartedAt: string;
+  maxSpeedKmph: number;
+  averageSpeedKmph: number;
+  overLimitReadings: number;
+  lastGpsSpeedKmph: number | null;
+  lastVerdict: string;
+  ruleScope: string;
+  limitKmph: number;
+};
+
+export type CacheEntry = {
+  key: string;
+  type: string;
+  purpose: string;
+  value: Record<string, string | number>;
+};
+
+export type VehicleTrackingState = {
+  imei: string;
+  cache: CacheEntry[];
+  history: Record<string, string>[];
+  events: Record<string, unknown>[];
+  processing: { recordedAt: string; latitude: number; longitude: number; totalDistanceMeters: number; odometerMeters: number | null } | null;
+  tripMotion: Record<string, unknown> | null;
+};
+
+export type ResetReport = {
+  at: string;
+  tookMillis: number;
+  fleetWasRunning: boolean;
+  fleetRestarted: boolean;
+  listenersSkippedToEnd: number;
+  kafkaRecordsDeleted: Record<string, number>;
+  tablesEmptied: string[];
+  redisKeysDeleted: number;
+  notes: string[];
+};

@@ -13,6 +13,8 @@ public enum PipelineStage {
             KafkaTopicNames.PROCESSED_POSITIONS, null),
     REJECTED_FRAME_PRODUCER(Kind.PRODUCER, "Producer 3: rejected frames",
             KafkaTopicNames.REJECTED_FRAMES, null),
+    VEHICLE_EVENT_PRODUCER(Kind.PRODUCER, "Producer 4: vehicle events (over-speed, stoppage, ignition ...)",
+            KafkaTopicNames.VEHICLE_EVENTS, null),
 
     RAW_FRAME_PROCESSING(Kind.CONSUMER, "Validate frame + calculate movement",
             KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaConsumerGroupNames.RAW_FRAME_PROCESSING),
@@ -22,6 +24,14 @@ public enum PipelineStage {
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.LIVE_LOCATION),
     TRIP_DETECTION(Kind.CONSUMER, "Detect trips and stops, keep them in PostgreSQL",
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.TRIP_DETECTION),
+    SPEED_VIOLATION(Kind.CONSUMER, "Check speed rules: sustained over-speed, speedometer against GPS",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.SPEED_VIOLATION),
+    VEHICLE_STATE(Kind.CONSUMER, "Keep each vehicle's state and history in Redis (Kalman distance, heading)",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.VEHICLE_STATE),
+    STOPPAGE_DETECTION(Kind.CONSUMER, "Detect stoppages and parking, check traffic and weather",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.STOPPAGE),
+    IGNITION(Kind.CONSUMER, "Track ignition (device or virtual), engine hours and idling",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.IGNITION),
     REJECTED_FRAME_LOGGER(Kind.CONSUMER, "Log rejected frames with the reason",
             KafkaTopicNames.REJECTED_FRAMES, KafkaConsumerGroupNames.REJECTED_FRAME_LOGGER),
 

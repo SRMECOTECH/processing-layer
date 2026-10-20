@@ -21,4 +21,14 @@ public class InMemoryPreviousReadingStore implements PreviousReadingStore {
     public void rememberLatestReading(String imei, PreviousReading reading) {
         latestReadingByImei.put(imei, reading);
     }
+
+    /** Forgets every device (demo reset). */
+    public void forgetAll() {
+        latestReadingByImei.clear();
+    }
+
+    /** What is held in memory for one device, without the database fallback a subclass may add. */
+    public Optional<PreviousReading> findInMemory(String imei) {
+        return Optional.ofNullable(latestReadingByImei.get(imei));
+    }
 }

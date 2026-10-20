@@ -4,7 +4,8 @@
 //   docker: GPS_API_URL=http://gps-service:8080
 
 const SERVICE_URL = (process.env.GPS_API_URL ?? "http://localhost:8080").replace(/\/+$/, "");
-const TIMEOUT_MILLIS = 10_000;
+// The demo reset takes about 6 s; everything else answers in milliseconds.
+const TIMEOUT_MILLIS = 30_000;
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,16 @@ async function forward(request: Request, context: Context): Promise<Response> {
   const query = new URL(request.url).search;
   const target = `${SERVICE_URL}/api/${path.map(encodeURIComponent).join("/")}${query}`;
 
+  const hasBody = request.method === "PUT" || request.method === "POST";
+  const body = hasBody ? await request.text() : undefined;
   try {
     const answer = await fetch(target, {
       method: request.method,
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        ...(body ? { "content-type": request.headers.get("content-type") ?? "application/json" } : {}),
+      },
+      body: body || undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MILLIS),
     });
@@ -37,4 +44,4 @@ async function forward(request: Request, context: Context): Promise<Response> {
   }
 }
 
-export { forward as GET, forward as POST };
+export { forward as GET, forward as POST, forward as PUT, forward as DELETE };

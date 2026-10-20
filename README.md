@@ -308,8 +308,9 @@ Device ko sirf apna IMEI pata hai – usko nahi pata wo kis truck ya company ka 
 
 1. smart_truck (READ-ONLY) se **150 alag devices ki sabse nayi trip** uthata hai (sirf wo trips jinme kam se kam 200 pings hon).
 2. Un devices/gaadiyon ko naye database mein register karta hai.
-3. **Rounds** mein chalata hai: round 1 = har gaadi ka ping 1, round 2 = har gaadi ka ping 2 … beech mein pause. Bilkul asli fleet jaisa – sab log, har kuch second.
-4. Trip khatam → **ulta wapas chalata hai** (driving back), taaki gaadi start point pe "teleport" na kare.
+3. **Faithful timing (default):** har ping apna **asli gap** rakhta hai (smart_truck mein ~1 minute). Replay clock 2 ghante pichhe se shuru hota hai, **30x tez** chalta hai jab tak "abhi" tak na pahunch jaye (~4 min ka burst, ~75 frames/s), phir **real time** (~2.5 frames/s). Isse distance/time wali speed, "60 sec over-speed", "3 min stop", idling – sab asli lagte hain. Pehle (compressed) har 2 sec mein ek round bhejte the – 1 minute ki driving 2 sec mein, isliye speed 30 guna galat aati thi aur trips mein avg speed > max speed dikhti thi. Wo mode ab bhi hai: `timing: compressed`.
+4. Trip khatam → **ulta wapas chalata hai** (driving back), taaki gaadi start point pe "teleport" na kare. Fleet dobara start ho to replay **DB ki sabse nayi reading ke baad** se shuru hota hai – purane time pe "late" readings ka dher nahi banta.
+5. smart_truck mein ignition/odometer nahi hai, isliye simulator **aadhe devices** ko ignition wire deta hai (baaki = virtual ignition), **aadhon** ko odometer (smart_truck ka `i_dist` jodta hai; baaki GPS se napte hain), aur **chauthai drivers "idler"** hain jo rukne par engine chalu rakhte hain (stoppage + idling alarm ke liye).
 
 | Setting (`gps.simulator.*`) | Default | Matlab |
 |---|---|---|
@@ -321,7 +322,13 @@ Device ko sirf apna IMEI pata hai – usko nahi pata wo kis truck ya company ka 
 | `repeat-forever` | true | Trip khatam → wapas chalao → phir aage … data aata rahe |
 | `start-when-application-starts` | false (Docker mein true) | Service start hote hi fleet chalu |
 
-⚠️ 75 frames/sec pe PostgreSQL roz lagbhag **65 lakh rows** badhta hai. Kaam na ho to fleet band kar do.
+| `timing` | faithful | `faithful` (asli gaps) ya `compressed` (purana tarika) |
+| `catch-up-minutes` / `catch-up-speed-factor` | 120 / 30 | Kitna pichhe se aur kitna tez catch-up |
+| `devices-with-ignition` / `devices-with-odometer` / `idling-devices` | 0.5 / 0.5 / 0.25 | Kitne devices ke paas wire / odometer, kitne idler |
+
+⚠️ Compressed timing (75 frames/sec) pe PostgreSQL roz lagbhag **65 lakh rows** badhta hai. Faithful timing live hone ke baad ~2.5 frames/sec.
+
+**Ek baat jo data ne dikhayi:** in trucks ki **max speed hi 60 km/h** hai (speed governor). Isliye 60 km/h ka over-speed rule is data pe kabhi trigger nahi hota. Demo mein over-speed dikhana ho to UI se limit 40-45 kar do (Speed violation → Speed rules) – 40 pe test kiya: NL01AG3477, 5 pings, max 55 km/h, GPS ne 53.3 confirm kiya, verdict GPS_VERIFIED.
 
 **smart_truck read-only kaise pakka hai?** `SmartTruckGpsReader` ka connection pool `setReadOnly(true)` pe khulta hai (MySQL khud INSERT/UPDATE/DELETE mana kar dega), class mein sirf SELECT hai, aur ye pool Spring ka main DataSource bhi nahi hai – galti se bhi mix nahi hoga. smart_truck down ho to service start ho jaati hai, sirf padhte waqt fail hota hai. Time India time (`Asia/Kolkata`) se `Instant` (UTC) mein convert hota hai.
 
@@ -398,6 +405,38 @@ Dashboard pe naya box: **Trips & stops → PostgreSQL** (msg/s aur lag).
 
 ---
 
+## 15a. Distance – Traccar ka logic (rev_engineer/traccar-rnd se)
+
+`CalculateMovementStep` ab Traccar ke `DistanceHandler` + `FilterHandler` jaisa chalta hai (`DistanceCalculator` = Traccar ka port, WGS-84 equatorial radius):
+
+1. **Device ka apna distance pehle:** odometer hai aur believable hai → uska delta (`DEVICE_ODOMETER`).
+2. Warna **haversine** previous position se (`GPS`).
+3. **Coordinates filter:** khadi gaadi ka GPS 10 m se kam "bhatke" → position pichhli wali pe clamp, distance 0 (`JITTER_FILTERED`). Parked truck roz ke kilometer nahi jodta.
+4. **Max-speed filter:** 200 km/h se tez chhalang (aur 500 m se lambi) → GPS glitch/relocation, count nahi (`JUMP_FILTERED`), nayi position rakhi.
+5. `totalDistance` = pichhla total + counted distance (Traccar "totalDistance"), `gps_position.total_distance_m` mein.
+6. **Late reading kabhi naye se nahi napi jaati** (Traccar napta hai – R&D mein -1020 m ki trip bani thi): distance 0, `OUT_OF_ORDER`.
+
+Har reading pe `distance_source` aur `implied_speed` bhi jaata hai. Settings: `gps.distance.*`.
+
+## 15b. Chaar stream consumers (Kafka ke baad)
+
+Sab `gps.processed-positions` padhte hain, har ek ka **apna consumer group** (apna offset) – ek slow weather API speed check ko nahi rokti. Logic `gps-processing` mein **pure Java** (unit tested), state **Redis** mein, events **`vehicle_event`** table + Redis list + Kafka topic **`gps.vehicle-events`**.
+
+| Consumer group | Kya karta hai | Algorithm |
+|---|---|---|
+| `gps-speed-violation-service` | Over-speed + speedometer vs GPS | Rule **Redis** mein (`gps:config:speed-rule:*`): vehicle → company → default (Traccar ka device→group→server lookup). Episode tab jab **lagatar N pings** limit ke upar **aur** kam se kam X seconds (60). **Hysteresis**: limit − 5 se neeche aaye tabhi khatam. Har ping pe speedometer ko **pichhle 2-3 pings ki GPS speed** (path ÷ time, odometer ho to uska) se cross-check: `GPS_VERIFIED` / `SENSOR_SUSPECT` (tamper). Lagatar mismatch → `SPEED_SENSOR_MISMATCH`. Lambi chuppi episode tod deti hai. |
+| `gps-vehicle-state-service` | Har gaadi ki state + history | `gps:state:vehicle:{imei}`: heading (bearing), acceleration, harsh braking/acceleration (sirf <10 s gap wali readings pe), **Kalman filter** (constant velocity, local metres, Mahalanobis outlier gate, 3 reject → reset) ka smooth track + distance, data-quality counters, moving/standing time. **History:** Redis **Stream** `gps:history:{imei}` (XADD + XTRIM MAXLEN ~1000) – historical context. |
+| `gps-stoppage-service` | Stoppage / parking | **Streaming stay-point** (radius 100 m, 3 min, "khada" = speedometer ≤ 3 km/h **aur** distance/time speed bhi kam), arrival pe back-dated, centroid position, paas-paas ke stops merge. **Ignition ON → STOPPAGE** (alarm) → **agents**: traffic (fleet ki engine-on gaadiyan 1 km mein, zyada tar slow → jam; TomTom key ho to wo bhi) + weather (Open-Meteo, 0.1° cell, 10 min cache) → verdict `JUSTIFIED_TRAFFIC / JUSTIFIED_WEATHER / UNEXPLAINED (HIGH)`. **Ignition OFF → PARKED** (neutralised, koi alarm nahi). Stop ke beech ignition badle to kind badal jaata hai. |
+| `gps-ignition-service` | Ignition, engine hours, idling | Wire ho to **device ignition** (Traccar IgnitionEventHandler), warna **virtual ignition** (chal rahi = ON, 5 min khadi = OFF), debounce, back-dating. Engine hours (Traccar EngineHoursHandler, lambi chuppi credit nahi). **Idling** = engine ON + ≤ 3 km/h + khadi > 5 min → `IDLING`. |
+
+Settings: `gps.stream.*` (stoppage, ignition, vehicle-state, enrichment). Speed rules UI se (Speed violation page) ya API se.
+
+**Vehicle tracking window** (UI: Stream Processors → Vehicle Tracking): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
+
+**Empty DB** (UI: Pipeline overview ya Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → 4 topics ke saare messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+
+---
+
 ## 16. Engine dashboard aur REST APIs
 
 **Dashboard** (http://localhost:8080) har 2 second refresh:
@@ -423,6 +462,13 @@ Load counters (`PipelineMetrics`, `StageCounters`) memory mein hain – har mess
 | `GET /api/trips?imei=…&from=…&to=…` | Trips jo is period se overlap karti hain (imei na do to sab devices, from/to na do to last 24 ghante) |
 | `GET /api/stops?imei=…&from=…&to=…` | Stops, same rules |
 | `GET /api/trips/count` | Kitni trips/stops OPEN aur CLOSED |
+| `GET /api/events?type=OVERSPEED,STOPPAGE&imei=…&status=OPEN&limit=100` | Stream consumers ke events (vehicle_event) |
+| `GET /api/events/summary` | Har type ke events: last 24 ghante, abhi chalu |
+| `GET /api/speed/rules` · `PUT /api/speed/rules/{scope}` · `DELETE …` | Redis wale speed rules (default, tenant:{code}, vehicle:{reg}) |
+| `GET /api/speed/active` | Abhi limit ke upar wali gaadiyan (CANDIDATE / VIOLATING) |
+| `GET /api/vehicles/{imei}/state?history=50` | Tracking window: gaadi ka saara cache (Redis keys), history stream, events, processing memory, trip state |
+| `GET /api/vehicles/states` | Har gaadi ka vehicle-state hash |
+| `POST /api/admin/reset?restartFleet=true` | **Empty DB** (demo practice) – neeche section 15b |
 | `GET /actuator/health` | DB + Redis UP/DOWN |
 
 Try karo – ek kharab frame:

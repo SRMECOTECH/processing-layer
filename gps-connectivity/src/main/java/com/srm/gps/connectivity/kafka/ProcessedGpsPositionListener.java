@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OnlyInKafkaFlow
-public class ProcessedGpsPositionListener {
+public class ProcessedGpsPositionListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.POSITION_STORAGE;
 

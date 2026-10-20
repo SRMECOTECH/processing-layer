@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OnlyInKafkaFlow
-public class RejectedGpsFrameListener {
+public class RejectedGpsFrameListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.REJECTED_FRAME_LOGGER;
 

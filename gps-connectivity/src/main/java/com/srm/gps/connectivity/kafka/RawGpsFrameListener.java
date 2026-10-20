@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OnlyInKafkaFlow
-public class RawGpsFrameListener {
+public class RawGpsFrameListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.RAW_FRAME_PROCESSING;
 

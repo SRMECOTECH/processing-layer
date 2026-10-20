@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { BellRing, RefreshCw, Siren, Webhook } from "lucide-react";
+import { BellRing, Siren, Webhook } from "lucide-react";
+import { EventTable } from "@/components/ops/events";
 import { Card, DemoButton, Empty, PageTitle, Tag } from "@/components/ops/kit";
 import { alertsFrom } from "@/lib/alerts";
 import { useOverview } from "@/lib/overview-context";
+import type { VehicleEventView } from "@/lib/types";
+import { usePoll } from "@/lib/use-poll";
 
 export default function DispatchPage() {
   const { data } = useOverview();
   const alerts = alertsFrom(data);
+  const events = usePoll<VehicleEventView[]>("/api/events?type=OVERSPEED,SPEED_SENSOR_MISMATCH,STOPPAGE,IDLING,HARSH_BRAKING,HARSH_ACCELERATION&limit=200", 4000);
+  const escalations = events.data?.filter((e) => e.severity === "MEDIUM" || e.severity === "HIGH" || e.severity === "CRITICAL").slice(0, 25);
 
   return (
     <div className="stack">
@@ -42,45 +47,11 @@ export default function DispatchPage() {
 
       <Card
         icon={Siren}
-        title="Dispatch and escalations"
-        subtitle="KAFKA_SINK: ops.notifications"
-        monoSubtitle
-        live={false}
-        actions={
-          <button type="button" className="icon-button" aria-label="Refresh">
-            <RefreshCw size={17} />
-          </button>
-        }
+        title="Escalation feed"
+        subtitle="Medium-and-above events from the stream consumers, as published on Kafka topic gps.vehicle-events"
+        live
       >
-        <ul className="timeline">
-          <li>
-            <span className="dot bad" />
-            <div>
-              <div className="what">Ops desk webhook P1</div>
-              <div className="detail">Over-speed sustained &gt; 60s (vehicle #108)</div>
-              <div className="meta">HTTP 200 · Delivered in 42ms</div>
-            </div>
-            <span className="when">Just now</span>
-          </li>
-          <li>
-            <span className="dot" />
-            <div>
-              <div className="what">Driver in-cab push notification</div>
-              <div className="detail">Corridor departure warning sounded</div>
-              <div className="meta">FCM ACK · Device online</div>
-            </div>
-            <span className="when">2m ago</span>
-          </li>
-          <li>
-            <span className="dot muted" />
-            <div>
-              <div className="what">Incident ledger auto-log</div>
-              <div className="detail">Audit ticket created in PostgreSQL sink</div>
-              <div className="meta">UUID: #d89f-43b2-981c</div>
-            </div>
-            <span className="when">8m ago</span>
-          </li>
-        </ul>
+        <EventTable events={escalations} empty="Nothing to escalate yet." />
         <div className="card-actions">
           <DemoButton primary icon={Webhook}>
             Broadcast test incident webhook

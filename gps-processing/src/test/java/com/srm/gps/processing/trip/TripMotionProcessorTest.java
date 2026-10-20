@@ -6,6 +6,7 @@ import com.srm.gps.configuration.message.RejectedGpsFrame;
 import com.srm.gps.configuration.json.GpsMessageJson;
 import com.srm.gps.processing.GpsFrameProcessor;
 import com.srm.gps.processing.ProcessingResultHandler;
+import com.srm.gps.processing.rule.DistanceCalculator;
 import com.srm.gps.processing.rule.GeoDistanceCalculator;
 import com.srm.gps.processing.step.InMemoryPreviousReadingStore;
 import org.junit.jupiter.api.Test;
@@ -431,7 +432,8 @@ class TripMotionProcessorTest {
     }
 
     private static double[] point(double eastMeters, double northMeters) {
-        double metersPerDegree = 6_371_000 * Math.PI / 180;
+        // Same sphere the platform measures on (Traccar's DistanceCalculator), so "N metres apart" stays exact.
+        double metersPerDegree = DistanceCalculator.EQUATORIAL_EARTH_RADIUS_METERS * Math.PI / 180;
         return new double[] {
                 BASE_LATITUDE + northMeters / metersPerDegree,
                 BASE_LONGITUDE + eastMeters / (metersPerDegree * Math.cos(Math.toRadians(BASE_LATITUDE)))};

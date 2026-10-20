@@ -1,50 +1,108 @@
 "use client";
 
+import Link from "next/link";
 import { Activity, Sigma } from "lucide-react";
-import { CompareChart } from "@/components/ops/charts";
-import { Card, KeyValues, PageTitle, Tag, Tile } from "@/components/ops/kit";
+import { Card, Empty, KeyValues, PageTitle, Tile } from "@/components/ops/kit";
+import { formatDistance, formatNumber, formatPercent } from "@/lib/format";
+import { usePoll } from "@/lib/use-poll";
 
-// Example: raw GPS distance increments jitter; the filtered line follows the true path.
-const RAW = [12, 19, 9, 22, 14, 25, 11, 27, 18, 24, 13, 26, 17, 21, 15];
-const FILTERED = [14, 16, 15, 17, 17, 18, 18, 19, 19, 20, 19, 20, 20, 20, 19];
+type VehicleRow = Record<string, string>;
 
 export default function KalmanPage() {
+  const states = usePoll<VehicleRow[]>("/api/vehicles/states?limit=500", 5000);
+  const rows = (states.data ?? [])
+    .map((v) => ({
+      imei: v.imei,
+      name: v.vehicleRegistrationNo || v.imei,
+      raw: Number(v.totalDistanceMeters || 0),
+      kalman: Number(v.kalmanDistanceMeters || 0),
+      readings: Number(v.readings || 0),
+      jitter: Number(v.jitterFilteredReadings || 0),
+      jumps: Number(v.jumpFilteredReadings || 0),
+      odometer: Number(v.odometerReadings || 0),
+    }))
+    .sort((a, b) => b.raw - a.raw);
+  const totalRaw = rows.reduce((s, r) => s + r.raw, 0);
+  const totalKalman = rows.reduce((s, r) => s + r.kalman, 0);
+  const jitter = rows.reduce((s, r) => s + r.jitter, 0);
+  const readings = rows.reduce((s, r) => s + r.readings, 0);
+
   return (
     <div className="stack">
       <PageTitle
         title="Kalman filter distance"
-        subtitle="Cumulative trip distance from smoothed positions. Raw GPS jitters around the true path, which inflates distance; the filter removes the jitter before each increment is added."
+        subtitle="Two ways to measure each vehicle's distance, side by side: the Traccar rules (odometer first, otherwise haversine, parking jitter clamped, impossible jumps ignored) and a Kalman-smoothed track whose length only grows while the vehicle moves."
       />
 
-      <Card icon={Activity} title="Raw against filtered distance increments" subtitle="Metres added per reading on one trip" live={false} badges={<Tag mono>Q=0.02 · R=4.0</Tag>}>
-        <div className="legend-row">
-          <span>
-            <i />
-            Raw GPS increment
-          </span>
-          <span>
-            <i className="dashed" />
-            Kalman filtered
-          </span>
-        </div>
-        <CompareChart primary={RAW} secondary={FILTERED} limit={30} height={220} />
-        <div className="grid-3" style={{ marginTop: 16 }}>
-          <Tile label="Noise removed" value="-38.2" unit="%" tone="accent" />
-          <Tile label="Positional accuracy" value="±1.2" unit="m" />
-          <Tile label="Fit against ground truth" value="0.994" unit="R²" />
-        </div>
+      <div className="grid-4">
+        <Tile label="Fleet distance, Traccar rules" value={formatDistance(totalRaw)} big />
+        <Tile label="Fleet distance, Kalman track" value={formatDistance(totalKalman)} big foot={totalRaw ? `${formatPercent(totalKalman / totalRaw - 1)} against Traccar` : undefined} />
+        <Tile label="Parking jitter removed" value={jitter} big foot={readings ? `${formatPercent(jitter / readings)} of readings clamped` : undefined} />
+        <Tile label="Readings" value={readings} big />
+      </div>
+
+      <Card icon={Activity} title="Per vehicle" subtitle="From Redis gps:state:vehicle:* (vehicle-state consumer). Select a vehicle to see its track." live>
+        {rows.length === 0 ? (
+          <Empty>{states.data ? "No vehicle state yet." : "Waiting for the service."}</Empty>
+        ) : (
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th className="right">Traccar rules</th>
+                  <th className="right">Kalman track</th>
+                  <th className="right">Difference</th>
+                  <th className="right">Readings</th>
+                  <th className="right">From odometer</th>
+                  <th className="right">Jitter clamped</th>
+                  <th className="right">Jumps ignored</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 40).map((r) => (
+                  <tr key={r.imei}>
+                    <td>
+                      <Link className="link mono" href={`/stream/tracking?imei=${r.imei}`}>
+                        {r.name}
+                      </Link>
+                    </td>
+                    <td className="right mono">{formatDistance(r.raw)}</td>
+                    <td className="right mono">{formatDistance(r.kalman)}</td>
+                    <td className="right mono muted">{r.raw > 0 ? formatPercent(r.kalman / r.raw - 1) : "–"}</td>
+                    <td className="right mono">{formatNumber(r.readings)}</td>
+                    <td className="right mono">{formatNumber(r.odometer)}</td>
+                    <td className="right mono">{formatNumber(r.jitter)}</td>
+                    <td className={`right mono${r.jumps ? " warn" : ""}`}>{formatNumber(r.jumps)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
-      <Card icon={Sigma} title="How the distance is built" subtitle="Applied on every trip increment." live={false}>
-        <KeyValues
-          rows={[
-            ["Input", "Latitude, longitude, reported speed, time gap"],
-            ["Prediction", "Constant velocity model between pings"],
-            ["Update", "Weighted by GPS accuracy and satellite count"],
-            ["Output", "Smoothed position, distance increment added to the trip"],
-            ["Reset", "On trip start, or a gap longer than 5 minutes"],
-          ]}
-        />
+      <Card icon={Sigma} title="How the two distances are built" subtitle="Both run on every reading." live={false}>
+        <div className="grid-2">
+          <KeyValues
+            rows={[
+              ["Traccar rules", "CalculateMovementStep (processing)"],
+              ["1", "Device odometer delta, when it reports one and it is believable"],
+              ["2", "Otherwise haversine on the WGS-84 equatorial radius"],
+              ["3", "Under 10 m while standing: clamped to the last position, 0 m"],
+              ["4", "Needs over 200 km/h and over 500 m: ignored as a glitch"],
+            ]}
+          />
+          <KeyValues
+            rows={[
+              ["Kalman track", "VehicleStateProcessor (vehicle-state consumer)"],
+              ["Model", "Constant velocity, local metres east/north"],
+              ["Noise", "GPS 12 m, acceleration 1.5 m/s²"],
+              ["Outliers", "Mahalanobis gate (99.9%), reset after 3 in a row"],
+              ["Distance", "Grows only while the vehicle is moving"],
+            ]}
+          />
+        </div>
       </Card>
     </div>
   );

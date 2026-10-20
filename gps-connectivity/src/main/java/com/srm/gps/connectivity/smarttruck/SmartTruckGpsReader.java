@@ -40,7 +40,7 @@ public class SmartTruckGpsReader {
             """;
 
     private static final String PINGS_OF_ONE_TRIP = """
-            SELECT i_trip_no, s_asset_id, s_device_id, s_entity_name, dt_message, d_lat, d_long, i_speed
+            SELECT i_trip_no, s_asset_id, s_device_id, s_entity_name, dt_message, d_lat, d_long, i_speed, i_dist
             FROM tta_trip_gps
             WHERE i_trip_no = ?
             ORDER BY dt_message
@@ -84,7 +84,8 @@ public class SmartTruckGpsReader {
                 row.getTimestamp("dt_message").toLocalDateTime().atZone(SMART_TRUCK_TIME_ZONE).toInstant(),
                 row.getDouble("d_lat"),
                 row.getDouble("d_long"),
-                row.getInt("i_speed"));
+                row.getInt("i_speed"),
+                row.getInt("i_dist"));
     }
 
     @PreDestroy

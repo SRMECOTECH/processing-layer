@@ -67,6 +67,20 @@ public class GpsPosition {
     @Column(name = "stored_at", nullable = false)
     private Instant storedAt = Instant.now();
 
+    /** Running total of counted distance for the device (Traccar "totalDistance"); null for older rows. */
+    @Column(name = "total_distance_m")
+    private Double totalDistanceMeters;
+
+    /** GPS, DEVICE_ODOMETER, JITTER_FILTERED, JUMP_FILTERED, FIRST_READING or OUT_OF_ORDER. */
+    @Column(name = "distance_source")
+    private String distanceSource;
+
+    @Column(name = "ignition")
+    private Boolean ignition;
+
+    @Column(name = "odometer_m")
+    private Long odometerMeters;
+
     protected GpsPosition() {
         // for Hibernate
     }
@@ -143,5 +157,30 @@ public class GpsPosition {
 
     public Instant getStoredAt() {
         return storedAt;
+    }
+
+    /** Distance details added by the Traccar-style distance step. */
+    public GpsPosition withDistanceDetails(Double totalDistanceMeters, String distanceSource, Boolean ignition, Long odometerMeters) {
+        this.totalDistanceMeters = totalDistanceMeters;
+        this.distanceSource = distanceSource;
+        this.ignition = ignition;
+        this.odometerMeters = odometerMeters;
+        return this;
+    }
+
+    public Double getTotalDistanceMeters() {
+        return totalDistanceMeters;
+    }
+
+    public String getDistanceSource() {
+        return distanceSource;
+    }
+
+    public Boolean getIgnition() {
+        return ignition;
+    }
+
+    public Long getOdometerMeters() {
+        return odometerMeters;
     }
 }

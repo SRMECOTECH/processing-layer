@@ -67,7 +67,10 @@ public class SimulationMasterDataSeeder {
         Device device = findOrCreateDevice(earliestPing.deviceImei());
 
         if (!deviceAssignmentRepository.existsByDeviceImei(device.getImei())) {
-            deviceAssignmentRepository.save(new DeviceAssignment(device, vehicle, earliestPing.recordedAt()));
+            // The simulator replays trips into the recent past (catch-up), so the fitting must reach back far enough.
+            java.time.Instant fittedSince = earliestPing.recordedAt().isBefore(java.time.Instant.now().minus(java.time.Duration.ofDays(7)))
+                    ? earliestPing.recordedAt() : java.time.Instant.now().minus(java.time.Duration.ofDays(7));
+            deviceAssignmentRepository.save(new DeviceAssignment(device, vehicle, fittedSince));
             LOG.info("Registered device {} in vehicle {} of tenant {} from {}",
                     device.getImei(), vehicle.getRegistrationNo(), tenant.getCode(), earliestPing.recordedAt());
         }

@@ -25,7 +25,7 @@ from the project root starts it as the `dashboard` service on port 3000.
 
 | Section | Sub-pages |
 |---|---|
-| Stream Processors | Pipeline overview, Vehicle state, Speed violation, Stoppage & ignition, Nested geofencing, Waypoints & corridors, Kalman filter distance |
+| Stream Processors | Pipeline overview (with Empty DB), Vehicle tracking (cache window), Vehicle state, Speed violation (rules editor), Stoppage & ignition, Nested geofencing, Waypoints & corridors, Kalman filter distance |
 | Business Rules & Alerts | Over-speed verification, Trip detection master, Route deviation, Dispatch & escalations, Ingest audit queue |
 | Ingestion & DB Sink | Schema validation gate, PostgreSQL sink, ClickHouse OLAP sink, Worker health & backpressure |
 | Telemetry Analytics | Live stream telemetry, Latency & backpressure, Violations & anomalies, Vehicle state & trip efficiency |
@@ -38,11 +38,12 @@ The menu lives in `src/lib/nav.ts`: add a sub-page there and create its `page.ts
 Every card says where its numbers come from:
 
 - **Live** (green dot): fed by the service – throughput, consumer groups and lag, partitions, Redis live
-  state, PostgreSQL counts, trips, stops, the audit queue (speedometer against distance-over-time speed),
-  validation rules and rejected frames, and the alerts in the bell.
-- **Demo data** (amber): the service does not produce this yet – speed-rule configuration in Redis,
-  AI traffic/weather enrichment, geofences, corridors, waypoints, Kalman filtering, ClickHouse, dispatch
-  webhooks. Buttons on these cards answer "Not connected yet". Replace them as the backend adds each feature.
+  state, the per-vehicle cache (tracking window), speed rules (editable, stored in Redis), over-speed and
+  speedometer-mismatch events, stoppages with their traffic/weather verdicts, parking, idling, ignition,
+  Kalman against Traccar distance, PostgreSQL counts, trips, stops, the audit queue, validation rules,
+  rejected frames, the escalation feed and the alerts in the bell.
+- **Demo data** (amber): the service does not produce this yet – geofences, corridors, waypoints,
+  route deviation, ClickHouse, dispatch webhooks. Buttons on these cards answer "Not connected yet".
 
 ## How it talks to the service
 

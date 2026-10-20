@@ -1,69 +1,64 @@
 "use client";
 
-import { Download, ScanLine, SlidersHorizontal } from "lucide-react";
-import { Card, DemoButton, PageTitle, Tag, Tile } from "@/components/ops/kit";
-
-const ROWS: [string, string, string, string, string, "good" | "neutral" | "bad", string][] = [
-  ["FLT-8892-A", "88.4 km/h", "87.9 km/h", "65.0 km/h", "Clear / Dry", "neutral", "Audit event"],
-  ["FLT-3401-K", "74.1 km/h", "73.8 km/h", "55.0 km/h", "Rain alert #12", "neutral", "Audit event"],
-  ["FLT-9023-P", "91.0 km/h", "42.1 km/h", "65.0 km/h", "Tamper discard", "bad", "Flag sensor"],
-  ["FLT-1177-C", "52.3 km/h", "51.6 km/h", "60.0 km/h", "Clear / Dry", "good", "None"],
-];
+import { ScanLine } from "lucide-react";
+import { EVENT_LABEL, EventTable } from "@/components/ops/events";
+import { Card, PageTitle, Progress, Tile } from "@/components/ops/kit";
+import { formatNumber, formatPercent } from "@/lib/format";
+import type { EventTypeCount, VehicleEventView } from "@/lib/types";
+import { usePoll } from "@/lib/use-poll";
 
 export default function AnomaliesPage() {
+  const summary = usePoll<EventTypeCount[]>("/api/events/summary", 5000);
+  const overspeed = usePoll<VehicleEventView[]>("/api/events?type=OVERSPEED&limit=500", 8000);
+  const stoppages = usePoll<VehicleEventView[]>("/api/events?type=STOPPAGE&limit=500", 8000);
+  const recent = usePoll<VehicleEventView[]>("/api/events?type=OVERSPEED,SPEED_SENSOR_MISMATCH,HARSH_ACCELERATION,HARSH_BRAKING&limit=30", 5000);
+
+  const verified = (overspeed.data ?? []).filter((e) => e.details.verdict === "GPS_VERIFIED").length;
+  const suspect = (overspeed.data ?? []).filter((e) => e.details.verdict === "SENSOR_SUSPECT").length;
+  const checked = (stoppages.data ?? []).filter((e) => e.details.contextVerdict && e.details.contextVerdict !== "PENDING");
+  const explained = checked.filter((e) => String(e.details.contextVerdict).startsWith("JUSTIFIED")).length;
+  const counts = (summary.data ?? []).filter((c) => c.last24Hours > 0).sort((a, b) => b.last24Hours - a.last24Hours);
+  const max = Math.max(1, ...counts.map((c) => c.last24Hours));
+
   return (
     <div className="stack">
       <PageTitle
         title="Violations and anomalies"
-        subtitle="How well the dual verification separates real over-speeding from tampering, how often stoppages are explained by traffic or weather, and how much GPS noise the filter removes."
+        subtitle="How well the checks separate real problems from sensor faults and circumstance: over-speed confirmed by GPS against suspect speedometers, and stoppages explained by traffic or weather against unexplained ones."
       />
 
-      <Card
-        icon={ScanLine}
-        title="Violation and anomaly breakdown"
-        subtitle="Dual-verification algorithm telemetry and GPS filtering effectiveness"
-        badges={<Tag>AI ENRICHED</Tag>}
-        live={false}
-      >
-        <div className="grid-3" style={{ marginBottom: 16 }}>
-          <Tile label="Over-speed vs tamper" value="94.8" unit="%" tone="accent" foot="Speedometer matched Haversine delta · 52 tamper attempts isolated" />
-          <Tile label="AI context confidence" value="96.4" unit="%" tone="accent" foot="Stoppage vs heavy traffic or storm · 789 genuine congestions" />
-          <Tile label="Kalman noise delta" value="-38.2" unit="%" tone="accent" foot="Smoothed raw GPS multipath jitter · ±1.2 m accuracy" />
+      <div className="grid-4">
+        <Tile label="Over-speed confirmed by GPS" value={overspeed.data?.length ? (verified / overspeed.data.length) * 100 : 0} format={(v) => v.toFixed(1)} unit="%" tone="accent" big foot={`${verified} of ${overspeed.data?.length ?? 0} episodes`} />
+        <Tile label="Suspect speedometers" value={suspect} big foot="GPS contradicted the over-speed" />
+        <Tile label="Stoppages explained" value={checked.length ? (explained / checked.length) * 100 : 0} format={(v) => v.toFixed(1)} unit="%" tone="accent" big foot={`${explained} of ${checked.length} checked by the agents`} />
+        <Tile label="Harsh driving (24 h)" value={(summary.data?.find((c) => c.type === "HARSH_BRAKING")?.last24Hours ?? 0) + (summary.data?.find((c) => c.type === "HARSH_ACCELERATION")?.last24Hours ?? 0)} big foot="only judged on readings under 10 s apart" />
+      </div>
+
+      <Card icon={ScanLine} title="Events by type, last 24 hours" subtitle="vehicle_event, grouped" live>
+        <div style={{ display: "grid", gap: 12 }}>
+          {counts.map((c) => (
+            <div key={c.type}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>{EVENT_LABEL[c.type as VehicleEventView["type"]] ?? c.type}</span>
+                <span className="mono">
+                  {formatNumber(c.last24Hours)} <span className="faint">({formatNumber(c.openNow)} ongoing)</span>
+                </span>
+              </div>
+              <Progress value={c.last24Hours / max} />
+            </div>
+          ))}
+          {counts.length === 0 && <p className="muted">No events yet.</p>}
         </div>
-        <div className="data-table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Trans-ID</th>
-                <th className="right">Recorded speed</th>
-                <th className="right">Haversine verified</th>
-                <th className="right">Zone limit</th>
-                <th>Enrichment</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map(([id, recorded, verified, limit, enrichment, tone, action]) => (
-                <tr key={id} className={tone === "bad" ? "flagged" : undefined}>
-                  <td className="mono accent-text">{id}</td>
-                  <td className={`right mono${Number.parseFloat(recorded) > Number.parseFloat(limit) ? " bad" : ""}`}>{recorded}</td>
-                  <td className="right mono">{verified}</td>
-                  <td className="right mono">{limit}</td>
-                  <td>
-                    <Tag tone={tone}>{enrichment}</Tag>
-                  </td>
-                  <td className="link">{action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card-foot">
+          <span>Share of events that are ongoing</span>
+          <span className="mono">
+            {formatPercent(counts.reduce((s, c) => s + c.openNow, 0) / Math.max(1, counts.reduce((s, c) => s + c.last24Hours, 0)))}
+          </span>
         </div>
-        <div className="card-actions">
-          <DemoButton icon={Download}>Export Parquet dump</DemoButton>
-          <DemoButton primary icon={SlidersHorizontal}>
-            Configure Haversine sinks
-          </DemoButton>
-        </div>
+      </Card>
+
+      <Card icon={ScanLine} title="Latest speed and driving anomalies" subtitle="Over-speed, speedometer against GPS, harsh acceleration and braking" live>
+        <EventTable events={recent.data} />
       </Card>
     </div>
   );

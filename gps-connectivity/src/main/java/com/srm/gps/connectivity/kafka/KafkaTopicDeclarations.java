@@ -35,4 +35,10 @@ public class KafkaTopicDeclarations {
         return TopicBuilder.name(KafkaTopicNames.REJECTED_FRAMES)
                 .partitions(KafkaTopicNames.PARTITIONS_PER_TOPIC).replicas(REPLICAS).build();
     }
+
+    @Bean
+    public NewTopic vehicleEventsTopic() {
+        return TopicBuilder.name(KafkaTopicNames.VEHICLE_EVENTS)
+                .partitions(KafkaTopicNames.PARTITIONS_PER_TOPIC).replicas(REPLICAS).build();
+    }
 }
