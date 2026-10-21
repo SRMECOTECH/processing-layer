@@ -2,6 +2,8 @@
 
 > **Ek line mein:** 150 trucks ka GPS data aata hai → Kafka mein line lagta hai → Spring Boot usko check karta hai, saaf karta hai → PostgreSQL mein save hota hai, Redis mein "abhi truck kahan hai" wala live board update hota hai, aur trip service "kab chali, kab ruki, kitna chali" likhti hai. Aur ek **engine dashboard** hai jahan har producer, topic, consumer live dikhta hai.
 
+> 🟢 **Naye ho?** Pehle [README_SIMPLE.md](README_SIMPLE.md) padho – poora project seedhi simple bhasha mein, ek ping ke safar ke saath.
+
 Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (main khud bhi 6 mahine baad 😅) padh ke poora project samajh jaye. Har cheez jo is project mein use hui hai, uska **kya**, **kyun** aur **kaise** neeche hai.
 
 > **Note:** Is repo mein jitne bhi IMEI, gaadi number, transporter naam dikhenge (jaise `0861000000000001`, `XX01AB1234`, `DEMO-TRANSPORT-JSR`) – sab **dummy** hain. Asli data public nahi kiya gaya hai.
