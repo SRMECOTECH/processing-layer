@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLiveUpdatesPaused } from "./preferences";
 import type { DeviceLoadView } from "./types";
 
 export type LiveVehicle = {
@@ -20,11 +21,13 @@ export type LiveVehicle = {
  * The device list is fetched first, then each device's live position, every `intervalMs`.
  */
 export function useLiveVehicles(limit: number, filter = "", intervalMs = 3000) {
+  const paused = useLiveUpdatesPaused();
   const [vehicles, setVehicles] = useState<LiveVehicle[]>();
   const [total, setTotal] = useState<number>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
+    if (paused) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -55,7 +58,7 @@ export function useLiveVehicles(limit: number, filter = "", intervalMs = 3000) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [limit, filter, intervalMs]);
+  }, [limit, filter, intervalMs, paused]);
 
   return { vehicles, total, error };
 }

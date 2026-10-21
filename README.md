@@ -59,7 +59,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 
 | Link | Kya dikhega |
 |---|---|
-| http://localhost:3000 | **PulseStream IoT console** (Next.js, `gps-dashboard-ui/`) – operations UI: Stream Processors, Business Rules & Alerts, Ingestion & DB Sink, Telemetry Analytics, Developer |
+| http://localhost:3000 | **PulseStream IoT console** (Next.js, `gps-dashboard-ui/`) – operations UI: Live, Processing, Alerts, Storage, Analytics, Notifications, Developer |
 | http://localhost:8080 | **Engine dashboard** – 3 producers, 3 topics, consumers, har partition ka load, lag, IMEI filter, simulator start/stop button |
 | http://localhost:8085 | **Kafka UI** (Docker mein) – topics, messages, key (= IMEI) se search, consumer groups |
 | http://localhost:8001 | **RedisInsight** (Docker mein) – `gps:` se shuru hone wali saari keys |
@@ -431,9 +431,9 @@ Sab `gps.processed-positions` padhte hain, har ek ka **apna consumer group** (ap
 
 Settings: `gps.stream.*` (stoppage, ignition, vehicle-state, enrichment). Speed rules UI se (Speed violation page) ya API se.
 
-**Vehicle tracking window** (UI: Stream Processors → Vehicle Tracking): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
+**Vehicle inspector** (UI: Live → Vehicle inspector): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
 
-**Empty DB** (UI: Pipeline overview ya Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → 4 topics ke saare messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → 4 topics ke saare messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
 
 ---
 
@@ -480,24 +480,26 @@ Log mein dikhega: `Frame rejected: Latitude 95.0 is outside -90..90`.
 
 ### PulseStream IoT console (Next.js) – `gps-dashboard-ui/`
 
-Operations ka web UI, Google Stitch wale "Fleet Telematics Analytics Platform" design se bana. YouTube jaisa layout: upar bar (menu, search, live Kafka rate, alerts, appearance), section tabs, aur har section ki apni left menu. Off-white background + navy accent – sliders icon se white/warm aur sky blue bhi chun sakte ho. Browser sirf dashboard (`:3000`) se baat karta hai, dashboard ka server `/api/*` ko service (`GPS_API_URL`, default `http://localhost:8080`) tak forward karta hai.
+Operations ka web UI. Upar ek hi bar mein fixed sections (Live, Processing, Alerts, Storage, Analytics, Notifications, Developer) + search (Ctrl K), live Kafka rate, notifications bell aur appearance menu (light/dark, 5 accent, density, live updates pause). Har section ki apni left menu – groups, aur har processor ke andar sub-pages. Browser sirf dashboard (`:3000`) se baat karta hai, dashboard ka server `/api/*` ko service (`GPS_API_URL`, default `http://localhost:8080`) tak forward karta hai.
 
-| Section (tab) | Left menu ke sub-pages |
+| Section (top bar) | Left menu |
 |---|---|
-| **Stream Processors** | Pipeline overview, Vehicle state (Redis live), Speed violation, Stoppage & ignition, Nested geofencing, Waypoints & corridors, Kalman filter distance |
-| **Business Rules & Alerts** | Over-speed verification, Trip detection master, Route deviation, Dispatch & escalations, Ingest audit queue |
-| **Ingestion & DB Sink** | Schema validation gate, PostgreSQL sink, ClickHouse OLAP sink, Worker health & backpressure |
-| **Telemetry Analytics** | Live stream telemetry, Latency & backpressure, Violations & anomalies, Vehicle state & trip efficiency |
-| **Developer** | Engineering pages: engine overview, producers & consumers, trips/stops/readings, topics & storage |
+| **Live** | Fleet overview, Live map, Vehicle list, Vehicle inspector, Throughput, Event stream, Fleet simulator |
+| **Processing** | Pipeline overview (Kafka output → parallel processors → business logic → ingestion → stores), Consumer groups; processors: **Speed violation** (live episodes, entity rules in Redis, distance cross-check, events), **Vehicle state** (state store, historical context, key layout), **Stoppage & ignition** (live stoppages, ignition on rules, ignition off neutralised, traffic & weather agents), **Geofencing** (zone hierarchy, nested distance, entry & exit), **Waypoints** (routes, arrivals & ETA), **Cumulative distance** (Kalman vs raw, trip increments, filter tuning) |
+| **Alerts** | All alerts, Escalations; business logic: **Over-speed** (dual verification, device log audit, alert policy), **Trip detection** (trips, master table lookup, stops), **Route deviation** (corridors, deviation log) |
+| **Storage** | Ingestion overview, Schema validation, Rejected frames, PostgreSQL, ClickHouse, Workers & backpressure |
+| **Analytics** | Live telemetry, Latency, Violations & anomalies, Trip efficiency |
+| **Notifications** | Inbox, Channels, Routing rules, Delivery log, Quiet hours & digest |
+| **Developer** | Engine overview, producers & consumers, topics & storage, trips/stops/readings, API reference, demo tools, service settings, module registry |
 
-Har card pe likha hota hai data kahan se aaya: **Live** (service se) ya **Demo data** (backend abhi nahi banata – Redis rule config, AI traffic/weather, geofence, corridors, Kalman, ClickHouse, dispatch webhooks).
+Har card pe likha hota hai data kahan se aaya: **Live** (service se) ya **Example data** (module abhi bana nahi – geofencing, waypoints, route deviation, ClickHouse, notification channels). Menu mein aise modules pe **Planned** likha hai.
 
 ```powershell
 cd gps-dashboard-ui
 npm install          # pehli baar
 npm run dev          # http://localhost:3000  (service :8080 pe chalni chahiye)
 ```
-Docker mein `docker compose up -d --build` isko `dashboard` service ke naam se khud chala deta hai.
+Docker mein `docker compose up -d --build` isko `dashboard` service ke naam se khud chala deta hai. Har service pe `restart: always` hai, isliye ek baar `up` karne ke baad Docker Desktop khulte hi poora platform (dashboard bhi) apne aap chal jaata hai – http://localhost:3000.
 
 ---
 

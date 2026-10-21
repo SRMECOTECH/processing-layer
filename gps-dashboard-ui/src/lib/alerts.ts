@@ -15,10 +15,10 @@ export function alertsFrom(overview: EngineOverview | undefined): Alert[] {
     alerts.push({ tone: "bad", title: "Kafka is not answering", text: overview.kafkaProblem, href: "/developer/processors" });
   }
   if (overview.redisProblem) {
-    alerts.push({ tone: "bad", title: "Redis is not answering", text: overview.redisProblem, href: "/stream/vehicle-state" });
+    alerts.push({ tone: "bad", title: "Redis is not answering", text: overview.redisProblem, href: "/processing/state" });
   }
   if (overview.storedPositions < 0) {
-    alerts.push({ tone: "bad", title: "PostgreSQL is not answering", text: "Positions cannot be counted or stored.", href: "/ingestion/postgresql" });
+    alerts.push({ tone: "bad", title: "PostgreSQL is not answering", text: "Positions cannot be counted or stored.", href: "/storage/postgres" });
   }
   for (const consumer of overview.consumers) {
     if (isKafkaFlow(overview) && !isHealthyGroupState(consumer.groupState)) {
@@ -52,11 +52,11 @@ export function alertsFrom(overview: EngineOverview | undefined): Alert[] {
       tone: "info",
       title: "Frames rejected at the gate",
       text: `${formatNumber(rejected.totalMessages)} frames failed validation`,
-      href: "/ingestion",
+      href: "/storage/rejected",
     });
   }
   if (!overview.simulator.running) {
-    alerts.push({ tone: "info", title: "Simulator is stopped", text: "No new frames are arriving from the simulated fleet.", href: "/stream" });
+    alerts.push({ tone: "info", title: "Simulator is stopped", text: "No new frames are arriving from the simulated fleet.", href: "/live/simulator" });
   }
   return alerts;
 }
