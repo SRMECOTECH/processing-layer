@@ -1,241 +1,273 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CircleUser, Menu, Search, SlidersHorizontal, Waves } from "lucide-react";
-import { alertsFrom, seriousCount } from "@/lib/alerts";
-import { formatRate } from "@/lib/format";
-import { allPages } from "@/lib/nav";
+import { Bell, CheckCheck, CircleUser, Menu, SlidersHorizontal, Waves } from "lucide-react";
+import { formatAgo, formatRate } from "@/lib/format";
+import { useNotifications } from "@/lib/notifications";
 import { useOverview } from "@/lib/overview-context";
 import { ingress, isKafkaFlow } from "@/lib/pipeline";
-import { usePreferences, type Accent, type Background } from "@/lib/preferences";
+import { usePreferences, type Accent, type Background, type Density, type Theme } from "@/lib/preferences";
+import { Switch } from "@/components/ops/kit";
+import { SearchButton } from "./command-palette";
 import { Popover } from "./popover";
-import { TopTabs } from "./top-tabs";
+import { TopNav } from "./top-nav";
 
+/** The single top bar: brand, the fixed sections, then search, live rate, notifications, appearance and user. */
 export function AppHeader() {
-  const { toggleSidebar } = usePreferences();
-  const { data: overview, error } = useOverview();
-  const kafka = isKafkaFlow(overview);
-  const rate = ingress(overview)?.messagesPerSecond;
+  const { setDrawerOpen } = usePreferences();
 
   return (
-    <header className="app-header">
-      <div className="topbar">
-        <div className="topbar-left">
-          <button type="button" className="icon-button" aria-label="Show or hide the menu" onClick={toggleSidebar}>
-            <Menu size={20} />
-          </button>
-          <Link href="/stream" className="logo">
-            <span className="logo-mark">
-              <Waves size={18} />
-            </span>
-            <span className="logo-name">PulseStream IoT</span>
-            <span className="tag">{overview ? (kafka ? "PROD KAFKA" : "DIRECT FLOW") : "CONNECTING"}</span>
-          </Link>
-        </div>
-
-        <SearchBox />
-
-        <div className="topbar-right">
-          <span className={`live-pill${error && !overview ? " down" : ""}`} title="Frames entering the pipeline, average of the last 10 seconds">
-            <i />
-            {error && !overview ? "Service offline" : `${kafka ? "Kafka" : "Direct"}: ${formatRate(rate)} msg/s`}
+    <header className="topbar">
+      <div className="topbar-start">
+        <button type="button" className="icon-button menu-button" aria-label="Open the menu" onClick={() => setDrawerOpen(true)}>
+          <Menu size={20} />
+        </button>
+        <Link href="/live" className="brand" aria-label="PulseStream home">
+          <span className="brand-mark">
+            <Waves size={17} />
           </span>
-          <Notifications />
-          <ThemeSettings />
-          <span className="avatar" aria-label="Signed in user">
-            <CircleUser size={22} />
-          </span>
-        </div>
+          <span className="brand-name">PulseStream</span>
+        </Link>
       </div>
-      <TopTabs />
+
+      <TopNav />
+
+      <div className="topbar-end">
+        <SearchButton />
+        <LivePill />
+        <NotificationBell />
+        <AppearanceMenu />
+        <UserMenu />
+      </div>
     </header>
   );
 }
 
-function SearchBox() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const pages = allPages()
-      .filter((p) => `${p.label} ${p.section}`.toLowerCase().includes(q))
-      .slice(0, 7)
-      .map((p) => ({ href: p.href, title: p.label, hint: p.section }));
-    if (/^\d{3,}$/.test(q)) {
-      pages.unshift({ href: `/stream/vehicle-state?imei=${q}`, title: `Vehicles with IMEI containing ${q}`, hint: "Vehicle State" });
-      pages.unshift({ href: `/stream/tracking?imei=${q}`, title: `Track vehicle ${q}`, hint: "Vehicle Tracking" });
-    }
-    return pages;
-  }, [query]);
-
-  function go(href: string) {
-    router.push(href);
-    setQuery("");
-    inputRef.current?.blur();
-  }
+function LivePill() {
+  const { data: overview, error } = useOverview();
+  const { paused, setPaused } = usePreferences();
+  const kafka = isKafkaFlow(overview);
+  const rate = ingress(overview)?.messagesPerSecond;
+  const offline = !!error && !overview;
+  const state = paused ? "paused" : offline ? "down" : overview ? "up" : "connecting";
+  const text = paused
+    ? "Updates paused"
+    : offline
+      ? "Service offline"
+      : overview
+        ? `${kafka ? "Kafka" : "Direct"} · ${formatRate(rate)} msg/s`
+        : "Connecting";
 
   return (
-    <div className="search">
-      <Search size={16} className="search-icon" />
-      <input
-        ref={inputRef}
-        className="search-input"
-        placeholder="Filter processors, pages, partitions or an IMEI"
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setActive(0);
-        }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 120)}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            setActive((i) => Math.min(i + 1, results.length - 1));
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            setActive((i) => Math.max(i - 1, 0));
-          } else if (event.key === "Enter" && results[active]) {
-            go(results[active].href);
-          } else if (event.key === "Escape") {
-            setQuery("");
-          }
-        }}
-        aria-label="Search"
-      />
-      <kbd className="search-kbd">Ctrl K</kbd>
-      {focused && query.trim() && (
-        <div className="search-results" role="listbox">
-          {results.length === 0 ? (
-            <div className="search-empty">Nothing matches “{query.trim()}”.</div>
-          ) : (
-            results.map((r, i) => (
-              <button
-                type="button"
-                key={r.href}
-                className={`search-result${i === active ? " active" : ""}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => go(r.href)}
-                onMouseEnter={() => setActive(i)}
-              >
-                <span>{r.title}</span>
-                <span className="search-hint">{r.hint}</span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      className={`live-pill ${state}`}
+      onClick={() => setPaused(!paused)}
+      title={paused ? "Live updates are paused. Click to resume." : "Frames entering the pipeline (10 s average). Click to pause live updates."}
+    >
+      <i />
+      <span className="live-pill-text">{text}</span>
+    </button>
   );
 }
 
-function Notifications() {
-  const { data: overview } = useOverview();
-  const alerts = alertsFrom(overview);
-  const serious = seriousCount(alerts);
+function NotificationBell() {
+  const { notices, unread, isRead, markRead, markAllRead } = useNotifications();
+  const latest = notices.slice(0, 6);
 
   return (
     <Popover
-      label="Alerts"
-      width={340}
+      label="Notifications"
+      width={360}
       button={
         <>
           <Bell size={19} />
-          {serious > 0 && <span className="bell-dot" />}
+          {unread > 0 && <span className="bell-count">{unread > 9 ? "9+" : unread}</span>}
         </>
       }
     >
       {(close) => (
         <div>
-          <div className="popover-title">Alerts</div>
-          {alerts.length === 0 ? (
-            <p className="popover-empty">Everything is running normally.</p>
+          <div className="popover-head">
+            <span className="popover-title">Notifications</span>
+            {unread > 0 && (
+              <button type="button" className="text-button" onClick={markAllRead}>
+                <CheckCheck size={14} />
+                Mark all read
+              </button>
+            )}
+          </div>
+          {latest.length === 0 ? (
+            <p className="popover-empty">You are all caught up.</p>
           ) : (
-            <ul className="alert-list">
-              {alerts.map((a, i) => (
-                <li key={i}>
-                  <Link href={a.href} onClick={close} className="alert-item">
-                    <span className={`alert-dot ${a.tone}`} />
-                    <span>
-                      <span className="alert-title">{a.title}</span>
-                      <span className="alert-text">{a.text}</span>
+            <ul className="notice-list">
+              {latest.map((n) => (
+                <li key={n.id}>
+                  <Link
+                    href={n.href}
+                    className={`notice-item${isRead(n.id) ? "" : " unread"}`}
+                    onClick={() => {
+                      markRead(n.id);
+                      close();
+                    }}
+                  >
+                    <span className={`status-dot ${n.tone === "info" ? "muted" : n.tone}`} />
+                    <span className="notice-body">
+                      <span className="notice-heading">{n.title}</span>
+                      <span className="notice-sub">
+                        {n.text}
+                        {n.at && n.kind === "vehicle" ? ` · ${formatAgo(n.at)}` : ""}
+                      </span>
                     </span>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
+          <Link href="/notifications" className="popover-footer-link" onClick={close}>
+            Open notification center
+          </Link>
         </div>
       )}
     </Popover>
   );
 }
 
+const THEMES: [Theme, string][] = [
+  ["light", "Light"],
+  ["dark", "Dark"],
+  ["system", "System"],
+];
+const ACCENTS: [Accent, string, string][] = [
+  ["navy", "Navy", "#0b4a8b"],
+  ["sky", "Sky", "#0284c7"],
+  ["indigo", "Indigo", "#4f46e5"],
+  ["teal", "Teal", "#0f766e"],
+  ["violet", "Violet", "#7c3aed"],
+];
 const BACKGROUNDS: [Background, string, string][] = [
   ["offwhite", "Off-white", "#f5f7fa"],
   ["white", "White", "#ffffff"],
-  ["warm", "Warm white", "#faf8f3"],
+  ["warm", "Warm", "#faf8f3"],
 ];
-const ACCENTS: [Accent, string, string][] = [
-  ["navy", "Navy blue", "#0b4a8b"],
-  ["sky", "Sky blue", "#0284c7"],
+const DENSITIES: [Density, string][] = [
+  ["comfortable", "Comfortable"],
+  ["compact", "Compact"],
 ];
 
-function ThemeSettings() {
-  const { background, accent, setBackground, setAccent } = usePreferences();
+function AppearanceMenu() {
+  const p = usePreferences();
   return (
-    <Popover label="Appearance" width={280} button={<SlidersHorizontal size={19} />}>
+    <Popover label="Appearance and updates" width={330} button={<SlidersHorizontal size={18} />}>
+      {() => (
+        <div className="settings">
+          <div className="popover-title">Appearance</div>
+          <div className="setting">
+            <div className="setting-label">Theme</div>
+            <Choice options={THEMES} value={p.theme} onChange={p.setTheme} />
+          </div>
+          <div className="setting">
+            <div className="setting-label">Accent</div>
+            <div className="accent-swatches">
+              {ACCENTS.map(([value, label, color]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className="accent-swatch"
+                  aria-pressed={p.accent === value}
+                  onClick={() => p.setAccent(value)}
+                  title={label}
+                  aria-label={`${label} accent`}
+                  style={{ background: color }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="setting">
+            <div className="setting-label">Page background (light theme)</div>
+            <div className="bg-swatches">
+              {BACKGROUNDS.map(([value, label, color]) => (
+                <button type="button" key={value} className="bg-swatch" aria-pressed={p.background === value} onClick={() => p.setBackground(value)}>
+                  <i style={{ background: color }} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="setting">
+            <div className="setting-label">Density</div>
+            <Choice options={DENSITIES} value={p.density} onChange={p.setDensity} />
+          </div>
+          <div className="setting-divider" />
+          <label className="switch-row">
+            <span>
+              <span className="switch-title">Live updates</span>
+              <span className="switch-sub">{p.paused ? "Paused: numbers stay as they are" : "Polling the service every few seconds"}</span>
+            </span>
+            <Switch checked={!p.paused} onChange={(on) => p.setPaused(!on)} label="Live updates" />
+          </label>
+          <label className="switch-row">
+            <span>
+              <span className="switch-title">Expanded menu</span>
+              <span className="switch-sub">Off shows icons only</span>
+            </span>
+            <Switch checked={p.sidebarOpen} onChange={p.toggleSidebar} label="Expanded menu" />
+          </label>
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+function UserMenu() {
+  const { data: o } = useOverview();
+  return (
+    <Popover label="Account and environment" width={280} button={<CircleUser size={21} />} buttonClassName="icon-button avatar-button">
       {() => (
         <div>
-          <div className="popover-title">Appearance</div>
-          <div className="setting-label">Background</div>
-          <div className="swatches">
-            {BACKGROUNDS.map(([value, label, color]) => (
-              <button
-                type="button"
-                key={value}
-                className={`swatch${background === value ? " selected" : ""}`}
-                onClick={() => setBackground(value)}
-              >
-                <span className="swatch-color" style={{ background: color }} />
-                {label}
-              </button>
-            ))}
+          <div className="user-card">
+            <span className="user-avatar">OP</span>
+            <span>
+              <span className="notice-heading">Operator</span>
+              <span className="notice-sub">Local console</span>
+            </span>
           </div>
-          <div className="setting-label">Accent</div>
-          <div className="swatches">
-            {ACCENTS.map(([value, label, color]) => (
-              <button
-                type="button"
-                key={value}
-                className={`swatch${accent === value ? " selected" : ""}`}
-                onClick={() => setAccent(value)}
-              >
-                <span className="swatch-color" style={{ background: color }} />
-                {label}
-              </button>
-            ))}
+          <dl className="kv compact">
+            <div className="kv-row">
+              <dt>Processing flow</dt>
+              <dd>{o ? (isKafkaFlow(o) ? "Kafka" : "Direct") : "–"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Service</dt>
+              <dd className="mono">/api → GPS_API_URL</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Last update</dt>
+              <dd>{o ? formatAgo(o.generatedAt) : "–"}</dd>
+            </div>
+          </dl>
+          <div className="shortcut-list">
+            <span>
+              <kbd>Ctrl K</kbd> Search
+            </span>
+            <span>
+              <kbd>/</kbd> Search
+            </span>
           </div>
         </div>
       )}
     </Popover>
+  );
+}
+
+function Choice<T extends string>({ options, value, onChange }: { options: [T, string][]; value: T; onChange: (value: T) => void }) {
+  return (
+    <div className="segmented full" role="group">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" aria-pressed={v === value} onClick={() => onChange(v)}>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }

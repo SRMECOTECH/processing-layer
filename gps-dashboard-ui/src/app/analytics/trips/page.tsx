@@ -61,7 +61,7 @@ export default function TripEfficiencyPage() {
               <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
                 <span>Corridor buffer: 250 m</span>
                 <span>
-                  Threshold: &lt; 5 min <Tag tone="warn">DEMO</Tag>
+                  Threshold: &lt; 5 min <Tag tone="neutral">EXAMPLE</Tag>
                 </span>
               </div>
             </div>

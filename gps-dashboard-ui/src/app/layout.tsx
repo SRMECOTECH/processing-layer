@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Offline } from "@/components/ops/kit";
 import { AppHeader } from "@/components/shell/app-header";
 import { Sidebar } from "@/components/shell/sidebar";
+import { NotificationsProvider } from "@/lib/notifications";
 import { OverviewProvider } from "@/lib/overview-context";
 import { APPLY_SAVED_THEME, PreferencesProvider } from "@/lib/preferences";
 import "./globals.css";
@@ -11,11 +13,14 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono", display: 
 
 export const metadata: Metadata = {
   title: "PulseStream IoT",
-  description: "Operations console for the GPS streaming platform: stream processors, business rules, ingestion and analytics.",
+  description: "Operations console for the GPS streaming platform: live fleet, stream processors, alerts, storage and notifications.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e131c" },
+  ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -23,8 +28,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       className={`${sans.variable} ${mono.variable}`}
+      data-theme="light"
       data-bg="offwhite"
       data-accent="navy"
+      data-density="comfortable"
       data-sidebar="open"
       suppressHydrationWarning
     >
@@ -34,11 +41,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <PreferencesProvider>
           <OverviewProvider>
-            <AppHeader />
-            <div className="app-body">
-              <Sidebar />
-              <main className="app-main">{children}</main>
-            </div>
+            <NotificationsProvider>
+              <AppHeader />
+              <div className="app-body">
+                <Sidebar />
+                <main className="app-main">
+                  <Offline />
+                  {children}
+                </main>
+              </div>
+            </NotificationsProvider>
           </OverviewProvider>
         </PreferencesProvider>
       </body>

@@ -17,6 +17,10 @@
 #   Stop:         docker compose down          (data is kept in the named volumes)
 #   Wipe data:    docker compose down -v
 #
+# Every service has restart: always, so after the first "up" the whole platform starts by itself whenever
+# Docker Desktop starts. Stopping it (Docker Desktop's stop button or docker compose stop) holds until you
+# start it again or Docker Desktop restarts; "docker compose down" removes it for good.
+#
 # Inside the compose network the containers find each other by service name (postgres, kafka, redis).
 # The Windows-side ports differ from the Windows installs (5432, 9092, 6379) so both can run side by side.
 # smart_truck stays the existing MySQL on Windows, reached through host.docker.internal (read-only, as always).
@@ -27,6 +31,7 @@ services:
 
   postgres:
     image: postgres:14.22
+    restart: always
     environment:
       POSTGRES_DB: gps_tracking
       POSTGRES_USER: gps_app
@@ -43,6 +48,7 @@ services:
 
   kafka:
     image: apache/kafka:4.3.1
+    restart: always
     environment:
       # One node that is both broker and controller (KRaft mode, no ZooKeeper) - same as the Windows install.
       KAFKA_NODE_ID: 1
@@ -74,6 +80,7 @@ services:
 
   kafka-ui:
     image: kafbat/kafka-ui:v1.3.0
+    restart: always
     environment:
       KAFKA_CLUSTERS_0_NAME: gps-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -86,6 +93,7 @@ services:
 
   redis:
     image: redis/redis-stack:7.4.0-v8
+    restart: always
     environment:
       # Live positions are rebuilt from the next reading of each vehicle, so nothing needs to be saved to disk.
       REDIS_ARGS: --save "" --appendonly no --maxmemory 512mb --maxmemory-policy noeviction
@@ -104,6 +112,7 @@ services:
     build: .
     # Built locally with --build, or pulled ready-made from Docker Hub: docker compose pull gps-service
     image: ${GPS_SERVICE_IMAGE:-srmecotech/processing-layer:latest}
+    restart: always
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
@@ -133,11 +142,19 @@ services:
   dashboard:
     build: ./gps-dashboard-ui
     image: ${GPS_DASHBOARD_IMAGE:-srmecotech/processing-layer-dashboard:latest}
+    restart: always
     environment:
       # The dashboard's server calls the service inside the compose network; the browser only talks to the dashboard.
       GPS_API_URL: http://gps-service:8080
     ports:
       - "3000:3000"
+    healthcheck:
+      # The page itself, not the service behind it: the console stays up (showing "offline") while gps-service restarts.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       - gps-service
 
