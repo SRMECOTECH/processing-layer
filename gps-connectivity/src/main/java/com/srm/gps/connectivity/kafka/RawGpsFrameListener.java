@@ -3,7 +3,7 @@ package com.srm.gps.connectivity.kafka;
 import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.KafkaTopicNames;
 import com.srm.gps.configuration.PipelineStage;
-import com.srm.gps.connectivity.flow.OnlyInKafkaFlow;
+import com.srm.gps.connectivity.flow.OnlyWhenListenerNormalizes;
 import com.srm.gps.connectivity.monitoring.PipelineLogContext;
 import com.srm.gps.connectivity.monitoring.PipelineMetrics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -16,9 +16,12 @@ import org.springframework.stereotype.Component;
  *
  * One consumer thread per partition. All frames of one device are in one partition,
  * so one device is always processed by one thread, in order.
+ *
+ * Not created when Kafka Streams owns normalization (gps.streams.normalization=owner): the Kafka Streams normalizer
+ * then uses this same group id and continues from its committed offsets.
  */
 @Component
-@OnlyInKafkaFlow
+@OnlyWhenListenerNormalizes
 public class RawGpsFrameListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.RAW_FRAME_PROCESSING;

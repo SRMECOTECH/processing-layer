@@ -41,4 +41,14 @@ public class KafkaTopicDeclarations {
         return TopicBuilder.name(KafkaTopicNames.VEHICLE_EVENTS)
                 .partitions(KafkaTopicNames.PARTITIONS_PER_TOPIC).replicas(REPLICAS).build();
     }
+
+    /**
+     * Kafka Streams output. Declared here, not left to Kafka Streams: it only creates its INTERNAL topics, and a sink
+     * topic auto-created by the broker would get the broker's default of 1 partition.
+     */
+    @Bean
+    public NewTopic vehicleActivityTopic() {
+        return TopicBuilder.name(KafkaTopicNames.VEHICLE_ACTIVITY)
+                .partitions(KafkaTopicNames.PARTITIONS_PER_TOPIC).replicas(REPLICAS).build();
+    }
 }

@@ -27,6 +27,7 @@ Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (
 13. [Simulator – nakli trucks jo asli jaise chalte hain](#13-simulator--nakli-trucks-jo-asli-jaise-chalte-hain)
 14. [Redis – live board](#14-redis--live-board)
 15. [Trips aur stops – gps-trip-service](#15-trips-aur-stops--gps-trip-service)
+    - [15c. Kafka Streams – processing layer ka engine](#15c-kafka-streams--processing-layer-ka-engine)
 16. [Engine dashboard aur REST APIs](#16-engine-dashboard-aur-rest-apis)
 17. [Classified logs – har line bataye kaun, kis truck ka, kahan se](#17-classified-logs--har-line-bataye-kaun-kis-truck-ka-kahan-se)
 18. [Maven modules – har module ka ek hi kaam](#18-maven-modules--har-module-ka-ek-hi-kaam)
@@ -77,6 +78,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | **Spring Boot** | 4.1.1 | Kafka, JPA, Redis, REST, Actuator sab ek jagah, kam configuration |
 | **Apache Kafka** | 4.3.1 (KRaft, ZooKeeper nahi) | GPS data ka **buffer + post office**. Database down ho to data Kafka mein intezaar karta hai, gum nahi hota |
 | **Spring for Apache Kafka** | Boot ke saath | `@KafkaListener`, `KafkaTemplate`, retry (`DefaultErrorHandler`) |
+| **Kafka Streams** (+ RocksDB) | 4.2.1 (Boot ke saath) | Raw frame → position ka kaam **exactly-once**, har gaadi ki state RocksDB + changelog topic mein, KTable, 5-min event-time windows, Interactive Queries (section 15c) |
 | **PostgreSQL** | 14.22 | Hamara apna naya database `gps_tracking` – positions aur master data |
 | **Hibernate / Spring Data JPA** | Boot ke saath | Java class ↔ table. `ddl-auto: validate` – Hibernate sirf check karta hai, table nahi banata |
 | **Flyway** | Boot ke saath | Tables numbered SQL files se bante hain (`V1__`, `V2__`). Kaunsi file chal chuki, wo yaad rakhta hai |
@@ -90,7 +92,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | **Spring Actuator** | Boot ke saath | `/actuator/health` – sab zinda hai ya nahi |
 | **JUnit 5** | – | Processing ke har rule ka test, bina kuch start kiye |
 
-**Apache Flink nahi hai** – pehle tha, hata diya. Saari processing Spring Boot ke andar plain Java mein hoti hai. Kyun? Simple rakhna tha, har cheez debug ho sake, aur 150 trucks ke liye Spring kaafi hai.
+**Apache Flink nahi hai** – pehle tha, hata diya. Processing ke rules `gps-processing` mein plain Java mein hain. Unko chalata hai **Kafka Streams** – ek library jo isi Spring service ke andar chalti hai, alag cluster nahi (section 15c). State, windows aur exactly-once Kafka se hi milte hain, bina naye system ke.
 
 ---
 
@@ -120,6 +122,8 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 
 **Ginti yaad rakho: 3 topics, 3 producers, 5 consumer groups.**
 
+> **Update (Kafka Streams):** C1 ka kaam (raw → processed / rejected) ab default se **Kafka Streams normalizer** karta hai – wahi group id `gps-raw-frame-processing-service`, wahi rules, lekin **exactly-once** aur state RocksDB + changelog mein. Ek doosra Kafka Streams app (`gps-streams-analytics`) processed positions se har gaadi ki KTable aur 5-minute windows banata hai. Poori kahani: section 15c.
+
 ---
 
 ## 5. Topics – 3 trays
@@ -129,6 +133,9 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 | 1 | `gps.raw-device-frames` | Frame bilkul waisa jaisa device ne bheja: IMEI, time, lat, lon, speed |
 | 2 | `gps.processed-positions` | Jo frame check pass kar gaya + distance, kitne second baad aaya, MOVING/STOPPED |
 | 3 | `gps.rejected-frames` | Jo fail hua + **reason** (jaise "Latitude 95.0 is outside -90..90") |
+| 4 | `gps.vehicle-events` | Stream consumers ke events: over-speed, stoppage, ignition … |
+| 5 | `gps.vehicle-activity` | **Kafka Streams**: har gaadi ka har 5-minute window ka final hisaab (window band hone ke baad ek hi record) |
+| – | `gps.shadow.processed-positions`, `gps.shadow.rejected-frames` | Sirf **shadow mode** mein: Kafka Streams ka output, listener ke output se milaane ke liye |
 
 - Har topic mein **3 partitions** hain.
 - **Key = IMEI.** Kafka key ka hash leta hai (`murmur2(key) % 3`), to ek truck ke saare frames hamesha **ek hi partition** mein jaate hain → **order bana rehta hai**. Truck ka 10:01 wala ping 10:00 wale se pehle process nahi hoga.
@@ -164,6 +171,9 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 | C3 | `gps-live-location-service` | `gps.processed-positions` | Har gaadi ki **sirf latest** position rakho | Redis |
 | C4 | `gps-rejected-frame-logger` | `gps.rejected-frames` | Reject reason log karo | Service ka log |
 | C5 | `gps-trip-service` | `gps.processed-positions` | Trips aur stops pehchano (section 15) | PostgreSQL `gps_trip`, `gps_stop` |
+| KS | `gps-streams-analytics` | `gps.processed-positions` | **Kafka Streams**: vehicle KTable + 5-min windows (+ shadow parity) | RocksDB stores, `gps.vehicle-activity` |
+
+C1 (`gps-raw-frame-processing-service`) ab default se **Kafka Streams** chalata hai (listener tab banta hi nahi) – group id same hai, isliye dono taraf switch karne pe offsets wahin se chalte hain.
 
 ### Group ka asli funda (sabse important Kafka concept)
 
@@ -435,7 +445,98 @@ Settings: `gps.stream.*` (stoppage, ignition, vehicle-state, enrichment). Speed 
 
 **Vehicle inspector** (UI: Live → Vehicle inspector): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
 
-**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → 4 topics ke saare messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → saare platform topics ke messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → **Kafka Streams reset** (local state, consumer groups, changelog topics saaf, apps dobara start) → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+
+---
+
+## 15c. Kafka Streams – processing layer ka engine
+
+> Poori gehraai English mein: [docs/KAFKA_STREAMS_GUIDE.md](docs/KAFKA_STREAMS_GUIDE.md) – Kafka 4.3 ke [architecture guide](https://kafka.apache.org/43/streams/architecture/) ka har concept, is code mein kahan hai.
+
+**Desi version:** pehle helper (listener) "har truck ne pichhli baar kya bheja" apni **jeb ki diary** (memory) mein rakhta tha. Ghar gaya (restart) to diary gayi, phir munshi ke register (PostgreSQL) se poochta tha. Ab har counter (partition) ka apna **locker** (state store, RocksDB) hai, aur locker ka har page back-office ke **ledger** (changelog topic, Kafka) mein bhi copy hota hai. Helper badla to naya helper wahi locker kholta hai, ya ledger se dobara bana leta hai. Aur teen kaam – tray pe maal rakhna, locker mein likhna, order slip pe tick – **ek hi thappa** (transaction) hain: ya teeno, ya koi nahi.
+
+**Do apps, service ke andar hi (Kafka Streams library hai, cluster nahi):**
+
+```
+normalizer  (application.id = gps-raw-frame-processing-service, exactly-once)
+  gps.raw-device-frames ─► normalize-frame ─► split ─┬─► gps.processed-positions   (timestamp = recordedAt)
+                            previous-reading-store    └─► gps.rejected-frames
+                            seen-reading-store
+
+analytics   (application.id = gps-streams-analytics, at-least-once, read_committed)
+  gps.processed-positions ─► group by IMEI ─┬─► vehicle-table-store    (KTable: har gaadi ki latest state)
+     (event time = recordedAt)              └─► 5 min window + 2 min grace ─► gps.vehicle-activity (band hone pe ek record)
+```
+
+**Architecture guide ke concepts, yahan:**
+
+| Concept | Is project mein |
+|---|---|
+| Partition + key | 3 partitions, key = IMEI. Normalizer **check** karta hai: record key ≠ frame ka IMEI → reject (warna ek gaadi ki state do jagah bat jaati) |
+| Task | Har app ke 3 tasks: `0_0`, `0_1`, `0_2` – task `0_1` hamesha partition 1 ka maalik |
+| Threads | Har app 3 stream threads, ek task per thread. Doosra instance chalao → Kafka tasks baant deta hai |
+| State store + changelog | `previous-reading-store`, `seen-reading-store`, `vehicle-table-store`, `activity-window-store` – sab RocksDB mein, har ek ka compacted changelog topic |
+| Restoration / standby | Task naye instance pe gaya → changelog se state wapas. `standby-replicas: 1` (2+ instances pe) → garam copy ready |
+| Exactly-once | Output record + state update + input offset = ek transaction |
+| Event time + grace | Window device ke time (`recordedAt`) pe, 2 min late reading bhi apne window mein ginti |
+| Interactive Queries | `GET /api/streams/...` seedha RocksDB store padhta hai; doosre instance ke paas wali gaadi → wahan forward |
+
+**Teen naye rules jo listener mein nahi the:**
+- **Key contract** – frame ka record key uska IMEI hi hona chahiye.
+- **Duplicate store** – listener sirf "sabse nayi reading dobara aayi" pakadta tha. Device reconnect hoke **purani** readings dobara bheje, to listener unko late maan ke dobara le leta tha. Ab 24 ghante ki har reading yaad hai (window store) → `Duplicate reading`.
+- **Stale** – device ki sabse nayi reading se 24 ghante se purani reading → `Stale reading` (reject topic mein, payload ke saath – kuch gum nahi).
+
+**Kaun normalize karega – ek hi maalik (`gps.streams.normalization`):**
+
+| Mode | Raw → position kaun | Kafka Streams aur kya |
+|---|---|---|
+| `owner` (default) | Kafka Streams | analytics |
+| `shadow` | listener | wahi logic `gps.shadow.*` mein + **parity** (dono ka output reading-by-reading match) |
+| `off` | listener | sirf analytics |
+
+**Hand-over ka jugaad:** Kafka Streams ka `application.id` hi uska consumer group hai. Isliye owner normalizer listener ka hi group id use karta hai. Listener se Kafka Streams pe (ya wapas) switch karo, to kaam **committed offsets se hi aage** chalta hai – na replay, na gap. Dono band hote waqt group chhod dete hain, to naya maalik turant partitions le leta hai (45 sec ka intezaar nahi).
+
+**Shadow parity kaise:** dono outputs IMEI se keyed hain, partitions same hain, aur dono ka timestamp `recordedAt` hai. Isliye **0 ke join window** wala outer join ek hi reading ke dono results ko jod deta hai. Verdict: `MATCH`, `MISMATCH` (kaunsa field), `WARMUP` (shadow ki pehli reading), `ONLY_LISTENER` / `ONLY_STREAMS`.
+
+**Dekho kahan:**
+
+| Kya | Kahan |
+|---|---|
+| Apps, topology, threads → tasks → partitions, stores, restore, metrics | UI: Processing → **Kafka Streams** → Topology & tasks · `GET /api/streams/overview` |
+| Har gaadi ki KTable row | Vehicle table · `GET /api/streams/vehicles`, `/api/streams/vehicles/{imei}` |
+| Fleet per 5-min window | Activity windows · `GET /api/streams/fleet/activity?windows=24` |
+| Listener vs Kafka Streams | Shadow parity · `GET /api/streams/parity` |
+| Health | `/actuator/health` → `kafkaStreams` |
+
+**Settings (`gps.streams.*`):**
+
+| Setting | Default |
+|---|---|
+| `enabled` | `true` |
+| `normalization` | `owner` |
+| `threads` | `3` |
+| `standby-replicas` | `0` |
+| `replication-factor` | `-1` (broker default) |
+| `state-dir` | Docker: `/var/lib/gps-streams` (volume pe) |
+| `advertised-host` | `localhost` |
+| `max-lateness`, `seen-readings-retention` | `24h`, `24h` |
+| `window-size`, `window-grace`, `window-retention` | `5m`, `2m`, `6h` |
+| `parity-grace` | `2m` |
+| `rocksdb-off-heap-mb` | `64` |
+| `normalizer-guarantee`, `analytics-guarantee` | `exactly_once_v2`, `at_least_once` |
+| `properties.*` | jaise `client.rack` |
+
+Docker mein env se badlo, jaise `GPS_STREAMS_NORMALIZATION=shadow`.
+
+**Dhyan rakhne wali baat:** exactly-once wale topics (`gps.processed-positions`, `gps.rejected-frames`) mein har transaction ek **commit marker** likhta hai. Isliye "latest − earliest offset" messages se zyada dikhata hai. msg/s aur totals sahi hain, lag bhi sahi hai. Saare listeners `isolation-level: read_committed` pe padhte hain – aborted transaction ka record kabhi nahi dikhta.
+
+**Code kahan:**
+- `gps-streams/` (plain Java, Spring nahi):
+  - `normalize/` – NormalizationTopology, NormalizeFrameProcessor
+  - `analytics/` – AnalyticsTopology, VehicleSnapshot, ActivityWindow, ParityVerdict
+  - `runtime/` – StreamsApp, RestoreTracker, BoundedMemoryRocksDbConfig, StreamsIntrospection
+- Spring wiring + IQ API: `gps-application/.../kafkastreams/`
+- Tests: `.\mvnw.cmd -pl gps-streams test` – 23 tests, `TopologyTestDriver` pe, broker ke bina.
 
 ---
 
@@ -470,6 +571,10 @@ Load counters (`PipelineMetrics`, `StageCounters`) memory mein hain – har mess
 | `GET /api/speed/active` | Abhi limit ke upar wali gaadiyan (CANDIDATE / VIOLATING) |
 | `GET /api/vehicles/{imei}/state?history=50` | Tracking window: gaadi ka saara cache (Redis keys), history stream, events, processing memory, trip state |
 | `GET /api/vehicles/states` | Har gaadi ka vehicle-state hash |
+| `GET /api/streams/overview` | Kafka Streams: dono apps, topology, threads/tasks, stores, restore, metrics |
+| `GET /api/streams/vehicles` · `/api/streams/vehicles/{imei}` | Vehicle KTable (Interactive Queries), ek gaadi ka partition + windows |
+| `GET /api/streams/fleet/activity?windows=24` | Fleet per 5-minute event-time window |
+| `GET /api/streams/parity` | Shadow mode: listener vs Kafka Streams |
 | `POST /api/admin/reset?restartFleet=true` | **Empty DB** (demo practice) – neeche section 15b |
 | `GET /actuator/health` | DB + Redis UP/DOWN |
 
@@ -531,6 +636,7 @@ Kuch toota → kis module mein dekhna hai, turant pata.
 | `gps-configuration` | Topic, group, flow, stage, Redis key ke naam; message formats (records); JSON. **Plain Java** | Do hisse ek naam ya JSON field pe agree nahi kar rahe |
 | `gps-connectivity` | Bahar ki duniya se har connection: smart_truck reader, Kafka publishers/listeners/retry/inspector, Redis stores, Hibernate entities + repositories, load counters | Kuch connect/read/write nahi ho raha |
 | `gps-processing` | Processing logic: `GpsFrameProcessor` + `step/` + `rule/`, aur trip detection `trip/`. **Plain Java, poora unit tested** | Frames reject ho rahe, distance/status galat, ya trip galat jagah shuru/band |
+| `gps-streams` | **Kafka Streams** topologies (normalizer, analytics) + runtime. Spring nahi, `TopologyTestDriver` se tested | Duplicate/stale/key wale rejections, KTable/windows galat, parity mismatch |
 | `gps-application` | Spring Boot service: dono flows, simulator, master data, storage, live location, trips, engine API + dashboard, Flyway migrations | Hisso ke beech ka flow galat hai |
 
 ```
@@ -541,6 +647,7 @@ processing-layer/
 │                       flow/ (@OnlyInKafkaFlow, @OnlyInDirectFlow)  monitoring/ (metrics, MDC log context)
 ├─ gps-processing/      GpsFrameProcessor, step/ (validate, movement, previous reading), rule/ (validation, movement, distance)
 │                       trip/ (TripMotionProcessor: trips aur stops, pure function)
+├─ gps-streams/         Kafka Streams: normalize/ (exactly-once normalizer), analytics/ (KTable, windows, parity), runtime/
 ├─ gps-application/     flow/ (kafka, direct)  simulator/  masterdata/  storage/  livelocation/  trip/  rejection/
 │                       processing/  engine/  api/  resources/ (application.yml, db/migration, static/index.html)
 ├─ infrastructure/      windows/ (Kafka, PostgreSQL setup + start/stop)  docker/ (.env banane ki script)
@@ -572,7 +679,7 @@ processing-layer/
 | `kafka` | Apache Kafka 4.3.1 (KRaft, ek node) | `localhost:29092` |
 | `kafka-ui` | Kafka UI | http://localhost:8085 |
 | `redis` | Redis Stack + RedisInsight | `localhost:6380`, http://localhost:8001 |
-| `gps-service` | Humari Spring Boot app | http://localhost:8080 |
+| `gps-service` | Humari Spring Boot app (+ dono Kafka Streams apps; state `gps-streams-state` volume mein) | http://localhost:8080 |
 
 Windows wale ports (5432, 9092, 6379) se alag rakhe hain taaki dono saath chal sakein. Containers ek dusre ko service naam se dhoondhte hain (`postgres`, `kafka`, `redis`). Health checks ki wajah se `gps-service` tabhi start hota hai jab postgres, redis, kafka healthy hon.
 
@@ -699,6 +806,10 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 9. **Device ek gaadi se doosri mein shift hua to purani readings?** `device_assignment` periods mein hai – reading ke time wali gaadi milti hai.
 10. **Trip ka distance kabhi negative kyun nahi hoga?** Distance in-order readings ke legs ka jod hai, "end odometer − start" nahi. Late reading skip hoti hai (sirf ginti), aur DB mein `CHECK (distance_m >= 0)`.
 11. **Trip service ko same reading do baar mili to?** State update `WHERE last_recorded_at < :recordedAt` – doosri baar 0 rows, transaction rollback. Trip `(imei, start_recorded_at)` pe upsert, to duplicate row ban hi nahi sakti.
+12. **Kafka Streams normalizer listener ka group id kyun use karta hai?** `application.id` = consumer group. Same id → switch karne pe committed offsets se aage, na replay na gap. Dono kabhi saath nahi chalte.
+13. **Exactly-once mein exactly kya ek saath hota hai?** Output record + dono stores ke changelog writes + input offset – ek transaction.
+14. **Fleet ke numbers ke liye ek "fleet" key kyun nahi?** Saari fleet ek partition, ek thread pe aa jaati. Har gaadi ke window ko query ke waqt jod lo – partitions ke saath scale hota hai.
+15. **4 instances, 3 partitions?** Ek khali baithega (hot spare; standby replicas ho to garam spare).
 
 ---
 
@@ -707,6 +818,7 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 > **3 trays, 3 producers, 5 kaam.**
 > Raw tray → 1 cleaner (jo agli do trays bhi bharta hai) → saaf tray ko 3 alag log padhte hain (DB, Redis, trip diary) → reject tray ko 1 logger.
 > **Key = IMEI = order. Alag group = poori copy. Same group = kaam ka batwara.**
+> **Kafka Streams: state locker mein, locker ki copy Kafka mein, teen kaam ek thappe mein. Ek waqt pe ek hi maalik – pehle shadow, phir owner.**
 
 Har application ko kaise start/stop/check karein aur uski main files kaunsi hain: [docs/APPLICATIONS_GUIDE.md](docs/APPLICATIONS_GUIDE.md).
 

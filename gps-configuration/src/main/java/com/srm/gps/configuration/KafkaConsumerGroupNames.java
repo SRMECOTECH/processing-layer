@@ -9,8 +9,19 @@ package com.srm.gps.configuration;
  */
 public final class KafkaConsumerGroupNames {
 
-    /** Reads raw frames, validates them, calculates movement, writes processed positions or rejections. */
+    /**
+     * Reads raw frames, validates them, calculates movement, writes processed positions or rejections.
+     * It is also the application.id of the Kafka Streams normalizer: a Kafka Streams application.id IS its consumer
+     * group, so switching between the listener and Kafka Streams continues from the same committed offsets -
+     * no replay and no gap in either direction (the two never run at the same time).
+     */
     public static final String RAW_FRAME_PROCESSING = "gps-raw-frame-processing-service";
+
+    /** Kafka Streams normalizer in shadow mode: same logic as the owner, writing to the gps.shadow.* topics. */
+    public static final String STREAMS_SHADOW_NORMALIZER = "gps-streams-shadow-normalizer";
+
+    /** Kafka Streams analytics: vehicle table, 5-minute activity windows, shadow parity. Its application.id. */
+    public static final String STREAMS_ANALYTICS = "gps-streams-analytics";
 
     /** Reads processed positions and stores them in PostgreSQL. */
     public static final String POSITION_STORAGE = "gps-position-storage-service";

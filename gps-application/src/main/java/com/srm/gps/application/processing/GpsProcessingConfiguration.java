@@ -22,7 +22,7 @@ public class GpsProcessingConfiguration {
     @ConfigurationProperties("gps.distance")
     public record DistanceProperties(Double jitterMeters, Integer jitterMaxSpeedKmph, Double maxImpliedSpeedKmph, Double minJumpMeters) {
 
-        DistanceSettings toSettings() {
+        public DistanceSettings toSettings() {
             DistanceSettings d = DistanceSettings.defaults();
             return new DistanceSettings(
                     jitterMeters != null ? jitterMeters : d.jitterMeters(),

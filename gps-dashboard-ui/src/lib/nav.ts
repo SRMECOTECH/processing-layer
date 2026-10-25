@@ -18,6 +18,7 @@ import {
   Grid3x3,
   History,
   Inbox,
+  Layers,
   ListChecks,
   Map,
   MapPinned,
@@ -96,6 +97,18 @@ export const SECTIONS: Section[] = [
         items: [
           { href: "/processing", label: "Pipeline overview", icon: Workflow, feed: "live" },
           { href: "/processing/consumers", label: "Consumer groups", icon: Network, feed: "live" },
+          {
+            href: "/processing/streams",
+            label: "Kafka Streams",
+            icon: Layers,
+            feed: "live",
+            children: [
+              { href: "/processing/streams", label: "Topology & tasks", feed: "live" },
+              { href: "/processing/streams/table", label: "Vehicle table", feed: "live" },
+              { href: "/processing/streams/windows", label: "Activity windows", feed: "live" },
+              { href: "/processing/streams/parity", label: "Shadow parity", feed: "live" },
+            ],
+          },
         ],
       },
       {

@@ -32,6 +32,8 @@ public enum PipelineStage {
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.STOPPAGE),
     IGNITION(Kind.CONSUMER, "Track ignition (device or virtual), engine hours and idling",
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.IGNITION),
+    STREAMS_ANALYTICS(Kind.CONSUMER, "Kafka Streams: vehicle table, 5-minute activity windows, shadow parity",
+            KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.STREAMS_ANALYTICS),
     REJECTED_FRAME_LOGGER(Kind.CONSUMER, "Log rejected frames with the reason",
             KafkaTopicNames.REJECTED_FRAMES, KafkaConsumerGroupNames.REJECTED_FRAME_LOGGER),
 

@@ -29,6 +29,7 @@ export const STAGE_NAME: Record<string, string> = {
   VEHICLE_STATE: "Vehicle state",
   STOPPAGE_DETECTION: "Stoppage detection",
   IGNITION: "Ignition",
+  STREAMS_ANALYTICS: "Kafka Streams analytics",
 };
 
 export function stageName(stage: string): string {

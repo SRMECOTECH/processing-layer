@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.srm.gps</groupId>
+        <artifactId>gps-streaming-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>gps-streams</artifactId>
+    <name>gps-streams</name>
+    <description>The Kafka Streams processing layer: normalization of raw frames with exactly-once state, and analytics (vehicle table, event-time windows, shadow parity). Plain Java, no Spring.</description>
+
+    <!--
+        Kafka Streams is a library, not a cluster: these topologies run inside the Spring service
+        (gps-application starts them), and every one of them is unit-tested here with TopologyTestDriver,
+        without a broker. The rules themselves are not repeated: they come from gps-processing.
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-processing</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams</artifactId>
+        </dependency>
+        <!-- log lines classified like the listeners' (stage, IMEI, partition, offset in the MDC) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams-test-utils</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

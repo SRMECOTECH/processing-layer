@@ -1,15 +1,17 @@
 # The whole GPS platform in containers.
 #
 #   postgres     PostgreSQL 14         gps_tracking database              Windows: localhost:5433
-#   kafka        Apache Kafka (KRaft)  the 3 topics                       Windows: localhost:29092
+#   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
 #   kafka-ui     Kafka UI              browse topics, messages, groups     http://localhost:8085
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
+#                + Kafka Streams       normalizer + analytics apps         state in the gps-streams-state volume
 #   dashboard    our Next.js web UI    PulseStream dashboard               http://localhost:3000
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
+#   Shadow run:   $env:GPS_STREAMS_NORMALIZATION = 'shadow'; docker compose up -d gps-service   (listener + parity)
 #   Direct flow:  docker compose up -d postgres redis
 #                 $env:GPS_PROCESSING_FLOW = 'direct'; docker compose up -d --no-deps --build gps-service
 #   Logs:         docker compose logs -f gps-service
@@ -115,6 +117,11 @@ services:
     restart: always
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
+      # Kafka Streams: owner (it normalizes) | shadow (the listener does, Kafka Streams is compared) | off
+      GPS_STREAMS_ENABLED: ${GPS_STREAMS_ENABLED:-true}
+      GPS_STREAMS_NORMALIZATION: ${GPS_STREAMS_NORMALIZATION:-owner}
+      GPS_STREAMS_STATEDIR: /var/lib/gps-streams
+      GPS_STREAMS_ADVERTISEDHOST: gps-service
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
       GPS_SIMULATOR_VEHICLECOUNT: ${GPS_SIMULATOR_VEHICLE_COUNT:-150}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
@@ -128,6 +135,8 @@ services:
       SMARTTRUCK_DATABASE_PASSWORD: ${SMART_TRUCK_DATABASE_PASSWORD}
     ports:
       - "8080:8080"
+    volumes:
+      - gps-streams-state:/var/lib/gps-streams
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -162,3 +171,4 @@ volumes:
   gps-postgres-data:
   gps-kafka-data:
   gps-redisinsight-data:
+  gps-streams-state:

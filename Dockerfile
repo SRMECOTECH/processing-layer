@@ -14,6 +14,7 @@ COPY mvnw pom.xml ./
 COPY gps-configuration gps-configuration
 COPY gps-connectivity gps-connectivity
 COPY gps-processing gps-processing
+COPY gps-streams gps-streams
 COPY gps-application gps-application
 
 # The cache mount keeps downloaded Maven libraries between builds, so a rebuild after a code change is fast.
@@ -25,7 +26,9 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Do not run as root inside the container.
-RUN useradd --system --uid 1001 gps
+# /var/lib/gps-streams: the Kafka Streams state stores (RocksDB), mounted as a volume by docker compose so a new
+# container reuses them instead of restoring every store from its changelog topic.
+RUN useradd --system --uid 1001 gps && mkdir -p /var/lib/gps-streams && chown gps /var/lib/gps-streams
 USER gps
 
 COPY --from=build /workspace/gps-application/target/gps-streaming-service.jar gps-streaming-service.jar

@@ -1,5 +1,5 @@
 // JSON shapes returned by gps-streaming-service. They mirror the Java records:
-//   EngineViews, KafkaTopologyInspector, SimulationStatus, GpsPositionView, TripView, StopView.
+//   EngineViews, KafkaTopologyInspector, SimulationStatus, GpsPositionView, TripView, StopView, KafkaStreamsViews.
 // Times are ISO-8601 strings (java.time.Instant).
 
 export type SimulationStatus = {
@@ -78,6 +78,15 @@ export type EngineOverview = {
   storedPositions: number;
   vehiclesWithLivePosition: number;
   redisProblem: string | null;
+  /** Who turns raw frames into processed positions (older services leave it out). */
+  normalization?: NormalizationView;
+};
+
+export type NormalizationView = {
+  engine: "kafka-streams" | "listener" | "direct";
+  mode: "owner" | "shadow" | "off" | null;
+  normalizerState: string | null;
+  analyticsState: string | null;
 };
 
 export type DeviceLoadView = {
@@ -224,4 +233,155 @@ export type ResetReport = {
   tablesEmptied: string[];
   redisKeysDeleted: number;
   notes: string[];
+};
+
+// ---------------------------------------------------------------- Kafka Streams (GET /api/streams/...)
+
+export type StreamsNode = { name: string; kind: "SOURCE" | "PROCESSOR" | "SINK" | "NODE"; topics: string[]; stores: string[]; next: string[] };
+export type StreamsSubtopology = { id: number; sourceTopics: string[]; sinkTopics: string[]; stores: string[]; nodes: StreamsNode[] };
+export type StreamsInput = { topic: string; partition: number; committedOffset: number | null; endOffset: number | null; lag: number | null };
+export type StreamsTask = { id: string; subtopology: number; partition: number; inputs: StreamsInput[] };
+export type StreamsThread = { name: string; state: string; activeTasks: StreamsTask[]; standbyTasks: StreamsTask[] };
+export type StreamsStoreLag = { store: string; partition: number; position: number; endOffset: number; lag: number };
+export type StreamsRestoration = {
+  store: string;
+  changelog: string;
+  partition: number;
+  recordsToRestore: number;
+  restored: number;
+  startedAt: string;
+  endedAt: string | null;
+  done: boolean;
+};
+export type StreamsStateChange = { at: string; from: string; to: string };
+export type StreamsInstance = { host: string; port: number; local: boolean; activePartitions: string[]; standbyPartitions: string[] };
+export type StreamsMetrics = {
+  processRate: number;
+  processTotal: number;
+  commitRate: number;
+  commitLatencyAvgMs: number;
+  pollRate: number;
+  droppedRecordsTotal: number;
+  aliveStreamThreads: number;
+};
+
+export type StreamsApp = {
+  role: "normalizer" | "analytics";
+  applicationId: string;
+  purpose: string;
+  state: string;
+  guarantee: string;
+  startedAt: string | null;
+  replacedThreads: number;
+  lastFailure: string | null;
+  topology: { subtopologies: StreamsSubtopology[] };
+  threads: StreamsThread[];
+  storeLags: StreamsStoreLag[];
+  storeEntries: Record<string, number | null>;
+  restorations: StreamsRestoration[];
+  stateChanges: StreamsStateChange[];
+  instances: StreamsInstance[];
+  metrics: StreamsMetrics | null;
+};
+
+export type StreamsSettings = {
+  windowSizeSeconds: number;
+  windowGraceSeconds: number;
+  windowRetentionSeconds: number;
+  maxLatenessSeconds: number;
+  seenReadingsRetentionSeconds: number;
+  parityGraceSeconds: number;
+  threads: number;
+  standbyReplicas: number;
+  replicationFactor: number;
+  rocksdbOffHeapMb: number;
+  stateDir: string | null;
+};
+
+export type StreamsOverview = {
+  enabled: boolean;
+  reason: string | null;
+  normalization: "owner" | "shadow" | "off" | null;
+  normalizer: string;
+  instance: string | null;
+  generatedAt: string;
+  settings: StreamsSettings | null;
+  apps: StreamsApp[];
+};
+
+export type VehicleSnapshot = {
+  imei: string;
+  recordedAt: string | null;
+  latitude: number;
+  longitude: number;
+  speedKmph: number;
+  movementStatus: "MOVING" | "STOPPED" | null;
+  statusSince: string | null;
+  totalDistanceMeters: number | null;
+  distanceSource: string | null;
+  ignition: boolean | null;
+  readings: number;
+  outOfOrderReadings: number;
+  maxSpeedKmph: number;
+  firstRecordedAt: string | null;
+  lastProcessedAt: string | null;
+};
+
+export type VehicleActivity = {
+  imei: string | null;
+  windowStart: string;
+  windowEnd: string;
+  readings: number;
+  movingReadings: number;
+  outOfOrderReadings: number;
+  maxSpeedKmph: number;
+  averageSpeedKmph: number;
+  movingShare: number;
+  distanceMeters: number;
+  firstRecordedAt: string | null;
+  lastRecordedAt: string | null;
+};
+
+export type StreamsVehicleView = {
+  snapshot: VehicleSnapshot | null;
+  partition: number;
+  servedBy: string;
+  standbyHosts: string[];
+  windows: VehicleActivity[];
+};
+
+export type FleetWindow = {
+  windowStart: string;
+  windowEnd: string;
+  open: boolean;
+  vehicles: number;
+  readings: number;
+  movingReadings: number;
+  outOfOrderReadings: number;
+  maxSpeedKmph: number;
+  averageSpeedKmph: number;
+  movingShare: number;
+  distanceMeters: number;
+};
+
+export type ParityOutcome = "MATCH" | "MISMATCH" | "WARMUP" | "ONLY_LISTENER" | "ONLY_STREAMS";
+export type ParityVerdict = { outcome: ParityOutcome; recordedAt: string; differences: string[] };
+export type ParityTally = {
+  matched: number;
+  mismatched: number;
+  warmup: number;
+  onlyListener: number;
+  onlyStreams: number;
+  lastRecordedAt: string | null;
+  lastDifference: ParityVerdict | null;
+};
+export type ParityView = {
+  active: boolean;
+  note: string | null;
+  totals: ParityTally;
+  streamsAccepted: number;
+  streamsRejected: number;
+  listenerAccepted: number;
+  listenerRejected: number;
+  vehicles: { imei: string; tally: ParityTally }[];
 };

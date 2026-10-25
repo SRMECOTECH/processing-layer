@@ -4963,3 +4963,355 @@ pre.code {
     transition-duration: 1ms !important;
   }
 }
+
+/* =================================================================== Kafka Streams pages (st-*) */
+
+.st-section:not(:first-child) {
+  margin-top: 20px;
+}
+
+.stack.tight {
+  gap: 14px;
+}
+
+/* the topology of one sub-topology, left to right as the data flows */
+.st-flow-wrap {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 4px;
+}
+
+.st-flow {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 760px;
+}
+
+.st-col-group {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+}
+
+/* a column holding a state store gets more room: its store names are the point of the picture */
+.st-col-group:has(.st-node.stateful) {
+  flex-grow: 1.6;
+}
+
+.st-col {
+  display: grid;
+  flex: 1 1 0;
+  gap: 10px;
+  align-content: center;
+  min-width: 0;
+}
+
+.st-arrow {
+  display: grid;
+  flex: 0 0 24px;
+  place-items: center;
+  color: var(--text-3);
+}
+
+.st-node {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+}
+
+.st-node.source {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  background: var(--accent-soft);
+}
+
+.st-node.sink {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+.st-node.processor.stateful {
+  border-style: solid;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong));
+}
+
+.st-node-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.st-node-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.st-node-topic {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.st-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  width: fit-content;
+  overflow-wrap: anywhere;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--tile-strong);
+  font-size: 11px;
+}
+
+/* tasks: one tile per task, tinted by the thread running it */
+.st-tasks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.st-task {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-tile);
+  background: var(--tile);
+  border-left: 3px solid var(--accent);
+}
+
+.st-task.t1 {
+  border-left-color: color-mix(in srgb, var(--accent) 60%, var(--good));
+}
+
+.st-task.t2 {
+  border-left-color: color-mix(in srgb, var(--accent) 45%, var(--warn));
+}
+
+.st-task.t3 {
+  border-left-color: var(--ink);
+}
+
+.st-task.standby {
+  border-left-style: dashed;
+  opacity: 0.8;
+}
+
+.st-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.st-task-id {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.st-task-thread {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.st-task-input {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.st-task-input .warn,
+.st-metric-value.warn {
+  color: var(--warn);
+}
+
+.st-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.st-metric {
+  display: grid;
+  gap: 3px;
+}
+
+.st-metric-label {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.st-metric-value {
+  font-size: 15px;
+}
+
+.st-failure {
+  margin-top: 12px;
+  color: var(--bad);
+  font-size: 12px;
+}
+
+/* restorations, state changes, concepts */
+.st-restores {
+  display: grid;
+  gap: 10px;
+}
+
+.st-restore-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.st-timeline {
+  display: grid;
+  gap: 8px;
+}
+
+.st-timeline-row {
+  display: grid;
+  grid-template-columns: 70px 80px minmax(0, auto) 14px auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.st-timeline-role {
+  color: var(--text-2);
+}
+
+.st-concepts {
+  display: grid;
+  gap: 12px;
+}
+
+.st-concept {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.st-concept:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.st-concept-name {
+  font-weight: 500;
+}
+
+.st-concept-text {
+  color: var(--text-2);
+}
+
+.st-split {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 12.5px;
+}
+
+/* fleet windows: one bar per window, oldest left */
+.st-bars {
+  display: grid;
+  grid-auto-columns: minmax(28px, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+  height: 230px;
+  overflow-x: auto;
+}
+
+.st-bar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.st-bar-value {
+  font-size: 10.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.st-bar-track {
+  position: relative;
+  border-radius: 8px;
+  background: var(--track);
+}
+
+.st-bar-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  border-radius: 8px;
+  background: var(--accent);
+  transition: height var(--medium) var(--ease-out);
+}
+
+.st-bar.open .st-bar-fill {
+  background: color-mix(in srgb, var(--accent) 40%, var(--track));
+}
+
+.st-bar-label {
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.data-table tr.clickable {
+  cursor: pointer;
+}
+
+.data-table tr.selected td {
+  background: var(--accent-soft);
+}
+
+.data-table.compact th,
+.data-table.compact td {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+@media (max-width: 760px) {
+  .st-concept {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .st-timeline-row {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+
+  .st-timeline-row > :nth-child(3),
+  .st-timeline-row > :nth-child(4) {
+    display: none;
+  }
+}
+
+.data-table td.nowrap {
+  white-space: nowrap;
+}

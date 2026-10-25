@@ -30,11 +30,19 @@ public class DatabaseBackedPreviousReadingStore extends InMemoryPreviousReadingS
             return inMemory;
         }
 
-        Optional<PreviousReading> fromDatabase = gpsPositionRepository.findFirstByImeiOrderByRecordedAtDesc(imei)
+        Optional<PreviousReading> fromDatabase = findStoredReading(imei);
+        fromDatabase.ifPresent(reading -> rememberLatestReading(imei, reading));
+        return fromDatabase;
+    }
+
+    /**
+     * Only the newest reading stored in PostgreSQL, without touching memory. The Kafka Streams normalizer uses this
+     * for a device its state store has never seen, so after the hand-over from the listener distances carry on.
+     */
+    public Optional<PreviousReading> findStoredReading(String imei) {
+        return gpsPositionRepository.findFirstByImeiOrderByRecordedAtDesc(imei)
                 .map(stored -> new PreviousReading(stored.getRecordedAt(), stored.getLatitude(), stored.getLongitude(),
                         stored.getTotalDistanceMeters() == null ? 0 : stored.getTotalDistanceMeters(),
                         stored.getOdometerMeters()));
-        fromDatabase.ifPresent(reading -> rememberLatestReading(imei, reading));
-        return fromDatabase;
     }
 }

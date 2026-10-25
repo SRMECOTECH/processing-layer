@@ -28,7 +28,19 @@ public final class EngineViews {
             String kafkaProblem,
             long storedPositions,
             long vehiclesWithLivePosition,
-            String redisProblem) {
+            String redisProblem,
+            NormalizationView normalization) {
+    }
+
+    /**
+     * Who turns raw frames into processed positions right now.
+     *
+     * @param engine          "kafka-streams", "listener" or "direct"
+     * @param mode            gps.streams.normalization (owner, shadow, off), or null without Kafka Streams
+     * @param normalizerState the Kafka Streams normalizer app's state (RUNNING, REBALANCING ...), or null
+     * @param analyticsState  the Kafka Streams analytics app's state, or null
+     */
+    public record NormalizationView(String engine, String mode, String normalizerState, String analyticsState) {
     }
 
     /** The load of one producer or consumer, as counted inside this service. */

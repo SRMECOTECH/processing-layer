@@ -1,5 +1,7 @@
 package com.srm.gps.processing.step;
 
+import com.srm.gps.configuration.message.ProcessedGpsPosition;
+
 import java.time.Instant;
 
 /**
@@ -15,5 +17,11 @@ public record PreviousReading(Instant recordedAt, double latitude, double longit
 
     public PreviousReading(Instant recordedAt, double latitude, double longitude) {
         this(recordedAt, latitude, longitude, 0, null);
+    }
+
+    /** What the next reading of the device is measured from, once this position was accepted. */
+    public static PreviousReading of(ProcessedGpsPosition position) {
+        return new PreviousReading(position.recordedAt(), position.latitude(), position.longitude(),
+                position.totalDistanceMeters() == null ? 0 : position.totalDistanceMeters(), position.odometerMeters());
     }
 }

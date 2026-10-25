@@ -3,12 +3,15 @@ package com.srm.gps.application.engine;
 import com.srm.gps.application.engine.EngineViews.ConsumerView;
 import com.srm.gps.application.engine.EngineViews.DeviceLoadView;
 import com.srm.gps.application.engine.EngineViews.EngineOverview;
+import com.srm.gps.application.engine.EngineViews.NormalizationView;
 import com.srm.gps.application.engine.EngineViews.StageView;
 import com.srm.gps.application.flow.RawGpsFrameSender;
+import com.srm.gps.application.kafkastreams.GpsStreamsRuntime;
 import com.srm.gps.application.simulator.GpsDeviceSimulatorService;
 import com.srm.gps.configuration.KafkaTopicNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.ProcessingFlowNames;
+import com.srm.gps.configuration.StreamsNormalization;
 import com.srm.gps.connectivity.database.repository.GpsPositionRepository;
 import com.srm.gps.connectivity.kafka.KafkaTopologyInspector;
 import com.srm.gps.connectivity.kafka.KafkaTopologyInspector.ConsumerGroupView;
@@ -48,6 +51,7 @@ public class EngineOverviewService {
     private final GpsPositionRepository gpsPositionRepository;
     private final LiveVehiclePositionStore liveVehiclePositionStore;
     private final ObjectProvider<KafkaTopologyInspector> kafkaTopologyInspector;
+    private final ObjectProvider<GpsStreamsRuntime> kafkaStreams;
 
     private volatile long cachedStoredPositions;
     private volatile long storedPositionsCountedAtMillis;
@@ -57,13 +61,15 @@ public class EngineOverviewService {
                                  GpsDeviceSimulatorService simulatorService,
                                  GpsPositionRepository gpsPositionRepository,
                                  LiveVehiclePositionStore liveVehiclePositionStore,
-                                 ObjectProvider<KafkaTopologyInspector> kafkaTopologyInspector) {
+                                 ObjectProvider<KafkaTopologyInspector> kafkaTopologyInspector,
+                                 ObjectProvider<GpsStreamsRuntime> kafkaStreams) {
         this.metrics = metrics;
         this.rawGpsFrameSender = rawGpsFrameSender;
         this.simulatorService = simulatorService;
         this.gpsPositionRepository = gpsPositionRepository;
         this.liveVehiclePositionStore = liveVehiclePositionStore;
         this.kafkaTopologyInspector = kafkaTopologyInspector;
+        this.kafkaStreams = kafkaStreams;
     }
 
     public EngineOverview overview() {
@@ -117,7 +123,19 @@ public class EngineOverviewService {
 
         return new EngineOverview(rawGpsFrameSender.flowName(), Instant.now(), simulatorService.currentStatus(),
                 producers, consumers, StageView.from(metrics.snapshot(PipelineStage.DIRECT_PROCESSING)),
-                topics, kafkaProblem, storedPositions(), vehiclesWithLivePosition, redisProblem);
+                topics, kafkaProblem, storedPositions(), vehiclesWithLivePosition, redisProblem, normalization(kafkaFlow));
+    }
+
+    private NormalizationView normalization(boolean kafkaFlow) {
+        if (!kafkaFlow) {
+            return new NormalizationView("direct", null, null, null);
+        }
+        GpsStreamsRuntime streams = kafkaStreams.getIfAvailable();
+        if (streams == null) {
+            return new NormalizationView("listener", null, null, null);
+        }
+        return new NormalizationView(streams.mode() == StreamsNormalization.OWNER ? "kafka-streams" : "listener",
+                streams.mode().propertyValue(), streams.normalizer().map(app -> app.state()).orElse(null), streams.analytics().state());
     }
 
     /** Every device seen by any producer/consumer, optionally only IMEIs containing {@code imeiFilter}. */

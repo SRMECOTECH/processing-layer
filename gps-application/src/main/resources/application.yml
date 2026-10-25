@@ -33,6 +33,9 @@ spring:
     consumer:
       # A brand-new consumer group starts from the oldest message instead of only new ones.
       auto-offset-reset: earliest
+      # The Kafka Streams normalizer writes in transactions (exactly-once): read only what was committed,
+      # never the records of a transaction it had to abort.
+      isolation-level: read_committed
 
   # The dashboard page changes with every release: make browsers always ask for the current version.
   web:
@@ -112,6 +115,43 @@ gps:
       tomtom-api-key: ${TOMTOM_API_KEY:}
       traffic-radius-meters: 1000
       timeout-millis: 3000
+  # Kafka Streams (Kafka flow only), see docs/KAFKA_STREAMS_GUIDE.md. Two apps run inside this service:
+  #   normalizer : raw frames -> processed positions / rejections, exactly-once, state in RocksDB + changelog topics
+  #   analytics  : processed positions -> vehicle KTable, 5-minute event-time windows (gps.vehicle-activity), parity
+  # normalization - who turns raw frames into positions (one owner, never two):
+  #   owner  : Kafka Streams; the @KafkaListener consumer is not created. It continues from the listener's offsets.
+  #   shadow : the listener; Kafka Streams writes the same results to gps.shadow.* and GET /api/streams/parity
+  #            compares both, reading by reading - validate here before switching to owner.
+  #   off    : the listener; Kafka Streams only runs the analytics.
+  # Read the state: GET /api/streams/overview, /api/streams/vehicles/{imei}, /api/streams/fleet/activity
+  streams:
+    enabled: true
+    normalization: owner
+    # one stream thread per partition, so each task has a thread of its own
+    threads: 3
+    # warm copies of every store on OTHER instances: 0 with one instance, 1 as soon as there are two
+    standby-replicas: 0
+    # internal changelog topics: -1 = the broker's default (1 here), 3 on a real cluster
+    replication-factor: -1
+    # where RocksDB keeps the stores (default: Kafka Streams' temp folder). Keep it on a volume - a restart then
+    # reuses the local stores instead of replaying the changelogs. Docker: GPS_STREAMS_STATEDIR=/var/lib/gps-streams
+    # state-dir: /var/lib/gps-streams
+    # how other instances reach this one for Interactive Queries (application.server = host:server.port)
+    advertised-host: localhost
+    leave-group-on-close: true
+    # ordering and duplicate policies of the normalizer (event time = the device's recordedAt)
+    max-lateness: 24h
+    seen-readings-retention: 24h
+    # activity windows: size, how late a reading may still count, how long closed windows stay queryable
+    window-size: 5m
+    window-grace: 2m
+    window-retention: 6h
+    parity-grace: 2m
+    rocksdb-off-heap-mb: 64
+    normalizer-guarantee: exactly_once_v2
+    analytics-guarantee: at_least_once
+    # anything else, passed on to Kafka Streams as is, e.g. client.rack, rack.aware.assignment.tags
+    properties: {}
   # "Empty DB" for demo practice (POST /api/admin/reset). Switch off anywhere that is not a demo.
   admin:
     reset-enabled: true

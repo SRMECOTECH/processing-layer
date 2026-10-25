@@ -20,9 +20,14 @@ const ENDPOINTS: [string, string, string, string][] = [
   ["GET", "/api/trips/count", "Open and closed trips and stops", "Overview tiles"],
   ["GET", "/api/gps-positions/recently-stored", "Last 20 stored positions", "Device log audit"],
   ["GET", "/api/gps-positions/count", "Stored positions", "–"],
+  ["GET", "/api/streams/overview", "Kafka Streams apps: state, topology, threads and tasks, stores, restorations, metrics", "Kafka Streams · topology & tasks"],
+  ["GET", "/api/streams/vehicles?limit=", "The vehicle KTable through Interactive Queries (every instance's share)", "Kafka Streams · vehicle table"],
+  ["GET", "/api/streams/vehicles/{imei}?windows=", "One vehicle: state, owning partition, standbys, activity windows", "Kafka Streams · vehicle table"],
+  ["GET", "/api/streams/fleet/activity?windows=", "The fleet per 5-minute event-time window", "Kafka Streams · activity windows"],
+  ["GET", "/api/streams/parity?limit=", "Shadow mode: the listener against Kafka Streams, per vehicle", "Kafka Streams · shadow parity"],
   ["POST", "/api/simulator/start", "Start the simulated fleet", "Fleet simulator"],
   ["POST", "/api/simulator/stop", "Stop the simulated fleet", "Fleet simulator"],
-  ["POST", "/api/admin/reset?restartFleet=", "Empty Kafka, PostgreSQL and Redis (demo only)", "Demo tools"],
+  ["POST", "/api/admin/reset?restartFleet=", "Empty Kafka, PostgreSQL and Redis, rebuild Kafka Streams state (demo only)", "Demo tools"],
 ];
 
 const TONE: Record<string, "good" | "accent" | "warn" | "bad"> = { GET: "good", PUT: "accent", POST: "warn", DELETE: "bad" };

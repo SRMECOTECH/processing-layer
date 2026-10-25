@@ -71,10 +71,7 @@ public final class GpsFrameProcessor {
 
                 // Step 3: remember it - but a late (older) reading must not replace the newest one we know about.
                 if (!position.arrivedOutOfOrder()) {
-                    previousReadingStore.rememberLatestReading(imei, new PreviousReading(
-                            position.recordedAt(), position.latitude(), position.longitude(),
-                            position.totalDistanceMeters() == null ? 0 : position.totalDistanceMeters(),
-                            position.odometerMeters()));
+                    previousReadingStore.rememberLatestReading(imei, PreviousReading.of(position));
                 }
             }
         }
