@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
+import { ChevronRight, Info } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
-import { Words } from "@/components/words";
-import { alertsFrom, seriousCount } from "@/lib/alerts";
 import { formatNumber } from "@/lib/format";
-import { QUICK_FILTERS } from "@/lib/nav";
+import { trailFor, type Feed } from "@/lib/nav";
 import { useOverview } from "@/lib/overview-context";
 
 export type Tone = "accent" | "good" | "bad" | "warn" | "neutral" | "ink";
@@ -17,7 +16,7 @@ export function Tag({ tone = "accent", children, mono }: { tone?: Tone; children
   return <span className={`tag ${tone}${mono ? " mono" : ""}`}>{children}</span>;
 }
 
-/** "Live" for cards fed by the service, "Demo data" for cards the backend does not produce yet. */
+/** "Live" for cards fed by the service, "Example data" for cards the backend does not produce yet. */
 export function Source({ live }: { live: boolean }) {
   return live ? (
     <span className="source live" title="Numbers come from the GPS service">
@@ -26,43 +25,73 @@ export function Source({ live }: { live: boolean }) {
     </span>
   ) : (
     <span className="source demo" title="Example numbers: the service does not produce this yet">
-      Demo data
+      Example data
     </span>
   );
 }
 
-export function PageTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+/** Built, part-built or planned: shown next to a module's title. */
+export function FeedTag({ feed }: { feed: Feed }) {
+  if (feed === "live") return <Tag tone="good">LIVE</Tag>;
+  if (feed === "partial") return <Tag tone="warn">PARTLY BUILT</Tag>;
+  return <Tag tone="neutral">PLANNED</Tag>;
+}
+
+type HeaderProps = {
+  /** Defaults to the page's name in the menu. */
+  title?: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+  badges?: ReactNode;
+  /** Small facts under the description: consumer group, topic, Redis keys... */
+  meta?: [string, ReactNode][];
+};
+
+/** Breadcrumb from the menu, title, description, actions on the right and a row of facts. */
+export function PageHeader({ title, description, actions, badges, meta }: HeaderProps) {
+  const pathname = usePathname();
+  const trail = trailFor(pathname);
+  const crumbs: [string, string | undefined][] = [[trail.section.label, trail.section.href]];
+  if (trail.group) crumbs.push([trail.group.title, undefined]);
+  if (trail.leaf && trail.item) crumbs.push([trail.item.label, trail.item.href]);
+
   return (
-    <div className="ops-head">
-      <div>
-        <h1 className="ops-title">
-          <Words text={title} />
-        </h1>
-        {subtitle && <p className="ops-subtitle">{subtitle}</p>}
+    <header className="hdr">
+      <nav className="crumbs" aria-label="Breadcrumb">
+        {crumbs.map(([label, href], i) => (
+          <span key={label} className="crumb">
+            {i > 0 && <ChevronRight size={13} className="crumb-sep" />}
+            {href ? <Link href={href}>{label}</Link> : <span>{label}</span>}
+          </span>
+        ))}
+      </nav>
+      <div className="hdr-row">
+        <div className="hdr-main">
+          <div className="hdr-title-row">
+            <h1 className="hdr-title">{title ?? trail.leaf?.label ?? trail.item?.label ?? trail.section.label}</h1>
+            {badges}
+          </div>
+          {description && <p className="hdr-desc">{description}</p>}
+        </div>
+        {actions && <div className="hdr-actions">{actions}</div>}
       </div>
-      {right && <div className="ops-head-right">{right}</div>}
-    </div>
+      {meta && meta.length > 0 && (
+        <dl className="hdr-meta">
+          {meta.map(([label, value]) => (
+            <div key={label} className="hdr-meta-item">
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </header>
   );
 }
 
-/** Quick filters above every operational page (they jump to the owning sub-page). */
-export function QuickFilters() {
-  const pathname = usePathname();
-  const { data } = useOverview();
-  const critical = seriousCount(alertsFrom(data));
-  return (
-    <div className="chips" role="navigation" aria-label="Quick filters">
-      {QUICK_FILTERS.map((f) => (
-        <Link key={f.href} href={f.href} className="chip" aria-current={pathname === f.href ? "page" : undefined}>
-          {f.label}
-        </Link>
-      ))}
-      <Link href="/rules/dispatch" className="chip danger" aria-current={pathname === "/rules/dispatch" ? "page" : undefined}>
-        <i />
-        Critical Alerts{critical > 0 ? ` (${critical})` : ""}
-      </Link>
-    </div>
-  );
+/** Older name, still used by the Developer pages. */
+export function PageTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+  return <PageHeader title={title} description={subtitle} actions={right} />;
 }
 
 type CardProps = {
@@ -75,16 +104,18 @@ type CardProps = {
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** No padding around the body: for tables that run edge to edge. */
+  flush?: boolean;
 };
 
-export function Card({ icon: Icon, title, subtitle, monoSubtitle, live, badges, actions, children, className }: CardProps) {
+export function Card({ icon: Icon, title, subtitle, monoSubtitle, live, badges, actions, children, className, flush }: CardProps) {
   return (
-    <section className={`card${className ? ` ${className}` : ""}`}>
+    <section className={`card${flush ? " flush" : ""}${className ? ` ${className}` : ""}`}>
       <div className="card-head">
         <div className="card-head-main">
           {Icon && (
             <span className="card-icon">
-              <Icon size={19} />
+              <Icon size={17} />
             </span>
           )}
           <div className="card-head-text">
@@ -100,7 +131,7 @@ export function Card({ icon: Icon, title, subtitle, monoSubtitle, live, badges, 
           {actions}
         </div>
       </div>
-      {children}
+      <div className="card-body">{children}</div>
     </section>
   );
 }
@@ -116,30 +147,35 @@ type TileProps = {
   progress?: number;
   tone?: Tone;
   big?: boolean;
+  href?: string;
 };
 
-/** A stat block on a light tile: label, a large mono number, an optional note and progress line. */
-export function Tile({ label, icon: Icon, value, format = formatNumber, unit, note, foot, progress, tone, big }: TileProps) {
-  return (
-    <div className={`tile${big ? " big" : ""}`}>
+/** A number with its label: large, calm, with an optional note, progress line and link. */
+export function Tile({ label, icon: Icon, value, format = formatNumber, unit, note, foot, progress, tone, big, href }: TileProps) {
+  const body = (
+    <>
       <div className="tile-label">
         <span>{label}</span>
         {Icon && <Icon size={15} className="tile-icon" />}
       </div>
       <div className="tile-value-row">
         <span className={`tile-value${tone ? ` ${tone}` : ""}`}>
-          {typeof value === "number" || value === null || value === undefined ? (
-            <AnimatedNumber value={value} format={format} />
-          ) : (
-            value
-          )}
+          {typeof value === "number" || value === null || value === undefined ? <AnimatedNumber value={value} format={format} /> : value}
         </span>
         {unit && <span className="tile-unit">{unit}</span>}
         {note && <span className="tile-note">{note}</span>}
       </div>
-      {progress !== undefined && <Progress value={progress} tone={tone === "bad" ? "bad" : undefined} />}
+      {progress !== undefined && <Progress value={progress} tone={tone === "bad" ? "bad" : tone === "warn" ? "warn" : undefined} />}
       {foot && <div className="tile-foot">{foot}</div>}
-    </div>
+    </>
+  );
+  const className = `tile${big ? " big" : ""}${href ? " linked" : ""}`;
+  return href ? (
+    <Link href={href} className={className}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
@@ -187,7 +223,7 @@ export function Segmented<T extends string>({
   );
 }
 
-/** Shows a short confirmation instead of doing anything: for buttons on demo cards. */
+/** Shows a short confirmation instead of doing anything: for buttons on cards with example data. */
 export function DemoButton({ children, primary, icon: Icon }: { children: ReactNode; primary?: boolean; icon?: LucideIcon }) {
   const [clicked, setClicked] = useState(false);
   return (
@@ -209,14 +245,61 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
+/** A calm note inside a page: explanation, caveat or what is planned. */
+export function Callout({ children, tone = "info", title }: { children: ReactNode; tone?: "info" | "warn" | "planned"; title?: string }) {
+  return (
+    <div className={`callout ${tone}`}>
+      <Info size={16} className="callout-icon" />
+      <div>
+        {title && <div className="callout-title">{title}</div>}
+        <div className="callout-text">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 /** Banner shown on operational pages when the service does not answer. */
 export function Offline() {
   const { data, error } = useOverview();
   if (!error) return null;
   return (
     <div className="offline" role="status">
-      <strong>{data ? "Lost contact with the GPS service." : "The GPS service is not answering."}</strong>{" "}
-      {error}. {data ? "Showing the last numbers received. " : ""}Retrying automatically.
+      <span className="status-dot bad" />
+      <span>
+        <strong>{data ? "Lost contact with the GPS service." : "The GPS service is not answering."}</strong>{" "}
+        {data ? "Showing the last numbers received. " : "Live cards stay empty until it is back; planned modules show example data. "}
+        Retrying automatically.
+      </span>
     </div>
+  );
+}
+
+/** A grid of tiles; 2 to 5 across depending on the screen. */
+export function Stats({ children, columns = 4 }: { children: ReactNode; columns?: 2 | 3 | 4 | 5 }) {
+  return <div className={`stats-row cols-${columns}`}>{children}</div>;
+}
+
+/** Short mono code-like label (Redis key, topic, group). */
+export function Code({ children }: { children: ReactNode }) {
+  return <code className="code-chip">{children}</code>;
+}
+
+/** An on/off switch. */
+export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (checked: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className="switch"
+      disabled={disabled}
+      onClick={(e) => {
+        e.preventDefault();
+        onChange(!checked);
+      }}
+    >
+      <i />
+    </button>
   );
 }

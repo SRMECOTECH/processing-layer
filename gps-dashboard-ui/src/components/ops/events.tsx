@@ -88,7 +88,7 @@ export function EventTable({ events, empty = "No events yet.", showType = true }
               <tr key={e.id} className={e.severity === "CRITICAL" || e.severity === "HIGH" ? "flagged" : undefined}>
                 {showType && <td>{EVENT_LABEL[e.type] ?? e.type}</td>}
                 <td>
-                  <Link className="link mono" href={`/stream/tracking?imei=${e.imei}`}>
+                  <Link className="link mono" href={`/live/inspector?imei=${e.imei}`}>
                     {vehicleName(e.vehicleRegistrationNo, e.imei)}
                   </Link>
                 </td>
@@ -105,5 +105,35 @@ export function EventTable({ events, empty = "No events yet.", showType = true }
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** A short list of events for side panels: severity, what, which vehicle, when. */
+export function EventFeed({ events, empty = "No events yet." }: { events: VehicleEventView[] | undefined; empty?: string }) {
+  if (!events) return <Empty>Waiting for the service.</Empty>;
+  if (events.length === 0) return <Empty>{empty}</Empty>;
+  return (
+    <ul className="feed">
+      {events.map((e) => {
+        const tone = severityTone(e.severity);
+        return (
+          <li key={e.id} className="feed-row">
+            <span className={`status-dot ${tone === "bad" ? "bad" : tone === "warn" ? "warn" : tone === "accent" ? "accent" : "muted"}`} />
+            <span className="feed-main">
+              <span className="feed-title">
+                {EVENT_LABEL[e.type] ?? e.type}
+                <Link className="link mono" href={`/live/inspector?imei=${e.imei}`}>
+                  {vehicleName(e.vehicleRegistrationNo, e.imei)}
+                </Link>
+              </span>
+              <span className="feed-sub">{eventSummary(e)}</span>
+            </span>
+            <span className="feed-side">
+              {e.status === "OPEN" ? <Tag tone="ink">ONGOING</Tag> : <span className="faint">{formatTime(e.startedAt)}</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

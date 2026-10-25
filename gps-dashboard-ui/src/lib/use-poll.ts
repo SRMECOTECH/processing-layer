@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLiveUpdatesPaused } from "./preferences";
 
 export type Poll<T> = {
   data: T | undefined;
@@ -12,16 +13,18 @@ export type Poll<T> = {
 
 /**
  * Fetches a JSON endpoint now and then every `intervalMs`, keeping the last good answer on screen
- * while the next one loads. Pauses while the browser tab is hidden. Pass null to skip fetching.
+ * while the next one loads. Pauses while the browser tab is hidden or the viewer paused live updates.
+ * Pass null to skip fetching.
  */
 export function usePoll<T>(path: string | null, intervalMs = 2000): Poll<T> {
+  const paused = useLiveUpdatesPaused();
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(path !== null);
   const runNow = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (path === null) {
+    if (path === null || paused) {
       setLoading(false);
       return;
     }
@@ -80,7 +83,7 @@ export function usePoll<T>(path: string | null, intervalMs = 2000): Poll<T> {
       controller?.abort();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [path, intervalMs]);
+  }, [path, intervalMs, paused]);
 
   const refresh = useCallback(() => runNow.current(), []);
   return { data, error, loading, refresh };
