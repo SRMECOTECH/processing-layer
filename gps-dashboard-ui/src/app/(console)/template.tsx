@@ -6,7 +6,7 @@ import { useLayoutEffect, useRef } from "react";
 // What blurs in on a new page, one after another in reading (document) order.
 // Keep in step with the selector in globals.css ("motion").
 const BLUR_IN = [
-  ".chips, .offline, .ops-subtitle, .ops-head-right, .page-lead, .page-meta, .card, .section, .page-head + .stats > *",
+  ".crumbs, .hdr-desc, .hdr-actions, .hdr-meta, .card, .callout, .section, .page-lead, .page-meta, .page-head + .stats > *",
   ".tile:not(.card .tile, .section .tile, .inner .tile, .modal .tile)",
 ].join(", ");
 const MAX_STEPS = 14;

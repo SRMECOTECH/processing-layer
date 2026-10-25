@@ -10,9 +10,8 @@ import { usePreferences, type Accent, type Background, type Density, type Theme 
 import { Switch } from "@/components/ops/kit";
 import { SearchButton } from "./command-palette";
 import { Popover } from "./popover";
-import { TopNav } from "./top-nav";
 
-/** The single top bar: brand, the fixed sections, then search, live rate, notifications, appearance and user. */
+/** The bar above each page, on the canvas: brand, search, live rate, notifications, appearance and user. The sections are in the rail. */
 export function AppHeader() {
   const { setDrawerOpen } = usePreferences();
 
@@ -30,10 +29,9 @@ export function AppHeader() {
         </Link>
       </div>
 
-      <TopNav />
+      <SearchButton />
 
       <div className="topbar-end">
-        <SearchButton />
         <LivePill />
         <NotificationBell />
         <AppearanceMenu />
@@ -79,9 +77,10 @@ function NotificationBell() {
     <Popover
       label="Notifications"
       width={360}
+      buttonClassName="icon-button ink"
       button={
         <>
-          <Bell size={19} />
+          <Bell size={16} strokeWidth={1.8} />
           {unread > 0 && <span className="bell-count">{unread > 9 ? "9+" : unread}</span>}
         </>
       }
@@ -139,6 +138,7 @@ const THEMES: [Theme, string][] = [
   ["system", "System"],
 ];
 const ACCENTS: [Accent, string, string][] = [
+  ["lavender", "Lavender", "#5a4ea6"],
   ["navy", "Navy", "#0b4a8b"],
   ["sky", "Sky", "#0284c7"],
   ["indigo", "Indigo", "#4f46e5"],
@@ -146,9 +146,9 @@ const ACCENTS: [Accent, string, string][] = [
   ["violet", "Violet", "#7c3aed"],
 ];
 const BACKGROUNDS: [Background, string, string][] = [
-  ["offwhite", "Off-white", "#f5f7fa"],
-  ["white", "White", "#ffffff"],
-  ["warm", "Warm", "#faf8f3"],
+  ["lilac", "Lilac", "#ece9ef"],
+  ["mist", "Mist", "#e9edf2"],
+  ["warm", "Warm", "#efebe6"],
 ];
 const DENSITIES: [Density, string][] = [
   ["comfortable", "Comfortable"],
@@ -158,7 +158,7 @@ const DENSITIES: [Density, string][] = [
 function AppearanceMenu() {
   const p = usePreferences();
   return (
-    <Popover label="Appearance and updates" width={330} button={<SlidersHorizontal size={18} />}>
+    <Popover label="Appearance and updates" width={330} button={<SlidersHorizontal size={16} strokeWidth={1.8} />}>
       {() => (
         <div className="settings">
           <div className="popover-title">Appearance</div>
@@ -184,7 +184,7 @@ function AppearanceMenu() {
             </div>
           </div>
           <div className="setting">
-            <div className="setting-label">Page background (light theme)</div>
+            <div className="setting-label">Canvas (light theme)</div>
             <div className="bg-swatches">
               {BACKGROUNDS.map(([value, label, color]) => (
                 <button type="button" key={value} className="bg-swatch" aria-pressed={p.background === value} onClick={() => p.setBackground(value)}>
@@ -222,7 +222,7 @@ function AppearanceMenu() {
 function UserMenu() {
   const { data: o } = useOverview();
   return (
-    <Popover label="Account and environment" width={280} button={<CircleUser size={21} />} buttonClassName="icon-button avatar-button">
+    <Popover label="Account and environment" width={280} button={<CircleUser size={19} strokeWidth={1.7} />} buttonClassName="icon-button avatar-button">
       {() => (
         <div>
           <div className="user-card">

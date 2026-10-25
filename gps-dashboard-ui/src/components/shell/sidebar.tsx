@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
 import { SECTIONS, itemContains, sectionFor, type NavGroup, type NavItem } from "@/lib/nav";
@@ -10,8 +11,8 @@ import { isKafkaFlow } from "@/lib/pipeline";
 import { usePreferences } from "@/lib/preferences";
 
 /**
- * The left menu of the current section: groups, items and, under an item, its sub-pages.
- * Collapses to an icon rail on wide screens and becomes a drawer on narrow ones.
+ * The white menu card of the current section: groups, items and, under an item, its sub-pages. A black pill
+ * slides to the open page. Collapses to icons on wide screens and becomes a drawer on narrow ones.
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -112,6 +113,7 @@ function SideItem({ item, pathname, open, onToggle }: { item: NavItem; pathname:
   if (!item.children) {
     return (
       <Link href={item.href} className="side-link" aria-current={current ? "page" : undefined} title={item.label}>
+        {current && <ActivePill />}
         <Icon size={16} strokeWidth={current ? 2.2 : 1.8} className="side-icon" />
         <span className="side-label">{item.label}</span>
         {item.feed === "planned" && <span className="side-pill">Planned</span>}
@@ -134,12 +136,18 @@ function SideItem({ item, pathname, open, onToggle }: { item: NavItem; pathname:
       <div className="side-sub" hidden={!open}>
         {item.children.map((leaf) => (
           <Link key={leaf.href} href={leaf.href} className="side-sublink" aria-current={leaf.href === pathname ? "page" : undefined}>
-            {leaf.label}
+            {leaf.href === pathname && <ActivePill />}
+            <span>{leaf.label}</span>
           </Link>
         ))}
       </div>
     </div>
   );
+}
+
+/** The black pill behind the open page; one shared layoutId, so it slides from page to page. */
+function ActivePill() {
+  return <motion.span layoutId="side-active" className="side-active" transition={{ type: "spring", stiffness: 400, damping: 34 }} />;
 }
 
 function filterGroups(groups: NavGroup[], filter: string): NavGroup[] {

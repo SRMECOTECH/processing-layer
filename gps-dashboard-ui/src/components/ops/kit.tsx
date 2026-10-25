@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { ChevronRight, Info } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { Words } from "@/components/words";
 import { formatNumber } from "@/lib/format";
 import { trailFor, type Feed } from "@/lib/nav";
 import { useOverview } from "@/lib/overview-context";
@@ -68,7 +69,9 @@ export function PageHeader({ title, description, actions, badges, meta }: Header
       <div className="hdr-row">
         <div className="hdr-main">
           <div className="hdr-title-row">
-            <h1 className="hdr-title">{title ?? trail.leaf?.label ?? trail.item?.label ?? trail.section.label}</h1>
+            <h1 className="hdr-title">
+              <Words text={title ?? trail.leaf?.label ?? trail.item?.label ?? trail.section.label} />
+            </h1>
             {badges}
           </div>
           {description && <p className="hdr-desc">{description}</p>}

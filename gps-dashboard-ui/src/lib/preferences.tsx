@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Theme = "light" | "dark" | "system";
-export type Accent = "navy" | "sky" | "indigo" | "teal" | "violet";
-export type Background = "offwhite" | "white" | "warm";
+export type Accent = "lavender" | "navy" | "sky" | "indigo" | "teal" | "violet";
+export type Background = "lilac" | "mist" | "warm";
 export type Density = "comfortable" | "compact";
 
 type Saved = {
@@ -28,7 +28,8 @@ type Preferences = Saved & {
   setDrawerOpen: (value: boolean) => void;
 };
 
-const DEFAULTS: Saved = { theme: "light", accent: "navy", background: "offwhite", density: "comfortable", sidebarOpen: true, paused: false };
+const DEFAULTS: Saved = { theme: "light", accent: "lavender", background: "lilac", density: "comfortable", sidebarOpen: true, paused: false };
+const BACKGROUNDS: Background[] = ["lilac", "mist", "warm"];
 const STORAGE_KEY = "pulsestream.preferences";
 const PreferencesContext = createContext<Preferences | null>(null);
 
@@ -46,6 +47,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<Saved>;
+      // Backgrounds saved by the earlier look (off-white, white) no longer exist: fall back to the default.
+      if (stored.background && !BACKGROUNDS.includes(stored.background)) delete stored.background;
       setSaved((current) => ({ ...current, ...stored }));
     } catch {
       // Storage blocked or unreadable: keep the defaults.

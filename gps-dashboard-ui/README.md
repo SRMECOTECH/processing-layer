@@ -1,14 +1,23 @@
 # PulseStream IoT console
 
-Operations console for the GPS streaming platform, built with Next.js 16 and React 19.
+Operations console for the GPS streaming platform, built with Next.js 16 and React 19, in the same look as
+Workspace Studio (below): a rounded lilac frame on white, borderless white cards, black pill buttons and
+pastel accents.
 
-Layout: one top bar with the fixed sections (Live, Processing, Alerts, Storage, Analytics, Notifications,
-Developer), search (Ctrl K or /), the live Kafka rate (click to pause live updates), notifications and an
-appearance menu. Each section has its own left menu: groups of pages, and under a processor its sub-pages.
-The menu collapses to an icon rail and becomes a drawer on narrow screens.
+Layout: a black capsule rail on the left holds the fixed sections (Live, Processing, Alerts, Storage,
+Analytics, Notifications, Developer) with alert and unread counts; the lavender circle and notch slide to the
+open section and hovering shows its name. Next to it, a white menu card for the section: groups of pages,
+and under a processor its sub-pages, with a black pill that slides to the open page. Above the page, a bar
+on the canvas with search (Ctrl K or /), the live Kafka rate (click to pause live updates), notifications,
+appearance and the user. The menu collapses to icons and becomes a drawer (with the sections) on narrow
+screens.
 
-Appearance (remembered per browser): light, dark or system theme; navy, sky, indigo, teal or violet accent;
-off-white, white or warm page; comfortable or compact density.
+Motion: on load the rail grows down and its icons fade in; on every page the blocks blur in one after another
+and the title word by word; numbers count up from 80% of their value; progress bars grow in. Cards lift 2px
+on hover, so dialogs are rendered at the document root (a portal).
+
+Appearance (remembered per browser): light, dark or system theme; lavender, navy, sky, indigo, teal or violet
+accent; lilac, mist or warm canvas; comfortable or compact density.
 
 ## Run it
 
@@ -68,10 +77,23 @@ system status and most pages.
 ## Layout of the code
 
 ```
-src/app/                 one folder per section and page; layout.tsx = top bar + left menu
+src/app/(console)/       one folder per section and page; layout.tsx = frame, rail, menu, top bar
+src/app/(studio)/        Workspace Studio: its own root layout, Tailwind stylesheet and Inter font
 src/app/api/             the proxy to the GPS service
-src/components/shell/    top bar, section nav, left menu, search palette, popovers
+src/components/shell/    rail of sections, section menu, top bar, search palette, popovers
+src/components/studio/   Workspace Studio shell, motion kit, SVG art and its four pages
 src/components/ops/      cards, tiles, tags, charts, module header/diagram, rule editor, map
 src/components/          pieces used by the Developer pages
 src/lib/                 API types, navigation, modules, polling, alerts, notifications, examples, formatting
 ```
+
+## Workspace Studio (`/studio`)
+
+A separate single-page workspace (Dashboard, Profile, Saved, Cloud) in the soft lilac design the console now
+follows: floating black sidebar whose active circle and notch slide between items, cards that blur in one
+after another, numbers that count up, bars and the storage ring that draw in. Built with Tailwind CSS v4,
+framer-motion and lucide-react; the 3D flower, coil and brain thumbnails are SVG. All content is sample data.
+
+It is its own root layout (route group `(studio)`), so its Tailwind stylesheet never loads on console pages
+and the console's CSS never reaches it; Tailwind scans only the studio files. Moving between the console and
+`/studio` is a full page load. The bottom icon of the console rail opens it; its log-out icon comes back.
