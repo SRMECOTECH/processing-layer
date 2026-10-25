@@ -13,7 +13,8 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
-COPY next.config.ts tsconfig.json ./
+# postcss.config.mjs runs Tailwind for the Workspace Studio stylesheet.
+COPY next.config.ts tsconfig.json postcss.config.mjs ./
 COPY src src
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
