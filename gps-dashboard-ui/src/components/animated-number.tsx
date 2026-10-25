@@ -8,10 +8,17 @@ type Props = {
   durationMillis?: number;
 };
 
-/** A number that glides from its previous value to the new one instead of jumping. */
+// A number seen for the first time counts up from this share of itself.
+const ENTRY_FROM = 0.8;
+const ENTRY_MILLIS = 800;
+
+const entryValue = (value: number | null | undefined) =>
+  value === null || value === undefined || Number.isNaN(value) ? null : value * ENTRY_FROM;
+
+/** A number that counts up when it first appears, then glides from its previous value to each new one. */
 export function AnimatedNumber({ value, format, durationMillis = 650 }: Props) {
-  const [shown, setShown] = useState<number | null>(value ?? null);
-  const shownRef = useRef<number | null>(value ?? null);
+  const [shown, setShown] = useState<number | null>(() => entryValue(value));
+  const shownRef = useRef<number | null>(entryValue(value));
 
   useEffect(() => {
     if (value === null || value === undefined || Number.isNaN(value)) {
@@ -19,9 +26,11 @@ export function AnimatedNumber({ value, format, durationMillis = 650 }: Props) {
       setShown(null);
       return;
     }
-    const from = shownRef.current;
+    const entering = shownRef.current === null;
+    const from = entering ? value * ENTRY_FROM : shownRef.current!;
+    const duration = entering ? ENTRY_MILLIS : durationMillis;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (from === null || from === value || reduceMotion) {
+    if (from === value || reduceMotion) {
       shownRef.current = value;
       setShown(value);
       return;
@@ -29,7 +38,7 @@ export function AnimatedNumber({ value, format, durationMillis = 650 }: Props) {
     const start = performance.now();
     let frame = 0;
     const step = (now: number) => {
-      const progress = Math.min(1, (now - start) / durationMillis);
+      const progress = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = from + (value - from) * eased;
       shownRef.current = current;

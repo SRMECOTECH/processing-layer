@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { DatabaseZap, X } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";
@@ -18,7 +19,8 @@ export function EmptyDbButton({ compact }: { compact?: boolean }) {
         <DatabaseZap size={15} />
         {compact ? "Empty DB" : "Empty DB"}
       </button>
-      {open && <EmptyDbDialog onClose={() => setOpen(false)} />}
+      {/* At the document root: a card that lifts on hover would otherwise become the dialog's frame. */}
+      {open && createPortal(<EmptyDbDialog onClose={() => setOpen(false)} />, document.body)}
     </>
   );
 }

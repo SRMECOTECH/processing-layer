@@ -1,0 +1,75 @@
+/* Workspace Studio. Its own root layout, so nothing here reaches the PulseStream console (and back).
+   Tailwind scans only the studio files, so it never emits classes the console's CSS also defines. */
+
+@import "tailwindcss" source(none);
+@source "./";
+@source "../../components/studio";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #ece9ef;
+  --color-ink: #111014;
+  --color-text: #18151c;
+  --color-text-2: #6f6a78;
+  --color-muted: #a19ca8;
+  --color-icon: #8c8892;
+  --color-lav: #cbbfea;
+  --color-lav-soft: #e6e0f8;
+  --color-lav-nav: #d8d1f7;
+  --color-lav-deep: #4c4388;
+  --color-pink: #f5ceec;
+  --color-pink-soft: #fae6f6;
+  --color-mint: #dae8dc;
+  --color-green: #3fa46a;
+  --color-sky: #dee7fa;
+  --color-track: #f1eff3;
+  --color-tile: #f4f2f6;
+
+  --radius-frame: 32px;
+  --radius-card: 22px;
+  --radius-tile: 16px;
+
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+@layer base {
+  html,
+  body {
+    background: #ffffff;
+    color: var(--color-text);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+  button {
+    cursor: pointer;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Buttons: darken 6% on hover, press to 0.97. */
+@utility press {
+  transition:
+    filter 200ms ease,
+    transform 120ms ease,
+    background-color 200ms ease;
+  &:hover {
+    filter: brightness(0.94);
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+}

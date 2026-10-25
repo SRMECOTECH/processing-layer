@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CircleUser, Menu, Search, SlidersHorizontal, Waves } from "lucide-react";
+import { Bell, CircleUser, PanelLeft, Search, SlidersHorizontal } from "lucide-react";
 import { alertsFrom, seriousCount } from "@/lib/alerts";
 import { formatRate } from "@/lib/format";
 import { allPages } from "@/lib/nav";
@@ -11,8 +11,8 @@ import { useOverview } from "@/lib/overview-context";
 import { ingress, isKafkaFlow } from "@/lib/pipeline";
 import { usePreferences, type Accent, type Background } from "@/lib/preferences";
 import { Popover } from "./popover";
-import { TopTabs } from "./top-tabs";
 
+/** The bar above the page, on the lilac canvas: menu toggle, product name, search, live rate, alerts, appearance. */
 export function AppHeader() {
   const { toggleSidebar } = usePreferences();
   const { data: overview, error } = useOverview();
@@ -20,36 +20,30 @@ export function AppHeader() {
   const rate = ingress(overview)?.messagesPerSecond;
 
   return (
-    <header className="app-header">
-      <div className="topbar">
-        <div className="topbar-left">
-          <button type="button" className="icon-button" aria-label="Show or hide the menu" onClick={toggleSidebar}>
-            <Menu size={20} />
-          </button>
-          <Link href="/stream" className="logo">
-            <span className="logo-mark">
-              <Waves size={18} />
-            </span>
-            <span className="logo-name">PulseStream IoT</span>
-            <span className="tag">{overview ? (kafka ? "PROD KAFKA" : "DIRECT FLOW") : "CONNECTING"}</span>
-          </Link>
-        </div>
-
-        <SearchBox />
-
-        <div className="topbar-right">
-          <span className={`live-pill${error && !overview ? " down" : ""}`} title="Frames entering the pipeline, average of the last 10 seconds">
-            <i />
-            {error && !overview ? "Service offline" : `${kafka ? "Kafka" : "Direct"}: ${formatRate(rate)} msg/s`}
-          </span>
-          <Notifications />
-          <ThemeSettings />
-          <span className="avatar" aria-label="Signed in user">
-            <CircleUser size={22} />
-          </span>
-        </div>
+    <header className="topbar">
+      <div className="topbar-left">
+        <button type="button" className="icon-button" aria-label="Show or hide the menu" onClick={toggleSidebar}>
+          <PanelLeft size={17} strokeWidth={1.8} />
+        </button>
+        <Link href="/stream" className="logo">
+          <span className="logo-name">PulseStream IoT</span>
+          <span className="tag">{overview ? (kafka ? "PROD KAFKA" : "DIRECT FLOW") : "CONNECTING"}</span>
+        </Link>
       </div>
-      <TopTabs />
+
+      <SearchBox />
+
+      <div className="topbar-right">
+        <span className={`live-pill${error && !overview ? " down" : ""}`} title="Frames entering the pipeline, average of the last 10 seconds">
+          <i />
+          {error && !overview ? "Service offline" : `${kafka ? "Kafka" : "Direct"}: ${formatRate(rate)} msg/s`}
+        </span>
+        <Notifications />
+        <ThemeSettings />
+        <span className="avatar" aria-label="Signed in user">
+          <CircleUser size={20} strokeWidth={1.7} />
+        </span>
+      </div>
     </header>
   );
 }
@@ -94,7 +88,7 @@ function SearchBox() {
 
   return (
     <div className="search">
-      <Search size={16} className="search-icon" />
+      <Search size={15} className="search-icon" />
       <input
         ref={inputRef}
         className="search-input"
@@ -156,9 +150,10 @@ function Notifications() {
     <Popover
       label="Alerts"
       width={340}
+      buttonClassName="icon-button ink"
       button={
         <>
-          <Bell size={19} />
+          <Bell size={16} strokeWidth={1.8} />
           {serious > 0 && <span className="bell-dot" />}
         </>
       }
@@ -190,19 +185,19 @@ function Notifications() {
 }
 
 const BACKGROUNDS: [Background, string, string][] = [
-  ["offwhite", "Off-white", "#f5f7fa"],
-  ["white", "White", "#ffffff"],
-  ["warm", "Warm white", "#faf8f3"],
+  ["lilac", "Lilac", "#ece9ef"],
+  ["mist", "Mist", "#e9edf2"],
+  ["warm", "Warm", "#efebe6"],
 ];
 const ACCENTS: [Accent, string, string][] = [
-  ["navy", "Navy blue", "#0b4a8b"],
-  ["sky", "Sky blue", "#0284c7"],
+  ["lavender", "Lavender", "#5a4ea6"],
+  ["sky", "Sky blue", "#2f63c8"],
 ];
 
 function ThemeSettings() {
   const { background, accent, setBackground, setAccent } = usePreferences();
   return (
-    <Popover label="Appearance" width={280} button={<SlidersHorizontal size={19} />}>
+    <Popover label="Appearance" width={280} button={<SlidersHorizontal size={16} strokeWidth={1.8} />}>
       {() => (
         <div>
           <div className="popover-title">Appearance</div>

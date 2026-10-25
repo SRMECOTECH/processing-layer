@@ -2,13 +2,16 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatedNumber } from "./animated-number";
+import { Words } from "./words";
 import { formatNumber } from "@/lib/format";
 
 export function PageHead({ title, lead, meta }: { title: string; lead: string; meta?: ReactNode }) {
   return (
     <header className="page-head">
       <div>
-        <h1 className="page-title">{title}</h1>
+        <h1 className="page-title">
+          <Words text={title} />
+        </h1>
         <p className="page-lead">{lead}</p>
       </div>
       {meta && <div className="page-meta">{meta}</div>}

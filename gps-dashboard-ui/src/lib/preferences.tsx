@@ -2,8 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type Background = "offwhite" | "white" | "warm";
-export type Accent = "navy" | "sky";
+export type Background = "lilac" | "mist" | "warm";
+export type Accent = "lavender" | "sky";
+
+const BACKGROUNDS: Background[] = ["lilac", "mist", "warm"];
+const ACCENTS: Accent[] = ["lavender", "sky"];
 
 type Preferences = {
   background: Background;
@@ -24,15 +27,16 @@ const PreferencesContext = createContext<Preferences | null>(null);
 export const APPLY_SAVED_THEME = `try{var p=JSON.parse(localStorage.getItem("${STORAGE_KEY}")||"{}");var d=document.documentElement;if(p.background)d.dataset.bg=p.background;if(p.accent)d.dataset.accent=p.accent;}catch(e){}`;
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [background, setBackgroundState] = useState<Background>("offwhite");
-  const [accent, setAccentState] = useState<Accent>("navy");
+  const [background, setBackgroundState] = useState<Background>("lilac");
+  const [accent, setAccentState] = useState<Accent>("lavender");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<Preferences>;
-      if (saved.background) setBackgroundState(saved.background);
-      if (saved.accent) setAccentState(saved.accent);
+      // Values saved by the earlier design (off-white, navy...) no longer exist and fall back to the defaults.
+      if (saved.background && BACKGROUNDS.includes(saved.background)) setBackgroundState(saved.background);
+      if (saved.accent && ACCENTS.includes(saved.accent)) setAccentState(saved.accent);
       if (saved.sidebarOpen === false) setSidebarOpen(false);
     } catch {
       // Storage blocked or unreadable: keep the defaults.

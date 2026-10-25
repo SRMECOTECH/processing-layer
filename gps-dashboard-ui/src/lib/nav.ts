@@ -29,16 +29,17 @@ import {
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 export type NavGroup = { title: string; items: NavItem[] };
-export type Section = { href: string; label: string; groups: NavGroup[] };
+export type Section = { href: string; label: string; icon: LucideIcon; groups: NavGroup[] };
 
 /**
- * The whole navigation: top tabs (sections) and, per section, the left menu (groups of sub-pages).
+ * The whole navigation: the sections (icons in the black rail) and, per section, the white menu of sub-pages.
  * Each sub-page shows one or two cards, so a section can grow by adding sub-pages, not by crowding one page.
  */
 export const SECTIONS: Section[] = [
   {
     href: "/stream",
     label: "Stream Processors",
+    icon: Workflow,
     groups: [
       {
         title: "Pipeline",
@@ -68,6 +69,7 @@ export const SECTIONS: Section[] = [
   {
     href: "/rules",
     label: "Business Rules & Alerts",
+    icon: ShieldCheck,
     groups: [
       {
         title: "Business logics",
@@ -89,6 +91,7 @@ export const SECTIONS: Section[] = [
   {
     href: "/ingestion",
     label: "Ingestion & DB Sink",
+    icon: Database,
     groups: [
       {
         title: "Storage ingestion",
@@ -107,6 +110,7 @@ export const SECTIONS: Section[] = [
   {
     href: "/analytics",
     label: "Telemetry Analytics",
+    icon: ChartLine,
     groups: [
       {
         title: "Analytics",
@@ -127,6 +131,7 @@ export const SECTIONS: Section[] = [
   {
     href: "/developer",
     label: "Developer",
+    icon: Terminal,
     groups: [
       {
         title: "Developer",

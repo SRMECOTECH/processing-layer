@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { Words } from "@/components/words";
 import { alertsFrom, seriousCount } from "@/lib/alerts";
 import { formatNumber } from "@/lib/format";
 import { QUICK_FILTERS } from "@/lib/nav";
@@ -34,7 +35,9 @@ export function PageTitle({ title, subtitle, right }: { title: string; subtitle?
   return (
     <div className="ops-head">
       <div>
-        <h1 className="ops-title">{title}</h1>
+        <h1 className="ops-title">
+          <Words text={title} />
+        </h1>
         {subtitle && <p className="ops-subtitle">{subtitle}</p>}
       </div>
       {right && <div className="ops-head-right">{right}</div>}

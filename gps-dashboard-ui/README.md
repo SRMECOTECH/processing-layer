@@ -1,13 +1,19 @@
 # PulseStream IoT console
 
-Operations console for the GPS streaming platform, built with Next.js 16 and React 19 from the
-"Fleet Telematics Analytics Platform" design in Google Stitch.
+Operations console for the GPS streaming platform, built with Next.js 16 and React 19, in the same look as
+Workspace Studio (below): a rounded lilac frame on white, white cards with no borders, black pill buttons and
+pastel accents.
 
-Layout: a top bar (menu, logo, search, live Kafka rate, alerts, appearance, user), section tabs, and
-for each section its own left menu of sub-pages. Each sub-page holds one or two cards, so sections grow
-by adding sub-pages rather than crowding one page. Off-white page with navy accent; background
-(off-white / white / warm) and accent (navy / sky) can be changed from the sliders icon and are remembered
-per browser.
+Layout: a black capsule rail on the left with one icon per section (the lavender circle and notch slide to
+the open one, hovering shows its name), a white menu card with that section's sub-pages (a black pill slides
+to the open page), and the page itself with a top bar for the menu toggle, search, live Kafka rate, alerts,
+appearance and user. Each sub-page holds one or two cards, so sections grow by adding sub-pages rather than
+crowding one page. Background (lilac / mist / warm) and accent (lavender / sky) can be changed from the
+sliders icon and are remembered per browser.
+
+Motion: on load the rail grows down and its icons fade in; on every page the blocks blur in one after
+another in reading order and the title word by word; numbers count up from 80% of their value and progress
+bars grow in. Cards lift 2px on hover, so dialogs are rendered at the document root (a portal).
 
 ## Run it
 
@@ -31,7 +37,8 @@ from the project root starts it as the `dashboard` service on port 3000.
 | Telemetry Analytics | Live stream telemetry, Latency & backpressure, Violations & anomalies, Vehicle state & trip efficiency |
 | Developer | The engineering pages: engine overview, producers & consumers, trips/stops/readings, topics & storage |
 
-The menu lives in `src/lib/nav.ts`: add a sub-page there and create its `page.tsx`.
+The menu lives in `src/lib/nav.ts` (each section also has its rail icon there): add a sub-page there and
+create its `page.tsx`.
 
 ## Live and demo cards
 
@@ -55,10 +62,23 @@ address can change per environment without a rebuild. One shared poll of `/api/e
 ## Layout of the code
 
 ```
-src/app/                 one folder per section and sub-page; layout.tsx = header + left menu
+src/app/(console)/       one folder per section and sub-page; layout.tsx = frame, rail, menu, top bar
+src/app/(studio)/        Workspace Studio: its own root layout, Tailwind stylesheet and Inter font
 src/app/api/             the proxy to the GPS service
-src/components/shell/    header, search, alerts, appearance, tabs, left menu
+src/components/shell/    rail, sub-page menu, top bar (search, alerts, appearance)
 src/components/ops/      cards, tiles, tags, charts used by the operational pages
+src/components/studio/   Workspace Studio shell, motion kit, SVG art and its four pages
 src/components/          pieces used by the Developer pages
 src/lib/                 API types (mirror the Java records), navigation, polling, alerts, formatting
 ```
+
+## Workspace Studio (`/studio`)
+
+A separate single-page workspace (Dashboard, Profile, Saved, Cloud) in a soft lilac design: floating black
+sidebar whose active circle and notch slide between items, cards that blur in one after another, numbers
+that count up, bars and the storage ring that draw in. Built with Tailwind CSS v4, framer-motion and
+lucide-react; the 3D flower, coil and brain thumbnails are SVG. All content is sample data.
+
+It is its own root layout (route group `(studio)`), so its Tailwind stylesheet never loads on console
+pages and the console's CSS never reaches it; Tailwind scans only the studio files. Moving between the
+console and `/studio` is a full page load. The log-out icon in the studio sidebar goes back to the console.
