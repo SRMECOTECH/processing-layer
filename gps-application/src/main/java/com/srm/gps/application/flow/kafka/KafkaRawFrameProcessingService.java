@@ -2,7 +2,7 @@ package com.srm.gps.application.flow.kafka;
 
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.RejectedGpsFrame;
-import com.srm.gps.connectivity.flow.OnlyInKafkaFlow;
+import com.srm.gps.connectivity.flow.OnlyWhenListenerNormalizes;
 import com.srm.gps.connectivity.kafka.ProcessedGpsPositionPublisher;
 import com.srm.gps.connectivity.kafka.RawGpsFrameHandler;
 import com.srm.gps.connectivity.kafka.RejectedGpsFramePublisher;
@@ -16,9 +16,12 @@ import org.springframework.stereotype.Service;
  *
  *   accepted -> "gps.processed-positions"  (read by the storage consumer)
  *   rejected -> "gps.rejected-frames"      (read by the rejected-frame logger)
+ *
+ * At-least-once: the previous reading is remembered only after both publishes were confirmed. When Kafka Streams owns
+ * normalization this service does not exist - see com.srm.gps.streams.normalize.NormalizationTopology.
  */
 @Service
-@OnlyInKafkaFlow
+@OnlyWhenListenerNormalizes
 public class KafkaRawFrameProcessingService implements RawGpsFrameHandler {
 
     private final GpsFrameProcessor gpsFrameProcessor;

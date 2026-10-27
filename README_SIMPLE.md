@@ -115,6 +115,15 @@ Ye project ka **dil** hai. Plain Java hai – na Kafka, na database – isliye a
 **(c) Result:** achha → **Topic 2**, kharab → **Topic 3**.
 ⚠️ Dhyaan do: processing **consumer bhi hai aur producer bhi** – Topic 1 se padhta hai, Topic 2/3 mein likhta hai.
 
+**(d) Ye sab chalata kaun hai? Kafka Streams 🔒**
+- Rules wahi upar wale hain (`gps-processing`), lekin unko ab **Kafka Streams** chalata hai – ek library jo isi service ke andar chalti hai.
+- "Truck ki pichhli reading" ab memory mein nahi, **locker** (RocksDB state store) mein hai, aur locker ki copy Kafka mein (changelog topic). Restart pe kuch gum nahi.
+- Output likhna + locker update + "ye frame ho gaya" (offset) – teeno **ek saath ya koi nahi** (exactly-once).
+- Do naye check: device **purani reading dobara** bheje → duplicate; 24 ghante se purani → stale.
+- Ek doosra Kafka Streams app har truck ki latest state (KTable) aur **5-minute ka hisaab** (`gps.vehicle-activity`) rakhta hai.
+- Purana listener abhi bhi hai: `gps.streams.normalization=shadow` pe wo kaam karta hai aur Kafka Streams ka output usse **milaaya** jaata hai.
+- 📁 `gps-streams/` · UI: Processing → Kafka Streams · Poori kahani: README section 15c, [docs/KAFKA_STREAMS_GUIDE.md](docs/KAFKA_STREAMS_GUIDE.md)
+
 ### Step 4 – Topic 2 se 7 log apni apni copy uthate hain
 Har ek alag consumer group hai, to **ek slow ho to baaki nahi rukte**. Ab ek ek karke:
 
@@ -208,7 +217,7 @@ Logic **same code** hai, sirf "daakiya" alag. 📁 `gps-application/.../flow/kaf
 
 1. **Kaam pehle, bookmark baad mein.** Consumer kaam poora karke hi Kafka ko bolta hai "ho gaya" (offset commit). Beech mein crash → message dobara aayega, gum nahi hoga.
 2. **Retry karte raho.** DB down → 1s, 2s, 4s … 60s tak ruk ruk ke retry, jab tak wapas na aaye.
-3. **Toota message skip.** Jo kabhi theek nahi ho sakta (galat JSON) – log karo, aage badho, line block mat karo.
+3. **Toota message phenko mat, alag rakho.** Jo kabhi theek nahi ho sakta (galat JSON) – `gps.dead-letters` mein park, aage badho, line block mat karo. Baad mein bug theek karke replay (README section 10a).
 4. **Do baar aaye to bhi ek hi baar likho (idempotent).** Unique keys + "pehle se hai?" check.
 
 ---

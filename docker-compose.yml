@@ -1,15 +1,19 @@
 # The whole GPS platform in containers.
 #
 #   postgres     PostgreSQL 14         gps_tracking database              Windows: localhost:5433
-#   kafka        Apache Kafka (KRaft)  the 3 topics                       Windows: localhost:29092
+#   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
 #   kafka-ui     Kafka UI              browse topics, messages, groups     http://localhost:8085
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
+#                + Kafka Streams       normalizer + analytics apps         state in the gps-streams-state volume
+#                + ingest journal      frames/events kept until Kafka has  the gps-ingest-journal volume
 #   dashboard    our Next.js web UI    PulseStream dashboard               http://localhost:3000
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
+#   Shadow run:   $env:GPS_STREAMS_NORMALIZATION = 'shadow'; docker compose up -d gps-service   (listener + parity)
+#   3 brokers:    docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d    (3 copies, fresh volumes)
 #   Direct flow:  docker compose up -d postgres redis
 #                 $env:GPS_PROCESSING_FLOW = 'direct'; docker compose up -d --no-deps --build gps-service
 #   Logs:         docker compose logs -f gps-service
@@ -61,12 +65,25 @@ services:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      # A single broker can only keep one copy of everything.
+      # A single broker can only keep one copy of everything (docker-compose.ha.yml runs three, with 3 copies).
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_RETENTION_HOURS: 168
+      # No data loss (docs/DATA_SAFETY_GUIDE.md):
+      #   one month of data: 744 h = 31 days for any topic without its own setting (the platform's topics set it too)
+      #   a consumer group stopped for up to a month keeps its place (committed offsets kept as long as the data)
+      #   only declared topics: a misspelled topic name fails instead of silently creating a topic nobody reads
+      #   a replica that missed records never becomes leader
+      #   one copy only, so it is on disk before the broker says "ok" (a power cut loses nothing acknowledged)
+      KAFKA_LOG_RETENTION_HOURS: 744
+      KAFKA_LOG_RETENTION_BYTES: -1
+      KAFKA_OFFSETS_RETENTION_MINUTES: 44640
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"
+      KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: ${KAFKA_LOG_FLUSH_INTERVAL_MESSAGES:-1}
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     ports:
       - "29092:29092"
@@ -115,6 +132,13 @@ services:
     restart: always
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
+      # Kafka Streams: owner (it normalizes) | shadow (the listener does, Kafka Streams is compared) | off
+      GPS_STREAMS_ENABLED: ${GPS_STREAMS_ENABLED:-true}
+      GPS_STREAMS_NORMALIZATION: ${GPS_STREAMS_NORMALIZATION:-owner}
+      GPS_STREAMS_STATEDIR: /var/lib/gps-streams
+      GPS_STREAMS_ADVERTISEDHOST: gps-service
+      # every frame and event is fsynced here before it is sent to Kafka, until Kafka confirms it
+      GPS_JOURNAL_DIRECTORY: /var/lib/gps-journal
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
       GPS_SIMULATOR_VEHICLECOUNT: ${GPS_SIMULATOR_VEHICLE_COUNT:-150}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
@@ -128,6 +152,9 @@ services:
       SMARTTRUCK_DATABASE_PASSWORD: ${SMART_TRUCK_DATABASE_PASSWORD}
     ports:
       - "8080:8080"
+    volumes:
+      - gps-streams-state:/var/lib/gps-streams
+      - gps-ingest-journal:/var/lib/gps-journal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -162,3 +189,5 @@ volumes:
   gps-postgres-data:
   gps-kafka-data:
   gps-redisinsight-data:
+  gps-streams-state:
+  gps-ingest-journal:

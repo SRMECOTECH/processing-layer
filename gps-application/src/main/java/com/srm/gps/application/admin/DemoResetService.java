@@ -1,5 +1,6 @@
 package com.srm.gps.application.admin;
 
+import com.srm.gps.application.kafkastreams.GpsStreamsRuntime;
 import com.srm.gps.application.processing.DatabaseBackedPreviousReadingStore;
 import com.srm.gps.application.simulator.GpsDeviceSimulatorService;
 import com.srm.gps.application.simulator.GpsDeviceSimulatorSettings;
@@ -37,12 +38,14 @@ import java.util.function.BooleanSupplier;
  *
  *   1. stop the simulated fleet;
  *   2. pause every Kafka consumer and move each one to the end of its topic (a paused consumer still polls,
- *      so the seek is applied and its prefetched records are dropped);
- *   3. delete every record in the platform's topics (deleteRecords up to the end offset);
- *   4. empty the telemetry tables - master data (tenant, vehicle, device, device_assignment) stays;
+ *      so the seek is applied and its prefetched records are dropped), and close the Kafka Streams apps;
+ *   3. delete every record in the platform's topics (deleteRecords up to the end offset) - the one deliberate
+ *      deletion in the platform, demo only (the ingest journal is not touched: it only holds what Kafka lacks);
+ *   4. empty the telemetry tables and the archives - master data (tenant, vehicle, device, device_assignment) stays;
  *   5. delete the gps:* Redis keys except configuration (gps:config:*, the speed rules);
  *   6. forget the in-memory previous readings and start the load counters from 0;
- *   7. resume the consumers, and restart the fleet if asked.
+ *   7. reset the Kafka Streams apps (local state, consumer groups, changelog topics) and start them again;
+ *   8. resume the consumers, and restart the fleet if asked.
  * Not for production: it is switched off with gps.admin.reset-enabled=false.
  */
 @Service
@@ -50,9 +53,10 @@ public class DemoResetService {
 
     private static final Logger LOG = LoggerFactory.getLogger(DemoResetService.class);
     private static final List<String> TOPICS = List.of(KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS,
-            KafkaTopicNames.REJECTED_FRAMES, KafkaTopicNames.VEHICLE_EVENTS);
+            KafkaTopicNames.REJECTED_FRAMES, KafkaTopicNames.VEHICLE_EVENTS, KafkaTopicNames.VEHICLE_ACTIVITY,
+            KafkaTopicNames.DEAD_LETTERS, KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
     private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "gps_trip_late_reading", "gps_trip",
-            "gps_stop", "vehicle_motion_state", "gps_position");
+            "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
 
     private final GpsDeviceSimulatorService simulator;
     private final GpsDeviceSimulatorSettings simulatorSettings;
@@ -63,12 +67,13 @@ public class DemoResetService {
     private final RedisStateStore redis;
     private final DatabaseBackedPreviousReadingStore previousReadings;
     private final PipelineMetrics metrics;
+    private final ObjectProvider<GpsStreamsRuntime> kafkaStreams;
 
     public DemoResetService(GpsDeviceSimulatorService simulator, GpsDeviceSimulatorSettings simulatorSettings,
                             ObjectProvider<KafkaListenerEndpointRegistry> listenerRegistry,
                             ObjectProvider<KafkaBacklogSkipper> backlogSkipper, ObjectProvider<KafkaAdmin> kafkaAdmin,
                             JdbcTemplate jdbc, RedisStateStore redis, DatabaseBackedPreviousReadingStore previousReadings,
-                            PipelineMetrics metrics) {
+                            PipelineMetrics metrics, ObjectProvider<GpsStreamsRuntime> kafkaStreams) {
         this.simulator = simulator;
         this.simulatorSettings = simulatorSettings;
         this.listenerRegistry = listenerRegistry;
@@ -78,11 +83,12 @@ public class DemoResetService {
         this.redis = redis;
         this.previousReadings = previousReadings;
         this.metrics = metrics;
+        this.kafkaStreams = kafkaStreams;
     }
 
     public record ResetReport(Instant at, long tookMillis, boolean fleetWasRunning, boolean fleetRestarted,
                               int listenersSkippedToEnd, Map<String, Long> kafkaRecordsDeleted, List<String> tablesEmptied,
-                              long redisKeysDeleted, List<String> notes) {
+                              long redisKeysDeleted, List<String> streamsAppsReset, List<String> notes) {
     }
 
     public synchronized ResetReport reset(boolean restartFleet) {
@@ -100,6 +106,12 @@ public class DemoResetService {
         containers.forEach(MessageListenerContainer::pause);
         if (!containers.isEmpty() && !waitFor(() -> containers.stream().allMatch(MessageListenerContainer::isPauseRequested), Duration.ofSeconds(5))) {
             notes.add("Not every consumer confirmed the pause");
+        }
+
+        // Kafka Streams keeps state of its own (RocksDB + changelogs): stop it now, rebuild it from nothing below
+        GpsStreamsRuntime streams = kafkaStreams.getIfAvailable();
+        if (streams != null) {
+            streams.stopAll();
         }
 
         int skipped = 0;
@@ -130,6 +142,12 @@ public class DemoResetService {
         previousReadings.forgetAll();
         metrics.reset();
 
+        List<String> streamsAppsReset = new ArrayList<>();
+        if (streams != null) {
+            notes.addAll(streams.resetAll());
+            streams.apps().forEach(app -> streamsAppsReset.add(app.applicationId()));
+        }
+
         containers.forEach(MessageListenerContainer::resume);
 
         boolean restarted = false;
@@ -139,7 +157,7 @@ public class DemoResetService {
         }
 
         ResetReport report = new ResetReport(Instant.now(), System.currentTimeMillis() - start, wasRunning, restarted, skipped,
-                deleted, emptied, redisKeys, notes);
+                deleted, emptied, redisKeys, streamsAppsReset, notes);
         LOG.warn("DEMO RESET done: {}", report);
         return report;
     }
@@ -152,7 +170,10 @@ public class DemoResetService {
             return deletedPerTopic;
         }
         try (AdminClient client = AdminClient.create(admin.getConfigurationProperties())) {
-            Map<String, TopicDescription> topics = client.describeTopics(TOPICS).allTopicNames().get(10, TimeUnit.SECONDS);
+            // the shadow topics exist only once shadow mode has run
+            List<String> existing = new ArrayList<>(TOPICS);
+            existing.retainAll(client.listTopics().names().get(10, TimeUnit.SECONDS));
+            Map<String, TopicDescription> topics = client.describeTopics(existing).allTopicNames().get(10, TimeUnit.SECONDS);
             Map<TopicPartition, OffsetSpec> latestRequest = new HashMap<>();
             Map<TopicPartition, OffsetSpec> earliestRequest = new HashMap<>();
             topics.values().forEach(topic -> topic.partitions().forEach(p -> {

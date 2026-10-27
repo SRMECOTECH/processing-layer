@@ -11,7 +11,7 @@
 
     <artifactId>gps-application</artifactId>
     <name>gps-application</name>
-    <description>The runnable Spring Boot service: GPS device simulator, processing flows (Kafka or direct), position storage (Hibernate) and a small REST API.</description>
+    <description>The runnable Spring Boot service: GPS device simulator, processing flows (Kafka or direct), the Kafka Streams apps, position storage (Hibernate) and a small REST API.</description>
 
     <dependencies>
         <dependency>
@@ -21,6 +21,10 @@
         <dependency>
             <groupId>com.srm.gps</groupId>
             <artifactId>gps-processing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-streams</artifactId>
         </dependency>
 
         <dependency>

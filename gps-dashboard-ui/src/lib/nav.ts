@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  Archive,
   Bell,
   BellRing,
   Boxes,
@@ -18,6 +19,7 @@ import {
   Grid3x3,
   History,
   Inbox,
+  Layers,
   ListChecks,
   Map,
   MapPinned,
@@ -96,6 +98,18 @@ export const SECTIONS: Section[] = [
         items: [
           { href: "/processing", label: "Pipeline overview", icon: Workflow, feed: "live" },
           { href: "/processing/consumers", label: "Consumer groups", icon: Network, feed: "live" },
+          {
+            href: "/processing/streams",
+            label: "Kafka Streams",
+            icon: Layers,
+            feed: "live",
+            children: [
+              { href: "/processing/streams", label: "Topology & tasks", feed: "live" },
+              { href: "/processing/streams/table", label: "Vehicle table", feed: "live" },
+              { href: "/processing/streams/windows", label: "Activity windows", feed: "live" },
+              { href: "/processing/streams/parity", label: "Shadow parity", feed: "live" },
+            ],
+          },
         ],
       },
       {
@@ -228,7 +242,7 @@ export const SECTIONS: Section[] = [
     href: "/storage",
     label: "Storage",
     icon: Database,
-    description: "Ingestion control: schema validation, then PostgreSQL and ClickHouse.",
+    description: "Ingestion control, no data loss, then PostgreSQL and ClickHouse.",
     groups: [
       {
         title: "Ingestion control",
@@ -236,6 +250,13 @@ export const SECTIONS: Section[] = [
           { href: "/storage", label: "Ingestion overview", icon: Workflow, feed: "live" },
           { href: "/storage/schema", label: "Schema validation", icon: FileCheck, feed: "live" },
           { href: "/storage/rejected", label: "Rejected frames", icon: FileX, feed: "live" },
+        ],
+      },
+      {
+        title: "No data loss",
+        items: [
+          { href: "/storage/safety", label: "Data safety", icon: ShieldCheck, feed: "live" },
+          { href: "/storage/dead-letters", label: "Dead letters", icon: Archive, feed: "live" },
         ],
       },
       {

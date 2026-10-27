@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Car, Database, FileCheck, Gauge, Grid3x3, Power, Route, ShieldCheck, Table2, TriangleAlert, Waypoints } from "lucide-react";
+import { Activity, Car, Database, FileCheck, Gauge, Grid3x3, Layers, Power, Route, ShieldCheck, Table2, TriangleAlert, Waypoints } from "lucide-react";
 import type { Feed } from "./nav";
 
 /**
@@ -151,6 +151,28 @@ export const PROCESSORS: PipelineModule[] = [
       "Gate outliers with the Mahalanobis distance (99.9 %); reset the filter after 3 outliers in a row.",
       "Add the filtered step to the trip only while the vehicle is moving, so parking jitter adds nothing.",
       "Keep the raw Traccar distance next to it (odometer first, otherwise haversine, jitter clamped, jumps ignored).",
+    ],
+  },
+  // Kafka Streams: the analytics app is one more processor on the output topic (the normalizer sits before it)
+  {
+    id: "streams",
+    name: "Kafka Streams analytics",
+    summary: "Latest state of every vehicle as a KTable and 5-minute event-time windows, read live through Interactive Queries.",
+    href: "/processing/streams",
+    icon: Layers,
+    status: "live",
+    stages: ["STREAMS_ANALYTICS"],
+    consumerGroups: ["gps-streams-analytics"],
+    reads: OUTPUT_TOPIC,
+    state: ["vehicle-table-store", "activity-window-store", "parity-tally-store (shadow)"],
+    config: "application.yml · gps.streams",
+    emits: ["gps.vehicle-activity"],
+    logic: [
+      "Read every processed position with its event time: the moment the device took the reading, not when it arrived.",
+      "Fold it into the vehicle's row of the KTable; a late reading is counted but never replaces a newer position.",
+      "Add it to the vehicle's 5-minute window; a reading up to 2 minutes late still counts in its own window.",
+      "When stream time passes a window's end plus grace, publish its final numbers once to gps.vehicle-activity.",
+      "Answer queries from the local RocksDB stores; fleet totals are summed over every instance's share.",
     ],
   },
 ];
