@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
 import {
   Activity,
   Archive,
@@ -42,15 +42,15 @@ import {
   Truck,
   Waypoints,
   Workflow,
-} from "lucide-react";
+} from "@/components/icons";
 
 /** Where a page's numbers come from, shown as a small mark in the menu. */
 export type Feed = "live" | "partial" | "planned";
 
 export type NavLeaf = { href: string; label: string; feed?: Feed };
-export type NavItem = { href: string; label: string; icon: LucideIcon; feed?: Feed; children?: NavLeaf[] };
+export type NavItem = { href: string; label: string; icon: IconComponent; feed?: Feed; children?: NavLeaf[] };
 export type NavGroup = { title: string; items: NavItem[] };
-export type Section = { href: string; label: string; icon: LucideIcon; description: string; groups: NavGroup[] };
+export type Section = { href: string; label: string; icon: IconComponent; description: string; groups: NavGroup[] };
 
 /**
  * The whole navigation. Sections are the fixed top bar; each section has its own left menu of groups,
@@ -375,7 +375,7 @@ export function trailFor(pathname: string): Trail {
   return { section };
 }
 
-export type PageEntry = { href: string; label: string; section: string; parent?: string; icon: LucideIcon; feed?: Feed };
+export type PageEntry = { href: string; label: string; section: string; parent?: string; icon: IconComponent; feed?: Feed };
 
 /** Every page once, for search. A sub-page carries the name of the item it belongs to. */
 export function allPages(): PageEntry[] {

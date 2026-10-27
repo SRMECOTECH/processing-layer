@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BellRing, Inbox, Search } from "lucide-react";
+import { BellRing, Inbox, Search } from "@/components/icons";
 import { EVENT_LABEL, EventTable } from "@/components/ops/events";
 import { Card, PageHeader, Segmented, Stats, Tile } from "@/components/ops/kit";
 import { alertsFrom } from "@/lib/alerts";

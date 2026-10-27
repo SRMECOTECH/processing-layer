@@ -5,6 +5,7 @@
 # Build it:  docker build -t gps-dashboard-ui ./gps-dashboard-ui
 # (docker compose builds it for you - see docker-compose.yml)
 # The GPS service address is read at start-up from GPS_API_URL (default http://localhost:8080).
+# Sign-in: DASHBOARD_USERNAME / DASHBOARD_PASSWORD (default abc / abc) and AUTH_SECRET, also read at start-up.
 
 # ---------- stage 1: build ----------
 FROM node:22-alpine AS build
@@ -13,8 +14,7 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
-# postcss.config.mjs runs Tailwind for the Workspace Studio stylesheet.
-COPY next.config.ts tsconfig.json postcss.config.mjs ./
+COPY next.config.ts tsconfig.json ./
 COPY src src
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

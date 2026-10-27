@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
-import { ChevronRight, Info } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
+import { ChevronRight, Info } from "@/components/icons";
 import { useState, type ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { Words } from "@/components/words";
@@ -98,7 +98,7 @@ export function PageTitle({ title, subtitle, right }: { title: string; subtitle?
 }
 
 type CardProps = {
-  icon?: LucideIcon;
+  icon?: IconComponent;
   title: string;
   subtitle?: ReactNode;
   monoSubtitle?: boolean;
@@ -141,7 +141,7 @@ export function Card({ icon: Icon, title, subtitle, monoSubtitle, live, badges, 
 
 type TileProps = {
   label: string;
-  icon?: LucideIcon;
+  icon?: IconComponent;
   value: number | string | null | undefined;
   format?: (value: number) => string;
   unit?: string;
@@ -227,7 +227,7 @@ export function Segmented<T extends string>({
 }
 
 /** Shows a short confirmation instead of doing anything: for buttons on cards with example data. */
-export function DemoButton({ children, primary, icon: Icon }: { children: ReactNode; primary?: boolean; icon?: LucideIcon }) {
+export function DemoButton({ children, primary, icon: Icon }: { children: ReactNode; primary?: boolean; icon?: IconComponent }) {
   const [clicked, setClicked] = useState(false);
   return (
     <button

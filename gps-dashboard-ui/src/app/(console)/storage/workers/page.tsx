@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu, Gauge } from "lucide-react";
+import { Cpu, Gauge } from "@/components/icons";
 import { Card, Empty, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatNumber, formatRate } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";

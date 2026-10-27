@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { History } from "lucide-react";
+import { History } from "@/components/icons";
 import { Card, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 
 type Status = "DELIVERED" | "FAILED" | "RETRYING";

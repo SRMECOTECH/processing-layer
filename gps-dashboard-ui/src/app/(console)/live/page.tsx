@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, Car, ChartLine, ListChecks, Radio, Route, Siren, Workflow } from "lucide-react";
+import { Activity, ArrowRight, Car, ChartLine, ListChecks, Radio, Route, Siren, Workflow } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { EventFeed } from "@/components/ops/events";
 import { Card, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Network, SplitSquareHorizontal } from "lucide-react";
+import { Network, SplitSquareHorizontal } from "@/components/icons";
 import { Card, Empty, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo, formatNumber, formatRate } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";

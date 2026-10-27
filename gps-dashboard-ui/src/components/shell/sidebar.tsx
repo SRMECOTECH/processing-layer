@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
+import { ChevronRight, PanelLeftClose, PanelLeftOpen, Search, X } from "@/components/icons";
+import { SlideMarker } from "@/components/slide-marker";
 import { SECTIONS, itemContains, sectionFor, type NavGroup, type NavItem } from "@/lib/nav";
 import { useOverview } from "@/lib/overview-context";
 import { isKafkaFlow } from "@/lib/pipeline";
@@ -145,9 +145,9 @@ function SideItem({ item, pathname, open, onToggle }: { item: NavItem; pathname:
   );
 }
 
-/** The black pill behind the open page; one shared layoutId, so it slides from page to page. */
+/** The black pill behind the open page; it slides from page to page. */
 function ActivePill() {
-  return <motion.span layoutId="side-active" className="side-active" transition={{ type: "spring", stiffness: 400, damping: 34 }} />;
+  return <SlideMarker id="side-active" className="side-active" />;
 }
 
 function filterGroups(groups: NavGroup[], filter: string): NavGroup[] {

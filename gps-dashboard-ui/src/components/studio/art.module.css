@@ -1,0 +1,14 @@
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 90s linear infinite;
+}
+
+/* Near-white in the light theme, near-black in the dark one. */
+.blob {
+  background: var(--blob-bg);
+}

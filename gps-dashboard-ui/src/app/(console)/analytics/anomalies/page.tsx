@@ -1,6 +1,6 @@
 "use client";
 
-import { ScanLine } from "lucide-react";
+import { ScanLine } from "@/components/icons";
 import { EVENT_LABEL, EventTable } from "@/components/ops/events";
 import { Card, PageTitle, Progress, Tile } from "@/components/ops/kit";
 import { formatNumber, formatPercent } from "@/lib/format";

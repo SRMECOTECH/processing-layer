@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Car, Crosshair, Search } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Car, Crosshair, Search } from "@/components/icons";
+import type { IconComponent } from "@/components/icons";
 import { allPages } from "@/lib/nav";
 
-type Result = { href: string; title: string; trail: string; icon: LucideIcon; planned?: boolean };
+type Result = { href: string; title: string; trail: string; icon: IconComponent; planned?: boolean };
 
 /** Ctrl K (or /) anywhere: jump to any page, or straight to a vehicle by IMEI. */
 export function SearchButton() {

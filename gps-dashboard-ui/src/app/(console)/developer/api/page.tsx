@@ -1,6 +1,6 @@
 "use client";
 
-import { Braces } from "lucide-react";
+import { Braces } from "@/components/icons";
 import { Card, Code, PageHeader, Tag } from "@/components/ops/kit";
 
 const ENDPOINTS: [string, string, string, string][] = [

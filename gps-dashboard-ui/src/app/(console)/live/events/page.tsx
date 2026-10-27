@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks } from "lucide-react";
+import { ListChecks } from "@/components/icons";
 import { EVENT_LABEL, EventTable } from "@/components/ops/events";
 import { Card, PageHeader, Segmented, Stats, Tile } from "@/components/ops/kit";
 import type { EventTypeCount, VehicleEventView } from "@/lib/types";

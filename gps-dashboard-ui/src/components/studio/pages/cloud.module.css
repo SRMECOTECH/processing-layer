@@ -1,0 +1,253 @@
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--length);
+  }
+}
+
+.split {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 45fr 55fr;
+  gap: 20px;
+}
+
+/* Storage ring */
+.storage {
+  display: flex;
+  flex-direction: column;
+}
+
+.storageBody {
+  margin-top: 12px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 32px;
+}
+
+.ring {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  flex-shrink: 0;
+}
+
+.ringSvg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.segment {
+  animation: draw 0.9s var(--ease) backwards;
+}
+
+.ringCenter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.ringValue {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.ringLabel {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.legendLabel {
+  flex: 1;
+  color: var(--text-2);
+}
+
+.legendValue {
+  font-weight: 500;
+}
+
+/* Folders */
+.foldersHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.folders {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.folderCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.folderIcon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.folderText {
+  min-width: 0;
+}
+
+.folderName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.folderMeta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Recent files */
+.recent {
+  margin-top: 20px;
+}
+
+.recentHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.search {
+  display: flex;
+  height: 36px;
+  width: 240px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  padding: 0 14px;
+  color: var(--muted);
+  transition: box-shadow 160ms ease;
+}
+
+.search:focus-within {
+  box-shadow: 0 0 0 2px var(--lav);
+}
+
+.searchInput {
+  width: 100%;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--muted);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 1fr 1.3fr 1.2fr;
+  column-gap: 16px;
+}
+
+.columnHead {
+  margin-top: 12px;
+  border-bottom: 1px solid var(--track);
+  padding-bottom: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.file {
+  align-items: center;
+  border-bottom: 1px solid var(--track);
+  padding: 10px 0;
+  font-size: 12px;
+}
+
+.file:last-child {
+  border-bottom: 0;
+}
+
+.fileName {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.fileText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.dim {
+  color: var(--text-2);
+}
+
+.shared {
+  display: flex;
+}
+
+.shared > * + * {
+  margin-left: -8px;
+}
+
+.empty {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}

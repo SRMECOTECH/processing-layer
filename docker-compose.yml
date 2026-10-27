@@ -159,11 +159,15 @@ services:
     environment:
       # The dashboard's server calls the service inside the compose network; the browser only talks to the dashboard.
       GPS_API_URL: http://gps-service:8080
+      # Sign-in account for the console (abc / abc until set in .env) and the key that signs its session cookie.
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-abc}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-abc}
+      AUTH_SECRET: ${DASHBOARD_AUTH_SECRET:-}
     ports:
       - "3000:3000"
     healthcheck:
-      # The page itself, not the service behind it: the console stays up (showing "offline") while gps-service restarts.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/live"]
+      # The sign-in page: public, and served by the dashboard alone, so it stays healthy while gps-service restarts.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login"]
       interval: 15s
       timeout: 5s
       retries: 5

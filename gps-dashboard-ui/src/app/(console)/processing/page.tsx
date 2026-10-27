@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Workflow } from "lucide-react";
+import { Boxes, Workflow } from "@/components/icons";
 import { Callout, Card, Code, PageHeader } from "@/components/ops/kit";
 import { ModuleCard, PipelineDiagram } from "@/components/ops/module";
 import { formatNumber } from "@/lib/format";

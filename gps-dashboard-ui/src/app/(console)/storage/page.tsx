@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Database, FileCheck, GitBranch, Table2, Zap } from "lucide-react";
+import { Database, FileCheck, GitBranch, Table2, Zap } from "@/components/icons";
 import { Ring } from "@/components/ops/charts";
 import { Callout, Card, Code, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatNumber, formatPercent, formatRate } from "@/lib/format";

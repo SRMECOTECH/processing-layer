@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
-import { Crosshair, Database, History, ListChecks, Workflow } from "lucide-react";
+import { Crosshair, Database, History, ListChecks, Workflow } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { EventTable } from "@/components/ops/events";
 import { Card, Empty, KeyValues, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";

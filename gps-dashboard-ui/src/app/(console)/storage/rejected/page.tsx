@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, ChartBar, ListChecks, Search } from "lucide-react";
+import { Archive, ChartBar, ListChecks, Search } from "@/components/icons";
 import { Card, Code, Empty, PageHeader, Stats, Tile } from "@/components/ops/kit";
 import { formatAgo, formatDateTime, formatNumber, formatRate } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";

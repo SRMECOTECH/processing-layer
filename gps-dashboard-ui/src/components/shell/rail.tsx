@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
-import { LayoutGrid, Waves } from "lucide-react";
+import { LayoutGrid, Waves } from "@/components/icons";
+import { SlideMarker } from "@/components/slide-marker";
 import { SECTIONS, sectionFor } from "@/lib/nav";
 import { useNotifications } from "@/lib/notifications";
-
-const SPRING = { type: "spring", stiffness: 400, damping: 32 } as const;
 
 /**
  * The black capsule on the left: one icon per section, with the open alert and unread counts. The lavender
@@ -42,8 +40,8 @@ export function Rail() {
             >
               {current && (
                 <>
-                  <motion.span layoutId="rail-circle" className="rail-circle" transition={SPRING} />
-                  <motion.span layoutId="rail-notch" className="rail-notch" transition={SPRING} />
+                  <SlideMarker id="rail-circle" className="rail-circle" />
+                  <SlideMarker id="rail-notch" className="rail-notch" />
                 </>
               )}
               <Icon size={18} strokeWidth={1.75} className="rail-icon" />

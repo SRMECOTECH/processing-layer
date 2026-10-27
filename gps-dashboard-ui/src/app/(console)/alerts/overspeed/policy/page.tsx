@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Layers3 } from "lucide-react";
+import { Layers3 } from "@/components/icons";
 import { Card, DemoButton, Switch, Tag } from "@/components/ops/kit";
 import { ModuleHeader, SettingsCard } from "@/components/ops/module";
 import { moduleById } from "@/lib/modules";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CloudSun, TrafficCone } from "lucide-react";
+import { Bot, CloudSun, TrafficCone } from "@/components/icons";
 import { Card, KeyValues, Progress, Stats, Tile } from "@/components/ops/kit";
 import { ModuleHeader, SettingsCard } from "@/components/ops/module";
 import { formatNumber, formatPercent } from "@/lib/format";

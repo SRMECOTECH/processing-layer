@@ -2,6 +2,10 @@
 // server (no CORS) and the service address can change per environment:
 //   local:  GPS_API_URL unset           -> http://localhost:8080
 //   docker: GPS_API_URL=http://gps-service:8080
+// Only for a signed-in browser: src/proxy.ts already turns others away, and this checks again in case it is skipped.
+
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, readSession } from "@/lib/session";
 
 const SERVICE_URL = (process.env.GPS_API_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 // The demo reset takes about 6 s; everything else answers in milliseconds.
@@ -12,6 +16,9 @@ export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
 
 async function forward(request: Request, context: Context): Promise<Response> {
+  if (!(await readSession((await cookies()).get(SESSION_COOKIE)?.value))) {
+    return Response.json({ error: "Sign in to use the dashboard." }, { status: 401, headers: { "cache-control": "no-store" } });
+  }
   const { path } = await context.params;
   const query = new URL(request.url).search;
   const target = `${SERVICE_URL}/api/${path.map(encodeURIComponent).join("/")}${query}`;

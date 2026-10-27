@@ -1,0 +1,364 @@
+@keyframes tipIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 4px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Stat cards */
+.statHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.statValue {
+  margin-top: 16px;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.caption {
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Header: pastel banner, avatar overlapping it, name and actions. */
+.header {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.banner {
+  position: relative;
+  height: 116px;
+  overflow: hidden;
+  background: var(--banner);
+}
+
+.bannerFlower {
+  pointer-events: none;
+  position: absolute;
+  top: -96px;
+  right: 150px;
+  width: 260px;
+  height: 260px;
+  opacity: 0.9;
+}
+
+.identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 0 24px 20px;
+}
+
+.avatarRing {
+  position: relative;
+  margin-top: -40px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px;
+}
+
+.who {
+  min-width: 0;
+  flex: 1;
+  padding-top: 12px;
+}
+
+.name {
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.role {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.contact {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.available {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--mint);
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.greenDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+/* About */
+.about {
+  margin-top: 12px;
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.skillsHead {
+  margin-top: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.skillsTitle {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.skills {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skill {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--track);
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.skill[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+/* The tick slides open when a skill is picked, so the chip grows smoothly. */
+.check {
+  display: inline-flex;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    width 220ms var(--ease),
+    margin 220ms var(--ease),
+    opacity 220ms ease;
+}
+
+.skill[aria-pressed="true"] .check {
+  width: 13px;
+  margin-right: 6px;
+  opacity: 1;
+}
+
+/* Focus this week */
+.focus {
+  display: flex;
+  flex-direction: column;
+}
+
+.focusHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.focusTotal {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.focusBars {
+  margin-top: 24px;
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.focusDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.focusTrack {
+  position: relative;
+  display: flex;
+  height: 150px;
+  width: 26px;
+  align-items: flex-end;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.focusFill {
+  position: relative;
+  width: 100%;
+  border-radius: 999px;
+}
+
+.focusTip {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  translate: -50% 0;
+  border-radius: 8px;
+  background: var(--ink);
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ink-text);
+  box-shadow: var(--shadow-float);
+  animation: tipIn 0.3s var(--ease) backwards;
+}
+
+.focusName {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Recent activity */
+.list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--track);
+  padding: 10px 0;
+}
+
+.activity:last-child {
+  border-bottom: 0;
+}
+
+.activityIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.activityText {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.when {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Team */
+.team {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teammate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.teammateName {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.teammateRole {
+  font-size: 11px;
+  color: var(--muted);
+}

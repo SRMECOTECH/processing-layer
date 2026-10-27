@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartColumn, Truck } from "lucide-react";
+import { ChartColumn, Truck } from "@/components/icons";
 import { Card, KeyValues, PageTitle, Progress, Tag } from "@/components/ops/kit";
 import { formatDistance, formatDuration, formatNumber, formatPercent } from "@/lib/format";
 import { useLiveVehicles } from "@/lib/live-vehicles";

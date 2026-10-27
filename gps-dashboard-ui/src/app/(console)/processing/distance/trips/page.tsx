@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Route } from "lucide-react";
+import { Route } from "@/components/icons";
 import { Card, Empty, Progress, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { formatDateTime, formatDecimal, formatDistance, formatDuration, formatNumber, vehicleName } from "@/lib/format";

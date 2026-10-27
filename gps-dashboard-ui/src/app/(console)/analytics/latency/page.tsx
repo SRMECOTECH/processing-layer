@@ -1,6 +1,6 @@
 "use client";
 
-import { Timer, Workflow } from "lucide-react";
+import { Timer, Workflow } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { Card, Empty, PageTitle, Progress, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo, formatNumber, formatRate } from "@/lib/format";

@@ -1,75 +1,194 @@
-/* Workspace Studio. Its own root layout, so nothing here reaches the PulseStream console (and back).
-   Tailwind scans only the studio files, so it never emits classes the console's CSS also defines. */
+/* Workspace Studio: colour tokens, light and dark, and a small reset. Its own root layout, so nothing here reaches
+   the PulseStream console (and back). Components style themselves with CSS Modules next to them
+   (src/components/studio/*.module.css) and read only these variables, so a theme switch is just
+   <html data-theme="dark">. The sign-in page (src/app/(auth)) uses the same file. */
 
-@import "tailwindcss" source(none);
-@source "./";
-@source "../../components/studio";
+:root {
+  --page: #ffffff;
+  --canvas: #ece9ef;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --text: #18151c;
+  --text-2: #6f6a78;
+  --muted: #a19ca8;
+  --divider: #d9d5de;
+  --divider-soft: #dcd8e0;
+  --track: #f1eff3;
+  --tile: #f4f2f6;
 
-@theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Black pills and buttons; they turn light in the dark theme so they still stand out. */
+  --ink: #111014;
+  --ink-text: #ffffff;
+  /* The sidebar and the event strip stay black in both themes. */
+  --rail: #111014;
+  --rail-icon: #8c8892;
+  --rail-hover: #ffffff;
+  --rail-active: #d8d1f7;
+  --rail-active-icon: #111014;
 
-  --color-canvas: #ece9ef;
-  --color-ink: #111014;
-  --color-text: #18151c;
-  --color-text-2: #6f6a78;
-  --color-muted: #a19ca8;
-  --color-icon: #8c8892;
-  --color-lav: #cbbfea;
-  --color-lav-soft: #e6e0f8;
-  --color-lav-nav: #d8d1f7;
-  --color-lav-deep: #4c4388;
-  --color-pink: #f5ceec;
-  --color-pink-soft: #fae6f6;
-  --color-mint: #dae8dc;
-  --color-green: #3fa46a;
-  --color-sky: #dee7fa;
-  --color-track: #f1eff3;
-  --color-tile: #f4f2f6;
+  --lav: #cbbfea;
+  --lav-soft: #e6e0f8;
+  --lav-deep: #4c4388;
+  --pink: #f5ceec;
+  --pink-soft: #fae6f6;
+  --pink-deep: #a0428c;
+  --mint: #dae8dc;
+  --mint-deep: #2f7a4c;
+  --sky: #dee7fa;
+  --sky-deep: #3d5bb0;
+  --green: #3fa46a;
+  --red: #c4314b;
+  --red-soft: #fbe4ec;
+  --grey: #bfbcc0;
+  /* Pastel tiles behind a doc or link on the Saved page. */
+  --thumb-lav: #c7bee7;
+  --thumb-pink: #f5ceec;
+  --thumb-mint: #dae8dc;
+  --thumb-sky: #dee7fa;
+  --glass: rgba(255, 255, 255, 0.9);
+
+  --hero: #cbbfea;
+  --hero-text: #18151c;
+  --hero-text-2: #5e5674;
+  --banner: linear-gradient(90deg, #ccc1e8 0%, #e2d3f2 55%, #f2ceeb 100%);
+  --blob-bg: linear-gradient(180deg, #f7f6f9, #e9e7ee);
+  --blob-wave: #ffffff;
+
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 24px 60px rgba(24, 21, 28, 0.12), 0 2px 8px rgba(24, 21, 28, 0.05);
+  --focus-ring: 0 0 0 2px var(--lav);
 
   --radius-frame: 32px;
   --radius-card: 22px;
   --radius-tile: 16px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.08);
+  color-scheme: light;
 }
 
-@layer base {
-  html,
-  body {
-    background: #ffffff;
-    color: var(--color-text);
-    font-size: 13px;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
-  h1,
-  h2,
-  h3 {
-    font-weight: 500;
-    letter-spacing: -0.02em;
-  }
-  button {
-    cursor: pointer;
-  }
+:root[data-theme="dark"] {
+  --page: #0c0b0f;
+  --canvas: #17151b;
+  --surface: #211f26;
+  --surface-raised: #2c2932;
+  --text: #ece9f1;
+  --text-2: #b3adbd;
+  --muted: #7d7787;
+  --divider: #3b3742;
+  --divider-soft: #3b3742;
+  --track: #2c2932;
+  --tile: #29262f;
+
+  --ink: #ece9f1;
+  --ink-text: #111014;
+  --rail: #050407;
+  --rail-icon: #7d7787;
+
+  --lav-soft: color-mix(in srgb, #cbbfea 17%, #211f26);
+  --lav-deep: #cbbfea;
+  --pink-soft: color-mix(in srgb, #f5ceec 15%, #211f26);
+  --pink-deep: #f5ceec;
+  --mint: color-mix(in srgb, #3fa46a 22%, #211f26);
+  --mint-deep: #86d9a8;
+  --sky: color-mix(in srgb, #8fa6ff 18%, #211f26);
+  --sky-deep: #b4c4ff;
+  --green: #4ade80;
+  --red: #f87171;
+  --red-soft: color-mix(in srgb, #f87171 14%, #211f26);
+  --grey: #5a5560;
+  --thumb-lav: color-mix(in srgb, #c7bee7 32%, #211f26);
+  --thumb-pink: color-mix(in srgb, #f5ceec 28%, #211f26);
+  --thumb-mint: color-mix(in srgb, #9fd2b0 26%, #211f26);
+  --thumb-sky: color-mix(in srgb, #a9bdf5 26%, #211f26);
+  --glass: rgba(33, 31, 38, 0.88);
+
+  --hero: #463d6b;
+  --hero-text: #f3effb;
+  --hero-text-2: #cfc6ea;
+  --banner: linear-gradient(90deg, #3d3560 0%, #4a3d68 55%, #5b3c5c 100%);
+  --blob-bg: linear-gradient(180deg, #2c2932, #1c1a21);
+  --blob-wave: rgba(255, 255, 255, 0.12);
+
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
 }
 
-@utility no-scrollbar {
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+/* Reset: what a browser adds by default and the design does not want. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
 }
 
-/* Buttons: darken 6% on hover, press to 0.97. */
-@utility press {
-  transition:
-    filter 200ms ease,
-    transform 120ms ease,
-    background-color 200ms ease;
-  &:hover {
-    filter: brightness(0.94);
-  }
-  &:active {
-    transform: scale(0.97);
+html,
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* The theme switch cross-fades (View Transitions); keep it short. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

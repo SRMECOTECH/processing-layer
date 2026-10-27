@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, Settings2 } from "lucide-react";
+import { Play, Settings2 } from "@/components/icons";
 import { Card, KeyValues, PageHeader, Progress, Stats, Tag, Tile } from "@/components/ops/kit";
 import { SettingsCard } from "@/components/ops/module";
 import { FleetButton } from "@/components/simulator-control";

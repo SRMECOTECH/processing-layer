@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks } from "lucide-react";
+import { ListChecks } from "@/components/icons";
 import { EventTable } from "@/components/ops/events";
 import { Callout, Card, Segmented } from "@/components/ops/kit";
 import { ModuleHeader, SettingsCard } from "@/components/ops/module";
