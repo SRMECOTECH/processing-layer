@@ -5315,3 +5315,71 @@ pre.code {
 .data-table td.nowrap {
   white-space: nowrap;
 }
+
+/* =================================================================== No data loss pages (safety, dead letters) */
+
+.safety-checks {
+  display: grid;
+  gap: 2px;
+}
+
+.safety-check {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.safety-check:last-child {
+  border-bottom: 0;
+}
+
+.safety-check .tag {
+  justify-self: start;
+}
+
+.safety-check-title {
+  font-weight: 500;
+}
+
+.safety-check-detail {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.code-block {
+  max-height: 220px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: var(--radius-tile);
+  background: var(--tile);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.code-block.small {
+  font-size: 11px;
+}
+
+.dl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.dl-actions .input-box {
+  flex: 1 1 180px;
+}
+
+.data-table td.good {
+  color: var(--good);
+}

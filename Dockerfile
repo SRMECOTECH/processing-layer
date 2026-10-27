@@ -28,7 +28,11 @@ WORKDIR /app
 # Do not run as root inside the container.
 # /var/lib/gps-streams: the Kafka Streams state stores (RocksDB), mounted as a volume by docker compose so a new
 # container reuses them instead of restoring every store from its changelog topic.
-RUN useradd --system --uid 1001 gps && mkdir -p /var/lib/gps-streams && chown gps /var/lib/gps-streams
+# /var/lib/gps-journal: the ingest journal - frames and events not yet confirmed by Kafka; a volume, so a new
+# container sends them instead of losing them.
+RUN useradd --system --uid 1001 gps \
+    && mkdir -p /var/lib/gps-streams /var/lib/gps-journal \
+    && chown gps /var/lib/gps-streams /var/lib/gps-journal
 USER gps
 
 COPY --from=build /workspace/gps-application/target/gps-streaming-service.jar gps-streaming-service.jar

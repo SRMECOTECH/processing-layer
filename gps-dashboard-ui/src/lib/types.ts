@@ -385,3 +385,92 @@ export type ParityView = {
   listenerRejected: number;
   vehicles: { imei: string; tally: ParityTally }[];
 };
+
+// ---------------------------------------------------------------- Data safety (GET /api/data-safety, /api/dead-letters, /api/rejected-frames)
+
+export type SafetyStatus = "OK" | "WARN" | "FAIL";
+export type SafetyCheck = { id: string; title: string; status: SafetyStatus; detail: string };
+export type TopicSafety = {
+  topic: string;
+  partitions: number;
+  replicationFactor: number;
+  minInsyncReplicas: number | null;
+  retentionMs: number | null;
+  cleanupPolicy: string | null;
+  recordsKept: number;
+  bytesOnDisk: number;
+};
+export type GroupSafety = { group: string; state: string; members: number; lag: number; lostRecords: number; lostPartitions: Record<string, number> };
+export type BrokerSafety = {
+  brokers: number;
+  flushIntervalMessages: number | null;
+  offsetsRetentionMinutes: number | null;
+  autoCreateTopics: boolean | null;
+  defaultReplicationFactor: string | null;
+  minInsyncReplicas: string | null;
+  uncleanLeaderElection: string | null;
+};
+export type JournalStats = {
+  segments: number;
+  unacknowledged: number;
+  bytesOnDisk: number;
+  appended: number;
+  acknowledged: number;
+  acknowledgedThrough: number;
+  oldestUnacknowledgedSegmentAt: string | null;
+};
+export type JournalStatus = {
+  catchingUp: boolean;
+  inFlight: number;
+  failedSends: number;
+  lastFailure: string | null;
+  lastFailureAt: string | null;
+  journal: JournalStats;
+  directory: string;
+  fsyncEveryRecord: boolean;
+};
+export type CountBy = { name: string; parked: number; total: number };
+export type DeadLetterSummary = {
+  parked: number;
+  replayed: number;
+  discarded: number;
+  oldestParkedAt: string | null;
+  byTopic: CountBy[];
+  byException: CountBy[];
+};
+export type ReasonCount = { reason: string; lastDay: number; total: number };
+export type RejectedSummary = { total: number; lastDay: number; newest: string | null; byReason: ReasonCount[] };
+export type DataSafetyReport = {
+  verdict: SafetyStatus;
+  generatedAt: string;
+  processingFlow: string;
+  retentionTargetMs: number;
+  checks: SafetyCheck[];
+  topics: TopicSafety[];
+  groups: GroupSafety[];
+  broker: BrokerSafety | null;
+  journal: JournalStatus | null;
+  deadLetters: DeadLetterSummary;
+  rejectedFrames: RejectedSummary;
+  producer: Record<string, string>;
+  problem: string | null;
+};
+export type DeadLetterRow = {
+  id: number;
+  source: "listener" | "kafka-streams";
+  originalTopic: string | null;
+  originalPartition: number | null;
+  originalOffset: number | null;
+  consumerGroup: string | null;
+  recordKey: string | null;
+  recordValue: string | null;
+  exceptionClass: string | null;
+  exceptionMessage: string | null;
+  stacktrace: string | null;
+  parkedAt: string;
+  status: "PARKED" | "REPLAYED" | "DISCARDED";
+  replayCount: number;
+  lastReplayedAt: string | null;
+  resolutionNote: string | null;
+};
+export type RejectedFrameRow = { id: number; imei: string | null; rejectionReason: string; originalPayload: string; rejectedAt: string };

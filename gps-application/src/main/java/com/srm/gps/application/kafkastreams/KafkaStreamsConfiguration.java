@@ -3,13 +3,13 @@ package com.srm.gps.application.kafkastreams;
 import com.srm.gps.configuration.KafkaTopicNames;
 import com.srm.gps.configuration.StreamsNormalization;
 import com.srm.gps.connectivity.flow.OnlyWithKafkaStreams;
+import com.srm.gps.connectivity.kafka.KafkaDurabilityProperties;
+import com.srm.gps.connectivity.kafka.KafkaTopicDeclarations;
 import com.srm.gps.streams.runtime.StreamsApp;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaAdmin;
 
 import java.util.LinkedHashMap;
@@ -23,22 +23,18 @@ import java.util.Map;
 @OnlyWithKafkaStreams
 public class KafkaStreamsConfiguration {
 
-    /** One broker locally, so one copy of each message (as KafkaTopicDeclarations). */
-    private static final int REPLICAS = 1;
-
-    /** Shadow mode only. Same partitions as the real topics: the parity join needs them co-partitioned. */
+    /**
+     * Shadow mode only, declared as durably as the real topics. Same partitions as the real topics: the parity join
+     * needs them co-partitioned.
+     */
     @Bean
-    public KafkaAdmin.NewTopics shadowTopics(KafkaStreamsProperties settings) {
+    public KafkaAdmin.NewTopics shadowTopics(KafkaStreamsProperties settings, KafkaDurabilityProperties durability) {
         if (settings.mode() != StreamsNormalization.SHADOW) {
             return new KafkaAdmin.NewTopics();
         }
         return new KafkaAdmin.NewTopics(
-                shadowTopic(KafkaTopicNames.SHADOW_PROCESSED_POSITIONS),
-                shadowTopic(KafkaTopicNames.SHADOW_REJECTED_FRAMES));
-    }
-
-    private static NewTopic shadowTopic(String name) {
-        return TopicBuilder.name(name).partitions(KafkaTopicNames.PARTITIONS_PER_TOPIC).replicas(REPLICAS).build();
+                KafkaTopicDeclarations.durable(KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, durability),
+                KafkaTopicDeclarations.durable(KafkaTopicNames.SHADOW_REJECTED_FRAMES, durability));
     }
 
     /**

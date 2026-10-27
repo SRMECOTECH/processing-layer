@@ -37,6 +37,13 @@ public final class KafkaTopicNames {
      */
     public static final String VEHICLE_ACTIVITY = "gps.vehicle-activity";
 
+    /**
+     * Every record a consumer could not handle and that retrying cannot fix (a broken message, a rule it breaks, a
+     * bug) - parked here instead of skipped, with the original topic, partition, offset and the error in its headers.
+     * Archived in PostgreSQL (dead_letter) and replayable. Key = the original key.
+     */
+    public static final String DEAD_LETTERS = "gps.dead-letters";
+
     /** Number of partitions per topic. Frames of one device always land in the same partition (keyed by IMEI). */
     public static final int PARTITIONS_PER_TOPIC = 3;
 

@@ -11,6 +11,7 @@ import com.srm.gps.processing.step.ValidateRawFrameStep;
 import com.srm.gps.processing.step.ValidationResult;
 import com.srm.gps.streams.StoreNames;
 import com.srm.gps.streams.StreamsObserver;
+import com.srm.gps.streams.errors.StateUnavailableException;
 import org.apache.kafka.streams.processor.api.Processor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
 import org.apache.kafka.streams.processor.api.Record;
@@ -146,7 +147,13 @@ final class NormalizeFrameProcessor implements Processor<String, String, String,
         if (stored != null) {
             return Optional.of(stored);
         }
-        Optional<PreviousReading> found = fallback.find(imei);
+        Optional<PreviousReading> found;
+        try {
+            found = fallback.find(imei);
+        } catch (RuntimeException unreachable) {
+            // the record is fine, the database is not: retry, never park it
+            throw new StateUnavailableException("The previous reading of " + imei + " could not be looked up", unreachable);
+        }
         found.ifPresent(reading -> previousReadings.put(imei, reading));
         return found;
     }

@@ -44,8 +44,11 @@ public final class KafkaConsumerGroupNames {
     /** Reads processed positions and tracks ignition, engine hours and idling. */
     public static final String IGNITION = "gps-ignition-service";
 
-    /** Reads rejected frames and writes them to the service log. */
+    /** Reads rejected frames, archives them in PostgreSQL (rejected_frame) and writes them to the service log. */
     public static final String REJECTED_FRAME_LOGGER = "gps-rejected-frame-logger";
+
+    /** Reads dead letters and archives them in PostgreSQL (dead_letter), where they are kept and can be replayed. */
+    public static final String DEAD_LETTER_ARCHIVE = "gps-dead-letter-archive";
 
     /** One consumer thread per partition - the most a group can use. Text, because Spring's listener setting is text. */
     public static final String ONE_CONSUMER_PER_PARTITION = "" + KafkaTopicNames.PARTITIONS_PER_TOPIC;

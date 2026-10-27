@@ -22,7 +22,7 @@ export const STAGE_NAME: Record<string, string> = {
   POSITION_STORAGE: "PostgreSQL storage",
   LIVE_LOCATION: "Live location in Redis",
   TRIP_DETECTION: "Trip and stop detection",
-  REJECTED_FRAME_LOGGER: "Rejected frame log",
+  REJECTED_FRAME_LOGGER: "Rejected frame archive",
   DIRECT_PROCESSING: "Direct flow",
   VEHICLE_EVENT_PRODUCER: "Vehicle events",
   SPEED_VIOLATION: "Speed violation",
@@ -30,6 +30,8 @@ export const STAGE_NAME: Record<string, string> = {
   STOPPAGE_DETECTION: "Stoppage detection",
   IGNITION: "Ignition",
   STREAMS_ANALYTICS: "Kafka Streams analytics",
+  DEAD_LETTER_PRODUCER: "Dead letters",
+  DEAD_LETTER_ARCHIVE: "Dead-letter archive",
 };
 
 export function stageName(stage: string): string {

@@ -15,6 +15,8 @@ public enum PipelineStage {
             KafkaTopicNames.REJECTED_FRAMES, null),
     VEHICLE_EVENT_PRODUCER(Kind.PRODUCER, "Producer 4: vehicle events (over-speed, stoppage, ignition ...)",
             KafkaTopicNames.VEHICLE_EVENTS, null),
+    DEAD_LETTER_PRODUCER(Kind.PRODUCER, "Producer 5: dead letters (records a consumer could not handle, parked)",
+            KafkaTopicNames.DEAD_LETTERS, null),
 
     RAW_FRAME_PROCESSING(Kind.CONSUMER, "Validate frame + calculate movement",
             KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaConsumerGroupNames.RAW_FRAME_PROCESSING),
@@ -34,8 +36,10 @@ public enum PipelineStage {
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.IGNITION),
     STREAMS_ANALYTICS(Kind.CONSUMER, "Kafka Streams: vehicle table, 5-minute activity windows, shadow parity",
             KafkaTopicNames.PROCESSED_POSITIONS, KafkaConsumerGroupNames.STREAMS_ANALYTICS),
-    REJECTED_FRAME_LOGGER(Kind.CONSUMER, "Log rejected frames with the reason",
+    REJECTED_FRAME_LOGGER(Kind.CONSUMER, "Archive rejected frames in PostgreSQL and log the reason",
             KafkaTopicNames.REJECTED_FRAMES, KafkaConsumerGroupNames.REJECTED_FRAME_LOGGER),
+    DEAD_LETTER_ARCHIVE(Kind.CONSUMER, "Archive dead letters in PostgreSQL, kept and replayable",
+            KafkaTopicNames.DEAD_LETTERS, KafkaConsumerGroupNames.DEAD_LETTER_ARCHIVE),
 
     DIRECT_PROCESSING(Kind.DIRECT, "Direct flow: process, store, update live location and trips in one call",
             null, null);

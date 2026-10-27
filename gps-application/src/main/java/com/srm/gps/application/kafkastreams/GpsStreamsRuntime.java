@@ -3,6 +3,7 @@ package com.srm.gps.application.kafkastreams;
 import com.srm.gps.application.processing.DatabaseBackedPreviousReadingStore;
 import com.srm.gps.application.processing.GpsProcessingConfiguration.DistanceProperties;
 import com.srm.gps.configuration.KafkaConsumerGroupNames;
+import com.srm.gps.configuration.KafkaTopicNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.StreamsNormalization;
 import com.srm.gps.connectivity.flow.OnlyWithKafkaStreams;
@@ -10,12 +11,14 @@ import com.srm.gps.connectivity.monitoring.PipelineMetrics;
 import com.srm.gps.streams.GpsStreamsTopologies;
 import com.srm.gps.streams.StreamsObserver;
 import com.srm.gps.streams.TopologySettings;
+import com.srm.gps.streams.errors.DeadLetterProcessingExceptionHandler;
 import com.srm.gps.streams.normalize.PreviousReadingFallback;
 import com.srm.gps.streams.runtime.BoundedMemoryRocksDbConfig;
 import com.srm.gps.streams.runtime.StreamsApp;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.LogAndContinueExceptionHandler;
 import org.slf4j.Logger;
@@ -119,8 +122,9 @@ public class GpsStreamsRuntime implements SmartLifecycle {
 
     private Properties analyticsProperties(StreamsNormalization mode) {
         Properties properties = common(KafkaConsumerGroupNames.STREAMS_ANALYTICS, settings.analyticsGuaranteeOrDefault());
-        // live analytics: a brand-new app starts at the end instead of folding a week of history into "latest state"
-        properties.put(StreamsConfig.mainConsumerPrefix(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "latest");
+        // a brand-new app folds everything Kafka still keeps (up to a month): the table and the windows are complete,
+        // and closed windows are published in event-time order as stream time moves through the history
+        properties.put(StreamsConfig.mainConsumerPrefix(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest");
         // at-least-once commits every 30 s by default; every second keeps the group's lag (and a replay after a
         // crash) small
         properties.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1_000);
@@ -151,8 +155,13 @@ public class GpsStreamsRuntime implements SmartLifecycle {
         if (settings.stateDir() != null && !settings.stateDir().isBlank()) {
             properties.put(StreamsConfig.STATE_DIR_CONFIG, settings.stateDir());
         }
-        // a record that cannot be read is logged and skipped, not a reason to stop the app
+        // nothing is skipped: a record that cannot be read, or that a processor cannot handle, is parked in the
+        // dead-letter topic (in the same transaction under exactly-once) and archived; an unreachable database is retried
+        properties.put(StreamsConfig.ERRORS_DEAD_LETTER_QUEUE_TOPIC_NAME_CONFIG, KafkaTopicNames.DEAD_LETTERS);
         properties.put(StreamsConfig.DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG, LogAndContinueExceptionHandler.class);
+        properties.put(StreamsConfig.PROCESSING_EXCEPTION_HANDLER_CLASS_CONFIG, DeadLetterProcessingExceptionHandler.class);
+        properties.put(StreamsConfig.producerPrefix(ProducerConfig.ACKS_CONFIG), "all");
+        properties.put(StreamsConfig.producerPrefix(ProducerConfig.COMPRESSION_TYPE_CONFIG), "zstd");
         properties.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, BoundedMemoryRocksDbConfig.class);
         properties.put(BoundedMemoryRocksDbConfig.TOTAL_OFF_HEAP_BYTES, settings.rocksdbOffHeapBytes());
         // never read what an aborted normalizer transaction wrote (exactly-once already implies it)

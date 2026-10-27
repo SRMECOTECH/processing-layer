@@ -30,6 +30,25 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      # Bring EXISTING topics in line with their declaration at every start (retention 7 days -> 31, min in-sync ...).
+      modify-topic-configs: true
+    producer:
+      # No acknowledged record is ever lost by a producer:
+      #   acks=all            "ok" only once every in-sync copy has the record
+      #   idempotence         a retry never writes a record twice, and order per partition is kept
+      #   retries / timeout   retry inside the client for 5 minutes; after that the ingest journal keeps the record
+      #   max.block.ms        do not hang a caller for a minute when Kafka is down: fail fast, the journal has it
+      #   zstd                a month of JSON takes a fraction of the disk
+      acks: all
+      retries: 2147483647
+      compression-type: zstd
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 300000
+        max.block.ms: 5000
+        linger.ms: 5
     consumer:
       # A brand-new consumer group starts from the oldest message instead of only new ones.
       auto-offset-reset: earliest
@@ -115,6 +134,22 @@ gps:
       tomtom-api-key: ${TOMTOM_API_KEY:}
       traffic-radius-meters: 1000
       timeout-millis: 3000
+  # Kafka: how long and how safely the platform's topics are kept (docs/DATA_SAFETY_GUIDE.md).
+  #   retention              31 days on every platform topic: a full month of data stays in Kafka
+  #   replication-factor     copies on different brokers: 1 with the single local broker, 3 with docker-compose.ha.yml
+  #   min-insync-replicas    copies written before a producer hears "ok": 1 local, 2 in HA
+  kafka:
+    retention: 31d
+    replication-factor: ${GPS_KAFKA_REPLICATION_FACTOR:1}
+    min-insync-replicas: ${GPS_KAFKA_MIN_INSYNC_REPLICAS:1}
+  # Ingest journal: device frames and vehicle events are fsynced to this folder BEFORE they are sent to Kafka, and stay
+  # until Kafka confirms them - Kafka down, the service killed, a power cut: they are sent again, in order.
+  # Docker: a volume (GPS_JOURNAL_DIRECTORY=/var/lib/gps-journal).
+  journal:
+    directory: ${GPS_JOURNAL_DIRECTORY:./data/ingest-journal}
+    records-per-segment: 1000
+    fsync-every-record: true
+    drain-batch-size: 5000
   # Kafka Streams (Kafka flow only), see docs/KAFKA_STREAMS_GUIDE.md. Two apps run inside this service:
   #   normalizer : raw frames -> processed positions / rejections, exactly-once, state in RocksDB + changelog topics
   #   analytics  : processed positions -> vehicle KTable, 5-minute event-time windows (gps.vehicle-activity), parity

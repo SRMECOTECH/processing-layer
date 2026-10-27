@@ -39,8 +39,9 @@ import java.util.function.BooleanSupplier;
  *   1. stop the simulated fleet;
  *   2. pause every Kafka consumer and move each one to the end of its topic (a paused consumer still polls,
  *      so the seek is applied and its prefetched records are dropped), and close the Kafka Streams apps;
- *   3. delete every record in the platform's topics (deleteRecords up to the end offset);
- *   4. empty the telemetry tables - master data (tenant, vehicle, device, device_assignment) stays;
+ *   3. delete every record in the platform's topics (deleteRecords up to the end offset) - the one deliberate
+ *      deletion in the platform, demo only (the ingest journal is not touched: it only holds what Kafka lacks);
+ *   4. empty the telemetry tables and the archives - master data (tenant, vehicle, device, device_assignment) stays;
  *   5. delete the gps:* Redis keys except configuration (gps:config:*, the speed rules);
  *   6. forget the in-memory previous readings and start the load counters from 0;
  *   7. reset the Kafka Streams apps (local state, consumer groups, changelog topics) and start them again;
@@ -53,9 +54,9 @@ public class DemoResetService {
     private static final Logger LOG = LoggerFactory.getLogger(DemoResetService.class);
     private static final List<String> TOPICS = List.of(KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS,
             KafkaTopicNames.REJECTED_FRAMES, KafkaTopicNames.VEHICLE_EVENTS, KafkaTopicNames.VEHICLE_ACTIVITY,
-            KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
+            KafkaTopicNames.DEAD_LETTERS, KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
     private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "gps_trip_late_reading", "gps_trip",
-            "gps_stop", "vehicle_motion_state", "gps_position");
+            "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
 
     private final GpsDeviceSimulatorService simulator;
     private final GpsDeviceSimulatorSettings simulatorSettings;
