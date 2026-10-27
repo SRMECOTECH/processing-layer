@@ -22,7 +22,7 @@ Socho humari ek **courier company** hai:
 - **gps-streaming-service** = humara **office** jahan saare karmchaari (simulator, processing, storage, live location, logger, dashboard) baithte hain.
 - **PostgreSQL** = office ka **pakka register** (record hamesha ke liye).
 - **Redis** = office ka **whiteboard** – "abhi kaun truck kahan hai", jaldi se likho, jaldi se padho.
-- **Kafka UI / RedisInsight** = CCTV camera – hub aur whiteboard ke andar jhaank ke dekhne ke liye.
+- **RedisInsight** = CCTV camera – whiteboard ke andar jhaank ke dekhne ke liye.
 
 | # | Application | Kaam | Port (Windows install) | Port (Docker) | Kis ka hai |
 |---|---|---|---|---|---|
@@ -31,9 +31,8 @@ Socho humari ek **courier company** hai:
 | 3 | **Apache Kafka** (KRaft) | 3 topics, buffer + post office | `9092` | `29092` | Humara |
 | 4 | **Redis** | Live location + engine counters | `6379` | `6380` | Humara |
 | 5 | **RedisInsight** | Redis ke andar dekhna (browser) | – | http://localhost:8001 | Docker only |
-| 6 | **Kafka UI** | Kafka ke andar dekhna (browser) | – | http://localhost:8085 | Docker only |
-| 7 | **gps-streaming-service** (Spring Boot) | Simulator, processing, storage, live location, logger, dashboard, API | http://localhost:8080 | http://localhost:8080 | Humara – **yahi asli app hai** |
-| 8 | **gps-dashboard-ui** (Next.js) | PulseStream IoT console – operations UI (4 sections + Developer), service ki APIs pe chalta hai | http://localhost:3000 (`npm run dev`) | http://localhost:3000 | Humara – sirf UI, service ke bina kuch nahi dikhata |
+| 6 | **gps-streaming-service** (Spring Boot) | Simulator, processing, storage, live location, logger, dashboard, API | http://localhost:8080 | http://localhost:8080 | Humara – **yahi asli app hai** |
+| 7 | **gps-dashboard-ui** (Next.js) | PulseStream IoT console – operations UI (4 sections + Developer), service ki APIs pe chalta hai | http://localhost:3000 (`npm run dev`) | http://localhost:3000 | Humara – sirf UI, service ke bina kuch nahi dikhata |
 
 **Kaun kis pe depend karta hai:**
 
@@ -211,16 +210,15 @@ $r = "D:\dev\redis-8.2.10\redis-cli.exe"
 & $r ZCARD gps:live:positions                 # kitni gaadiyon ki live position hai
 ```
 
-### 4.5 Kafka UI aur RedisInsight – CCTV 📹
+### 4.5 RedisInsight – CCTV 📹
 
-Sirf Docker mein aate hain.
+Sirf Docker mein aata hai.
 
 | App | Link | Kya dekho |
 |---|---|---|
-| Kafka UI (kafbat 1.3.0) | http://localhost:8085 | Topics → messages, key (IMEI) se search, consumer groups ka lag |
 | RedisInsight | http://localhost:8001 | `gps:` filter karo → live vehicles, engine counters |
 
-Main file: `docker-compose.yml` (services `kafka-ui` aur `redis`).
+Main file: `docker-compose.yml` (service `redis`). Kafka ke topics, consumer groups aur lag PulseStream console (http://localhost:3000) aur engine dashboard (http://localhost:8080) mein dikhte hain.
 
 ### 4.6 gps-streaming-service – asli office 🏢
 

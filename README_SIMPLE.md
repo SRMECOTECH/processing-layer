@@ -228,7 +228,6 @@ Logic **same code** hai, sirf "daakiya" alag. 📁 `gps-application/.../flow/kaf
 |---|---|
 | http://localhost:3000 | **PulseStream dashboard** (Next.js) – main UI |
 | http://localhost:8080 | Spring Boot service + purana engine dashboard (producers, topics, consumers, lag) |
-| http://localhost:8085 | **Kafka UI** – topics ke andar messages dekho |
 | http://localhost:8001 | **RedisInsight** – `gps:` keys dekho |
 | http://localhost:8080/actuator/health | DB aur Redis zinda hain ya nahi |
 
@@ -319,7 +318,7 @@ docker compose down                               # band (data bacha rehta hai)
 docker compose down -v                            # band + data bhi saaf
 ```
 
-Containers: `postgres`, `kafka`, `kafka-ui`, `redis`, `gps-service`, `dashboard`.
+Containers: `postgres`, `kafka`, `redis`, `gps-service`, `dashboard`.
 
 **Logs mein ek truck dhoondho:**
 ```powershell
