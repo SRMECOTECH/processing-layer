@@ -217,7 +217,7 @@ Logic **same code** hai, sirf "daakiya" alag. 📁 `gps-application/.../flow/kaf
 
 1. **Kaam pehle, bookmark baad mein.** Consumer kaam poora karke hi Kafka ko bolta hai "ho gaya" (offset commit). Beech mein crash → message dobara aayega, gum nahi hoga.
 2. **Retry karte raho.** DB down → 1s, 2s, 4s … 60s tak ruk ruk ke retry, jab tak wapas na aaye.
-3. **Toota message skip.** Jo kabhi theek nahi ho sakta (galat JSON) – log karo, aage badho, line block mat karo.
+3. **Toota message phenko mat, alag rakho.** Jo kabhi theek nahi ho sakta (galat JSON) – `gps.dead-letters` mein park, aage badho, line block mat karo. Baad mein bug theek karke replay (README section 10a).
 4. **Do baar aaye to bhi ek hi baar likho (idempotent).** Unique keys + "pehle se hai?" check.
 
 ---
