@@ -65,7 +65,6 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 |---|---|
 | http://localhost:3000 | **PulseStream IoT console** (Next.js, `gps-dashboard-ui/`) – operations UI: Live, Processing, Alerts, Storage, Analytics, Notifications, Developer |
 | http://localhost:8080 | **Engine dashboard** – 3 producers, 3 topics, consumers, har partition ka load, lag, IMEI filter, simulator start/stop button |
-| http://localhost:8085 | **Kafka UI** (Docker mein) – topics, messages, key (= IMEI) se search, consumer groups |
 | http://localhost:8001 | **RedisInsight** (Docker mein) – `gps:` se shuru hone wali saari keys |
 | http://localhost:8080/actuator/health | PostgreSQL (`db`) aur Redis (`redis`) UP hai ya DOWN |
 
@@ -88,8 +87,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | **HikariCP** | Boot ke saath | smart_truck ke liye alag **read-only** connection pool |
 | **Jackson 3** (`tools.jackson`) | Boot ke saath | Messages ko JSON banana aur wapas padhna, ek hi tarike se |
 | **Maven** (multi-module + wrapper `mvnw`) | – | 4 modules, har ek ka ek kaam. Maven install karne ki zarurat nahi, `mvnw` khud le aata hai |
-| **Docker + Docker Compose** | – | Poora system ek command mein: postgres, kafka, kafka-ui, redis, service |
-| **Kafka UI** (kafbat) | 1.3.0 | Kafka ke andar jhaank ke dekhne ke liye |
+| **Docker + Docker Compose** | – | Poora system ek command mein: postgres, kafka, redis, service, dashboard |
 | **Spring Actuator** | Boot ke saath | `/actuator/health` – sab zinda hai ya nahi |
 | **JUnit 5** | – | Processing ke har rule ka test, bina kuch start kiye |
 
@@ -730,7 +728,6 @@ processing-layer/
 |---|---|---|
 | `postgres` | PostgreSQL 14, `gps_tracking` | `localhost:5433` |
 | `kafka` | Apache Kafka 4.3.1 (KRaft, ek node) | `localhost:29092` |
-| `kafka-ui` | Kafka UI | http://localhost:8085 |
 | `redis` | Redis Stack + RedisInsight | `localhost:6380`, http://localhost:8001 |
 | `gps-service` | Humari Spring Boot app (+ dono Kafka Streams apps; state `gps-streams-state` volume mein) | http://localhost:8080 |
 

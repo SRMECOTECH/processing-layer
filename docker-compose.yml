@@ -2,7 +2,6 @@
 #
 #   postgres     PostgreSQL 14         gps_tracking database              Windows: localhost:5433
 #   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
-#   kafka-ui     Kafka UI              browse topics, messages, groups     http://localhost:8085
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
@@ -94,19 +93,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 20
-
-  kafka-ui:
-    image: kafbat/kafka-ui:v1.3.0
-    restart: always
-    environment:
-      KAFKA_CLUSTERS_0_NAME: gps-local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    ports:
-      - "8085:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-        required: false
 
   redis:
     image: redis/redis-stack:7.4.0-v8

@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Kafka Streams serde for the platform's records, written with {@link GpsMessageJson} - so a processed position
  * written by Kafka Streams is byte for byte what the listener writes, and every consumer reads it unchanged.
- * State is JSON too, so a changelog topic can be read in Kafka UI like any other topic.
+ * State is JSON too, so a changelog topic can be read with the console consumer like any other topic.
  *
  * A record that is not valid JSON fails with a {@link SerializationException}; the streams apps are configured to
  * log and skip such records (deserialization.exception.handler) instead of stopping.
