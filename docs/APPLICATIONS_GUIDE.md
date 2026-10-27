@@ -10,6 +10,9 @@
 | `docs/APPLICATIONS_GUIDE.md` (ye wali) | Har application: start, stop, check, main files | Desi Hinglish |
 | `docs/LEARNING_GUIDE.md` | Kafka zero se, har module ki gehri padhai, interview Qs | English |
 | `docs/ENGINE_AND_DOCKER_GUIDE.md` | Docker, dashboard, Redis, logs ki detail | English |
+| `docs/ROUTING_ENGINE_SETUP.md` | GraphHopper India map: install, algorithms, refresh, troubleshooting | English |
+| `docs/ROUTE_INTELLIGENCE_PLAN.md` | Route deviation / recalculation / reassessment – kya aur kaise, phases | English |
+| `docs/HOME_SERVER_SETUP.md` | Purana HP laptop = routing server: space, RAM, Ubuntu, import yahan, serve wahan | English |
 
 ---
 
@@ -34,6 +37,8 @@ Socho humari ek **courier company** hai:
 | 6 | **Kafka UI** | Kafka ke andar dekhna (browser) | – | http://localhost:8085 | Docker only |
 | 7 | **gps-streaming-service** (Spring Boot) | Simulator, processing, storage, live location, logger, dashboard, API | http://localhost:8080 | http://localhost:8080 | Humara – **yahi asli app hai** |
 | 8 | **gps-dashboard-ui** (Next.js) | PulseStream IoT console – operations UI (4 sections + Developer), service ki APIs pe chalta hai | http://localhost:3000 (`npm run dev`) | http://localhost:3000 | Humara – sirf UI, service ke bina kuch nahi dikhata |
+| 9 | **GraphHopper** (routing engine) | India ka road map, truck/car routes, map matching – profile `routing` | `java -jar` (see setup doc) | http://localhost:8989 | Open source (Java), humara config – [ROUTING_ENGINE_SETUP.md](ROUTING_ENGINE_SETUP.md) |
+| 10 | **gps-route-service** (Spring Boot) | Route planning API (Dijkstra, A\*, CH, alternatives); aage deviation / recalculation | http://localhost:8090 | http://localhost:8090 | Humara – engine ke bina `DOWN` batata hai |
 
 **Kaun kis pe depend karta hai:**
 

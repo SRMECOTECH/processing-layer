@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.srm.gps</groupId>
+        <artifactId>gps-streaming-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>gps-route-service</artifactId>
+    <name>gps-route-service</name>
+    <description>The route service: route planning on the India road map through the routing engine (GraphHopper). Later: route deviation, recalculation and reassessment.</description>
+
+    <!--
+        A runnable Spring Boot service of its own, next to gps-application (not inside it):
+        the routing engine is a large map with a long import, and route work must never hold up ingestion.
+        It reuses the shared message formats (gps-configuration) and the geometry (gps-processing).
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-configuration</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-processing</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>gps-route-service</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

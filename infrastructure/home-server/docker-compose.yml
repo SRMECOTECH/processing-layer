@@ -1,0 +1,54 @@
+# The home server: the old HP laptop (Ubuntu Server, 8 GB RAM) serving road routing to the whole home network.
+# See docs/HOME_SERVER_SETUP.md.
+#
+#   graphhopper    GraphHopper 11.1, India     http://<hp-ip>:8989   (API, /maps/ UI, /health)
+#   route-service  our Spring Boot app         http://<hp-ip>:8090   (/api/routing/*, /actuator/health)
+#
+# The India graph is NOT imported here (that needs ~7 GB of Java heap): it is imported once on the 24 GB laptop,
+# exported with export-routing-graph.ps1 and installed with install-routing-graph.sh. This machine only serves it.
+#
+#   On the HP, from the repository root:
+#     docker compose -f infrastructure/home-server/docker-compose.yml up -d --build
+#     docker compose -f infrastructure/home-server/docker-compose.yml logs -f graphhopper
+
+name: gps-home-server
+
+services:
+
+  graphhopper:
+    build: ../routing/graphhopper
+    image: srmecotech/processing-layer-graphhopper:11.1
+    # Comes back after a reboot or a crash; a "docker compose stop" holds until you start it again.
+    restart: unless-stopped
+    environment:
+      GH_MAP_REGION: ${GPS_ROUTING_MAP_REGION:-asia/india}
+      GH_IMPORT: never
+      # Serving reads the memory-mapped graph: a small heap, and the rest of the 8 GB stays free for the
+      # operating system to keep the busy parts of the graph in memory.
+      GH_SERVER_JAVA_OPTS: ${GPS_ROUTING_SERVER_JAVA_OPTS:--Xmx2g}
+    ports:
+      - "8989:8989"
+    volumes:
+      - gps-routing-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8989/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m
+
+  route-service:
+    build:
+      context: ../..
+      target: route-service
+    image: srmecotech/processing-layer-route:latest
+    restart: unless-stopped
+    environment:
+      GPS_ROUTING_ENGINE_URL: http://graphhopper:8989
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    ports:
+      - "8090:8090"
+
+volumes:
+  # Name on the HP: gps-home-server_gps-routing-data (install-routing-graph.sh fills it).
+  gps-routing-data:
