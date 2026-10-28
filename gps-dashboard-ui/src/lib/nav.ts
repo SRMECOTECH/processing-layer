@@ -6,6 +6,8 @@ import {
   BellRing,
   Boxes,
   Braces,
+  CalendarClock,
+  CalendarDays,
   Car,
   ChartLine,
   Cpu,
@@ -13,6 +15,7 @@ import {
   Database,
   DatabaseZap,
   FileCheck,
+  FileText,
   FileX,
   Gauge,
   GitCompareArrows,
@@ -20,6 +23,7 @@ import {
   History,
   Inbox,
   Layers,
+  Link2,
   ListChecks,
   Map,
   MapPinned,
@@ -32,7 +36,9 @@ import {
   ScanLine,
   Send,
   Server,
+  Settings2,
   ShieldCheck,
+  Sigma,
   Siren,
   SlidersHorizontal,
   Table2,
@@ -239,6 +245,33 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    href: "/reports",
+    label: "Reports",
+    icon: FileText,
+    description: "End-of-day and end-of-month reports for every vehicle: stops, idling, distance, fuel and money.",
+    groups: [
+      {
+        title: "Reports",
+        items: [
+          { href: "/reports", label: "Day report", icon: CalendarClock, feed: "live" },
+          { href: "/reports/month", label: "Month report", icon: CalendarDays, feed: "live" },
+          { href: "/reports/vehicle", label: "Vehicle day sheet", icon: Truck, feed: "live" },
+        ],
+      },
+      {
+        title: "Business value",
+        items: [{ href: "/reports/savings", label: "Fuel & savings", icon: Sigma, feed: "live" }],
+      },
+      {
+        title: "Setup",
+        items: [
+          { href: "/reports/assumptions", label: "Cost assumptions", icon: Settings2, feed: "live" },
+          { href: "/reports/clear", label: "Clear database", icon: DatabaseZap, feed: "live" },
+        ],
+      },
+    ],
+  },
+  {
     href: "/storage",
     label: "Storage",
     icon: Database,
@@ -343,6 +376,7 @@ export const SECTIONS: Section[] = [
         title: "Tools",
         items: [
           { href: "/developer/demo", label: "Demo tools (Empty DB)", icon: DatabaseZap },
+          { href: "/developer/connections", label: "Connections", icon: Link2 },
           { href: "/developer/settings", label: "Service settings", icon: SlidersHorizontal },
           { href: "/developer/modules", label: "Module registry", icon: Boxes },
         ],

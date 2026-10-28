@@ -36,7 +36,20 @@ const ENDPOINTS: [string, string, string, string][] = [
   ["GET", "/api/rejected-frames/summary", "Rejected frames by reason, last 24 h and all time", "Rejected frames"],
   ["POST", "/api/simulator/start", "Start the simulated fleet", "Fleet simulator"],
   ["POST", "/api/simulator/stop", "Stop the simulated fleet", "Fleet simulator"],
-  ["POST", "/api/admin/reset?restartFleet=", "Empty Kafka, PostgreSQL and Redis, rebuild Kafka Streams state (demo only)", "Demo tools"],
+  ["POST", "/api/admin/reset?restartFleet=&keepReports=", "Empty Kafka, PostgreSQL and Redis, rebuild Kafka Streams state; reports kept unless keepReports=false", "Demo tools, Clear database"],
+  ["GET", "/api/connections", "Redis, Valhalla and the HP ingestion API: where each points, each checked now", "Connections"],
+  ["POST", "/api/connections/redis/test", "Check a Redis without using it: ping, memory, eviction policy, its database", "Connections"],
+  ["PUT", "/api/connections/redis", "Move the service to another Redis at once (speed rules copied)", "Connections"],
+  ["POST", "/api/connections/valhalla/test", "Valhalla /status and a short test route", "Connections"],
+  ["PUT", "/api/connections/valhalla", "Save the routing engine's address", "Connections"],
+  ["POST", "/api/connections/ingestion-api/test", "The HP ingestion API's /health (read-only)", "Connections"],
+  ["GET", "/api/reports/filters", "Companies, vehicles and today, for the report drop-downs", "Reports"],
+  ["GET", "/api/reports/day?date=&tenant=&imei=", "Every vehicle on one day: distance, stops, idling, fuel, cost, could-save", "Day report"],
+  ["GET", "/api/reports/month?month=&tenant=&imei=", "Every vehicle over a month, and the fleet per day", "Month report, Fuel & savings"],
+  ["GET", "/api/reports/vehicle-day?imei=&date=", "One vehicle's trips, stops and events in time order", "Vehicle day sheet"],
+  ["POST", "/api/reports/refresh?date=", "Rebuild a day's summaries now (otherwise every 5 minutes)", "Day report"],
+  ["GET", "/api/reports/assumptions", "Fuel price, mileage, idle burn, economical speed behind the estimates", "Cost assumptions"],
+  ["PUT", "/api/reports/assumptions", "Change them; every report is priced again at once", "Cost assumptions"],
 ];
 
 const TONE: Record<string, "good" | "accent" | "warn" | "bad"> = { GET: "good", PUT: "accent", POST: "warn", DELETE: "bad" };

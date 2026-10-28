@@ -11,15 +11,19 @@ import { usePreferences, type Accent, type Background, type Density, type Theme 
 import { Switch } from "@/components/ops/kit";
 import { SearchButton } from "./command-palette";
 import { Popover } from "./popover";
+import { SectionTabs } from "./section-tabs";
 
-/** The bar above each page, on the canvas: brand, search, live rate, notifications, appearance and user. The sections are in the rail. */
+/**
+ * The bar across the top of the frame: brand, the sections, then search, live rate, notifications, appearance and
+ * user. It stays the same on every page of a section; the section's own pages are in the menu on the left.
+ */
 export function AppHeader({ user }: { user: string }) {
   const { setDrawerOpen } = usePreferences();
 
   return (
     <header className="topbar">
       <div className="topbar-start">
-        <button type="button" className="icon-button menu-button" aria-label="Open the menu" onClick={() => setDrawerOpen(true)}>
+        <button type="button" className="icon-button menu-button" aria-label="Open this section's pages" onClick={() => setDrawerOpen(true)}>
           <Menu size={20} />
         </button>
         <Link href="/live" className="brand" aria-label="PulseStream home">
@@ -30,9 +34,10 @@ export function AppHeader({ user }: { user: string }) {
         </Link>
       </div>
 
-      <SearchButton />
+      <SectionTabs />
 
       <div className="topbar-end">
+        <SearchButton />
         <LivePill />
         <NotificationBell />
         <AppearanceMenu />

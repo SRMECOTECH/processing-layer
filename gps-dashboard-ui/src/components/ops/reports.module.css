@@ -1,0 +1,527 @@
+/* Reports: filters, "How is this calculated?" drop-downs, the vehicle table with its breakdown rows, the day chart,
+   the timeline of a vehicle's day, and the printed page. */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 16px;
+}
+
+.filter {
+  display: grid;
+  gap: 6px;
+  min-width: 170px;
+}
+
+.filter :global(.select),
+.filter :global(.input-box) {
+  width: 100%;
+}
+
+.filterWide {
+  min-width: 240px;
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* "How is this calculated?" */
+
+.explain {
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+
+.explain summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.explain summary::-webkit-details-marker {
+  display: none;
+}
+
+.explain summary:hover {
+  background: var(--accent-soft);
+}
+
+.explain summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--fast) var(--ease);
+}
+
+.explain[open] summary::after {
+  transform: rotate(225deg) translate(-2px, 0);
+}
+
+.explainBody {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  animation: open 220ms var(--ease-out);
+}
+
+@keyframes open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.formula {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.6fr) auto;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line-strong);
+}
+
+.formula:last-child {
+  border-bottom: 0;
+}
+
+.fLabel {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.fExpr {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.fResult {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.note {
+  margin: 4px 0 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+/* the vehicle table */
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th:first-child,
+.table th:nth-child(2) {
+  text-align: left;
+}
+
+.table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.table td:first-child,
+.table td:nth-child(2) {
+  text-align: left;
+}
+
+.row {
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+.row:hover {
+  background: var(--hover);
+}
+
+.row[aria-expanded="true"] {
+  background: var(--accent-soft);
+}
+
+.toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: transform var(--fast) var(--ease);
+}
+
+.row[aria-expanded="true"] .toggle {
+  transform: rotate(90deg);
+}
+
+.vehicle {
+  display: grid;
+  gap: 2px;
+}
+
+.vehicleName {
+  font-weight: 600;
+}
+
+.vehicleSub {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+}
+
+.money {
+  font-weight: 600;
+}
+
+.save {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.warnText {
+  color: var(--warn);
+}
+
+.detail td {
+  padding: 4px 12px 18px;
+  background: var(--accent-soft);
+  text-align: left;
+  white-space: normal;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.detailTitle {
+  margin: 0 0 6px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.totals td {
+  border-bottom: 0;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* who could save the most */
+
+.savers {
+  display: grid;
+  gap: 12px;
+}
+
+.saver {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.saverBar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.saverIdle,
+.saverFast {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+}
+
+.saverIdle {
+  left: 0;
+  background: var(--accent);
+}
+
+.saverFast {
+  background: #e8a33d;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+/* the fleet per day (month report) */
+
+.days {
+  display: grid;
+  grid-auto-columns: minmax(14px, 1fr);
+  grid-auto-flow: column;
+  align-items: end;
+  gap: 4px;
+  height: 180px;
+  padding-top: 10px;
+}
+
+.dayBar {
+  position: relative;
+  display: grid;
+  align-items: end;
+  height: 100%;
+}
+
+.dayFill {
+  min-height: 2px;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--chart-2);
+  transition: height 400ms var(--ease-out);
+}
+
+.dayBar:hover .dayFill {
+  background: var(--accent);
+}
+
+.dayLabels {
+  display: grid;
+  grid-auto-columns: minmax(14px, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+/* a vehicle's day */
+
+.timeline {
+  display: grid;
+  gap: 0;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 110px 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.entryTime {
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.entryDot {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  height: 100%;
+}
+
+.entryDot::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--line-strong);
+}
+
+.entry:last-child .entryDot::before {
+  display: none;
+}
+
+.entryDot i {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.entry[data-kind="STOP"] .entryDot i {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--text-3);
+}
+
+.entry[data-engine="ON"] .entryDot i {
+  background: #e8a33d;
+  box-shadow: 0 0 0 2px #e8a33d;
+}
+
+.entryTitle {
+  font-weight: 600;
+}
+
+.entrySub {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.entryRight {
+  text-align: right;
+  font-size: 12.5px;
+}
+
+/* what-if */
+
+.whatIf {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.slider {
+  display: grid;
+  gap: 8px;
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.big {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* only on paper */
+
+.printHead {
+  display: none;
+}
+
+/* the frame, bars and menu are hidden for print in globals.css ("printed pages") */
+@media print {
+  .actions,
+  .noPrint {
+    display: none !important;
+  }
+
+  .printHead {
+    display: block;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #111;
+    font-size: 12px;
+  }
+
+  .table {
+    font-size: 10.5px;
+  }
+
+  .table td,
+  .table th {
+    padding: 5px 6px;
+  }
+}
+
+@media (max-width: 760px) {
+  .saver {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .saverBar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .entry {
+    grid-template-columns: 80px 22px minmax(0, 1fr);
+  }
+
+  .entryRight {
+    grid-column: 3;
+    text-align: left;
+  }
+
+  .formula {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .fExpr {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

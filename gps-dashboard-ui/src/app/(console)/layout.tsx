@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { Geist_Mono, Inter } from "next/font/google";
 import { Offline } from "@/components/ops/kit";
 import { AppHeader } from "@/components/shell/app-header";
-import { Rail } from "@/components/shell/rail";
 import { Sidebar } from "@/components/shell/sidebar";
 import { NotificationsProvider } from "@/lib/notifications";
 import { OverviewProvider } from "@/lib/overview-context";
@@ -28,8 +27,8 @@ export const viewport: Viewport = {
 };
 
 /**
- * The console sits in one rounded frame: the black rail of sections, the white menu of the current
- * section's pages, and the scrolling page with its top bar.
+ * The console sits in one rounded frame: the top bar with the sections across the top, then the white menu of the
+ * current section's pages on the left and the scrolling page beside it.
  */
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // src/proxy.ts sends visitors without a session to /login; checked again here so the console never renders without one.
@@ -55,10 +54,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <OverviewProvider>
             <NotificationsProvider>
               <div className="frame">
-                <Rail />
+                <AppHeader user={session.user} />
                 <Sidebar />
                 <div className="app-scroll">
-                  <AppHeader user={session.user} />
                   <main className="app-main">
                     <Offline />
                     {children}

@@ -4,6 +4,7 @@
 #   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
+#                (optional: Developer -> Connections can switch the service to the HP home server's Redis)
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
 #                + Kafka Streams       normalizer + analytics apps         state in the gps-streams-state volume
 #                + ingest journal      frames/events kept until Kafka has  the gps-ingest-journal volume
@@ -130,8 +131,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
       SPRING_DATASOURCE_USERNAME: gps_app
       SPRING_DATASOURCE_PASSWORD: ${GPS_DATABASE_PASSWORD}
+      # This laptop's Redis is the default; Developer -> Connections can move the service to the HP's Redis while it
+      # runs (saved in PostgreSQL, kept across restarts). The HP home server is 192.168.137.1 on its hotspot.
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      HOME_SERVER_REDIS_URL: ${HOME_SERVER_REDIS_URL:-redis://192.168.137.1:6379/1}
+      VALHALLA_URL: ${VALHALLA_URL:-http://192.168.137.1:8002}
+      GPS_INGESTION_API_URL: ${GPS_INGESTION_API_URL:-http://192.168.137.1:8000}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SMARTTRUCK_DATABASE_URL: jdbc:mysql://host.docker.internal:3306/smart_truck
       SMARTTRUCK_DATABASE_USERNAME: ${SMART_TRUCK_DATABASE_USERNAME}
@@ -148,6 +154,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+        required: false              # optional once the service uses the HP's Redis: docker compose stop redis
       kafka:
         condition: service_healthy
         required: false              # the direct flow runs without Kafka

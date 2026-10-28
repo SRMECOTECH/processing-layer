@@ -65,6 +65,8 @@ spring:
 
   # Redis: latest position of every vehicle + engine load counters (browse with RedisInsight).
   data:
+    # This laptop's Redis: the default, and the "This laptop" choice on Developer -> Connections. Switching to the HP's
+    # Redis there is saved in PostgreSQL (connection_setting) and wins over this at the next start.
     redis:
       host: localhost
       port: 6379
@@ -80,6 +82,18 @@ gps:
   #   direct : frame -> processing -> PostgreSQL in one call, no Kafka at all                    (Kafka may be stopped)
   # Override at start-up:  --gps.processing-flow=direct
   processing-flow: kafka
+  # The outside connections (Developer -> Connections, GET /api/connections). The HP home server is reached over its
+  # Wi-Fi hotspot "SANJOY-HP 0161" and is always 192.168.137.1. What is saved in the console wins over these defaults.
+  #   valhalla-url           routing engine, all-India map (route deviation will use it)
+  #   ingestion-api-url      the HP's FastAPI, which writes devices' points into the HP's Redis; only checked here
+  #   home-server-redis-url  the "HP home server" choice for Redis: database 1, because the ingestion API uses 0 there
+  connections:
+    valhalla-url: ${VALHALLA_URL:http://192.168.137.1:8002}
+    ingestion-api-url: ${GPS_INGESTION_API_URL:http://192.168.137.1:8000}
+    home-server-redis-url: ${HOME_SERVER_REDIS_URL:redis://192.168.137.1:6379/1}
+    redis-command-timeout: 5s
+    redis-connect-timeout: 3s
+    http-timeout: 5s
   simulator:
     vehicle-count: 150
     pings-per-vehicle: 500
@@ -190,6 +204,19 @@ gps:
   # "Empty DB" for demo practice (POST /api/admin/reset). Switch off anywhere that is not a demo.
   admin:
     reset-enabled: true
+  # Reports (GET /api/reports/*): one summary row per vehicle per day (vehicle_day_summary), rebuilt for today and
+  # yesterday every refresh-every, so a month report reads a few thousand rows whatever the number of positions.
+  # Fuel price, mileage and the other cost assumptions are edited in the console (Reports -> Cost assumptions).
+  #   zone              a report day runs midnight to midnight here
+  #   max-gap-seconds          a longer silence before a moving reading counts neither as driving nor as standing
+  #   max-stopped-gap-seconds  the same before a standing reading (a parked tracker reports rarely)
+  #   backfill-days            days back summarized once after a start (when they still have positions)
+  reports:
+    zone: Asia/Kolkata
+    refresh-every: 5m
+    max-gap-seconds: 600
+    max-stopped-gap-seconds: 3600
+    backfill-days: 62
   # Trip and stop detection (consumer group gps-trip-service), Traccar's defaults:
   #   a trip starts once the vehicle is min-distance away from where it stopped,
   #   it stops when it stays within min-distance for min-duration,

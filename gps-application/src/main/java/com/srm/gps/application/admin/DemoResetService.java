@@ -2,6 +2,7 @@ package com.srm.gps.application.admin;
 
 import com.srm.gps.application.kafkastreams.GpsStreamsRuntime;
 import com.srm.gps.application.processing.DatabaseBackedPreviousReadingStore;
+import com.srm.gps.application.report.DaySummarizer;
 import com.srm.gps.application.simulator.GpsDeviceSimulatorService;
 import com.srm.gps.application.simulator.GpsDeviceSimulatorSettings;
 import com.srm.gps.configuration.KafkaTopicNames;
@@ -42,7 +43,10 @@ import java.util.function.BooleanSupplier;
  *   3. delete every record in the platform's topics (deleteRecords up to the end offset) - the one deliberate
  *      deletion in the platform, demo only (the ingest journal is not touched: it only holds what Kafka lacks);
  *   4. empty the telemetry tables and the archives - master data (tenant, vehicle, device, device_assignment) stays;
- *   5. delete the gps:* Redis keys except configuration (gps:config:*, the speed rules);
+ *      with keepReports the daily report summaries are first frozen (DaySummarizer.freezeThen), so the day's and
+ *      month's reports keep their numbers; without it they are emptied too;
+ *   5. delete the platform's telemetry keys in Redis (RedisKeyNames.TELEMETRY_PATTERNS): configuration (gps:config:*,
+ *      the speed rules) stays, and so do other programs' keys in a shared Redis (the HP ingestion API's gps:points);
  *   6. forget the in-memory previous readings and start the load counters from 0;
  *   7. reset the Kafka Streams apps (local state, consumer groups, changelog topics) and start them again;
  *   8. resume the consumers, and restart the fleet if asked.
@@ -57,6 +61,8 @@ public class DemoResetService {
             KafkaTopicNames.DEAD_LETTERS, KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
     private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "gps_trip_late_reading", "gps_trip",
             "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
+    /** Days back whose report numbers are frozen before the tables are emptied (keepReports). */
+    private static final int REPORT_DAYS_KEPT = 400;
 
     private final GpsDeviceSimulatorService simulator;
     private final GpsDeviceSimulatorSettings simulatorSettings;
@@ -68,12 +74,14 @@ public class DemoResetService {
     private final DatabaseBackedPreviousReadingStore previousReadings;
     private final PipelineMetrics metrics;
     private final ObjectProvider<GpsStreamsRuntime> kafkaStreams;
+    private final DaySummarizer daySummaries;
 
     public DemoResetService(GpsDeviceSimulatorService simulator, GpsDeviceSimulatorSettings simulatorSettings,
                             ObjectProvider<KafkaListenerEndpointRegistry> listenerRegistry,
                             ObjectProvider<KafkaBacklogSkipper> backlogSkipper, ObjectProvider<KafkaAdmin> kafkaAdmin,
                             JdbcTemplate jdbc, RedisStateStore redis, DatabaseBackedPreviousReadingStore previousReadings,
-                            PipelineMetrics metrics, ObjectProvider<GpsStreamsRuntime> kafkaStreams) {
+                            PipelineMetrics metrics, ObjectProvider<GpsStreamsRuntime> kafkaStreams, DaySummarizer daySummaries) {
+        this.daySummaries = daySummaries;
         this.simulator = simulator;
         this.simulatorSettings = simulatorSettings;
         this.listenerRegistry = listenerRegistry;
@@ -86,12 +94,13 @@ public class DemoResetService {
         this.kafkaStreams = kafkaStreams;
     }
 
+    /** @param reportsKept the daily report summaries were frozen and kept (otherwise emptied too) */
     public record ResetReport(Instant at, long tookMillis, boolean fleetWasRunning, boolean fleetRestarted,
                               int listenersSkippedToEnd, Map<String, Long> kafkaRecordsDeleted, List<String> tablesEmptied,
-                              long redisKeysDeleted, List<String> streamsAppsReset, List<String> notes) {
+                              long redisKeysDeleted, List<String> streamsAppsReset, boolean reportsKept, List<String> notes) {
     }
 
-    public synchronized ResetReport reset(boolean restartFleet) {
+    public synchronized ResetReport reset(boolean restartFleet, boolean keepReports) {
         long start = System.currentTimeMillis();
         List<String> notes = new ArrayList<>();
         boolean wasRunning = simulator.currentStatus().running();
@@ -123,14 +132,14 @@ public class DemoResetService {
 
         Map<String, Long> deleted = registry == null ? Map.of() : purgeTopics(notes);
 
-        List<String> emptied = new ArrayList<>();
-        for (String table : TELEMETRY_TABLES) {
-            try {
-                jdbc.execute("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE");
-                emptied.add(table);
-            } catch (RuntimeException problem) {
-                notes.add("Could not empty " + table + ": " + problem.getMessage());
-            }
+        List<String> emptied;
+        if (keepReports) {
+            // the day and month reports keep today's and earlier days' numbers: frozen before the tables are emptied
+            emptied = daySummaries.freezeThen(REPORT_DAYS_KEPT, () -> emptyTables(notes));
+        } else {
+            emptied = emptyTables(notes);
+            daySummaries.deleteAll();
+            emptied.add("vehicle_day_summary");
         }
 
         long redisKeys = 0;
@@ -157,9 +166,22 @@ public class DemoResetService {
         }
 
         ResetReport report = new ResetReport(Instant.now(), System.currentTimeMillis() - start, wasRunning, restarted, skipped,
-                deleted, emptied, redisKeys, streamsAppsReset, notes);
+                deleted, emptied, redisKeys, streamsAppsReset, keepReports, notes);
         LOG.warn("DEMO RESET done: {}", report);
         return report;
+    }
+
+    private List<String> emptyTables(List<String> notes) {
+        List<String> emptied = new ArrayList<>();
+        for (String table : TELEMETRY_TABLES) {
+            try {
+                jdbc.execute("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE");
+                emptied.add(table);
+            } catch (RuntimeException problem) {
+                notes.add("Could not empty " + table + ": " + problem.getMessage());
+            }
+        }
+        return emptied;
     }
 
     /** Deletes every record of the platform's topics; returns how many per topic. */

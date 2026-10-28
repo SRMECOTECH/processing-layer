@@ -103,6 +103,21 @@ export async function post<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Sends a JSON body with POST or PUT and returns the JSON answer; a refusal throws with the service's reason. */
+export async function sendJson<T>(path: string, method: "POST" | "PUT", body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 401) backToSignIn();
+  if (!response.ok) {
+    throw new Error(await problemText(response));
+  }
+  return (await response.json()) as T;
+}
+
 /** The session ended (signed out in another tab, or expired): sign in again and come back to this page. */
 function backToSignIn() {
   window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
