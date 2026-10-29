@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Gauge, Map as MapIcon } from "lucide-react";
+import { Gauge, Map as MapIcon } from "@/components/icons";
 import { Card, Empty, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { PositionMap } from "@/components/ops/position-map";
 import { formatAgo, formatNumber } from "@/lib/format";

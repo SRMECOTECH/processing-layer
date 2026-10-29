@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Car, ChartLine, Database, Gauge, HardDrive, MoreVertical, Radio, Server, Table2, Timer } from "lucide-react";
+import { Car, ChartLine, Database, Gauge, HardDrive, MoreVertical, Radio, Server, Table2, Timer } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { Card, KeyValues, PageTitle, Tag, Tile } from "@/components/ops/kit";
 import { formatNumber, formatRate } from "@/lib/format";

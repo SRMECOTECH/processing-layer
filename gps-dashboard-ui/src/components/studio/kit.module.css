@@ -1,0 +1,276 @@
+/* Shared pieces of every Studio page: entry motion, cards, buttons, avatars and colour tints. */
+
+@keyframes blurIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(10px);
+  }
+}
+
+@keyframes growX {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes growY {
+  from {
+    height: 0;
+  }
+}
+
+/* `backwards`: hidden during the delay, then back to the element's own style (so hover lifts still work). */
+.blurIn {
+  animation: blurIn 0.5s var(--ease) backwards;
+}
+
+.word {
+  display: inline-block;
+  white-space: pre;
+  animation: blurIn 0.5s var(--ease) backwards;
+}
+
+.growX {
+  animation: growX 0.7s var(--ease) backwards;
+}
+
+.growY {
+  animation: growY 0.7s var(--ease) backwards;
+}
+
+/* White card; lifts 2px on hover (the `translate` property, so it never fights the entry `transform`). */
+.card {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: 18px;
+  transition:
+    translate 200ms ease,
+    background-color 200ms ease;
+}
+
+.card:hover,
+.lift:hover {
+  translate: 0 -2px;
+}
+
+.lift {
+  transition: translate 200ms ease;
+}
+
+.tile {
+  border-radius: var(--radius-tile);
+  padding: 16px;
+}
+
+.cardTitle {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.scroll {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons: darken 6% on hover (brighten in the dark theme), press to 0.97. */
+.press {
+  transition:
+    filter 200ms ease,
+    transform 120ms ease,
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.press:hover {
+  filter: brightness(0.94);
+}
+
+:global(:root[data-theme="dark"]) .press:hover {
+  filter: brightness(1.12);
+}
+
+.press:active {
+  transform: scale(0.97);
+}
+
+.press:disabled {
+  cursor: default;
+  filter: none;
+  transform: none;
+}
+
+.plus {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--text-2);
+}
+
+.plus:hover {
+  color: var(--text);
+}
+
+.pill {
+  display: inline-flex;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ink {
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+.lav {
+  background: var(--lav);
+  color: #18151c;
+}
+
+.grey {
+  background: var(--grey);
+  color: #ffffff;
+}
+
+/* Segmented pills: the active one is black and slides between options. */
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.segment {
+  position: relative;
+  height: 28px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--text-2);
+  transition: color 160ms ease;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segment[aria-pressed="true"] {
+  color: var(--ink-text);
+}
+
+.segmentPill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.segmentLabel {
+  position: relative;
+}
+
+.avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.ring {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Soft chip colours: a pastel background with a deeper icon/text colour of the same hue. */
+.tintLav {
+  background: var(--lav-soft);
+  color: var(--lav-deep);
+}
+
+.tintPink {
+  background: var(--pink-soft);
+  color: var(--pink-deep);
+}
+
+.tintMint {
+  background: var(--mint);
+  color: var(--mint-deep);
+}
+
+.tintSky {
+  background: var(--sky);
+  color: var(--sky-deep);
+}
+
+.tintInk {
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+/* Solid fills for bars and dots. */
+.fillInk {
+  background: var(--ink);
+}
+
+.fillLav {
+  background: var(--lav);
+}
+
+.fillPink {
+  background: var(--pink);
+}
+
+.fillGrey {
+  background: var(--grey);
+}
+
+/* Page heading with a lead line and actions on the right (Saved, Cloud). */
+.pageTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pageTitle {
+  font-size: 30px;
+  line-height: 1.25;
+}
+
+.pageLead {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pageActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { GitFork, OctagonAlert } from "lucide-react";
+import { GitFork, OctagonAlert } from "@/components/icons";
 import { EventTable } from "@/components/ops/events";
 import { Card, Stats, Tile } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader } from "@/components/ops/module";

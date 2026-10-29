@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, RotateCcw, ScanSearch, Undo2 } from "lucide-react";
+import { Archive, RotateCcw, ScanSearch, Undo2 } from "@/components/icons";
 import { Callout, Card, Code, Empty, KeyValues, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo, formatDateTime, formatNumber } from "@/lib/format";
 import type { DeadLetterRow, DeadLetterSummary } from "@/lib/types";

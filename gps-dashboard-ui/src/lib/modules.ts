@@ -1,5 +1,5 @@
-import type { LucideIcon } from "lucide-react";
-import { Activity, Car, Database, FileCheck, Gauge, Grid3x3, Layers, Power, Route, ShieldCheck, Table2, TriangleAlert, Waypoints } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
+import { Activity, Car, Database, FileCheck, Gauge, Grid3x3, Layers, Power, Route, ShieldCheck, Table2, TriangleAlert, Waypoints } from "@/components/icons";
 import type { Feed } from "./nav";
 
 /**
@@ -12,7 +12,7 @@ export type PipelineModule = {
   name: string;
   summary: string;
   href: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   status: Feed;
   /** PipelineStage names whose live load is shown for this module (empty while planned). */
   stages: string[];

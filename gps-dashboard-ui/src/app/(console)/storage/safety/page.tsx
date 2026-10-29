@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Archive, Database, HardDrive, Network, ShieldCheck, Workflow } from "lucide-react";
+import { Archive, Database, HardDrive, Network, ShieldCheck, Workflow } from "@/components/icons";
 import { Callout, Card, Code, Empty, KeyValues, PageHeader, Stats, Tag, Tile, type Tone } from "@/components/ops/kit";
 import { formatAgo, formatBytes, formatNumber, formatRetention } from "@/lib/format";
 import type { DataSafetyReport, SafetyStatus } from "@/lib/types";

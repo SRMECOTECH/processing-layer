@@ -1,6 +1,6 @@
 "use client";
 
-import { Table2, Zap } from "lucide-react";
+import { Table2, Zap } from "@/components/icons";
 import { Card, DemoButton, KeyValues, PageHeader, Progress, Tag, Tile } from "@/components/ops/kit";
 import { PlannedNote } from "@/components/ops/module";
 

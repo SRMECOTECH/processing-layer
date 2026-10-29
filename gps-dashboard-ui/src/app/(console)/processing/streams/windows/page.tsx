@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, ChartColumn, ListOrdered } from "lucide-react";
+import { CalendarClock, ChartColumn, ListOrdered } from "@/components/icons";
 import { Card, Code, Empty, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { SettingsCard } from "@/components/ops/module";
 import { StreamsOff, formatSeconds, useStreamsOverview } from "@/components/ops/streams";

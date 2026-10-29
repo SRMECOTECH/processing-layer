@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Gauge } from "lucide-react";
+import { Gauge } from "@/components/icons";
 import { Card, Empty, Stats, Tag, Tile } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader } from "@/components/ops/module";
 import { formatAgo, formatDecimal, formatNumber } from "@/lib/format";

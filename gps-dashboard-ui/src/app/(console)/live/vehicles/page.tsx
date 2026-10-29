@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useEffect, useState } from "react";
-import { Car, Search } from "lucide-react";
+import { Car, Search } from "@/components/icons";
 import { Card, Empty, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo, formatCoordinate, formatNumber, formatTime } from "@/lib/format";
 import { useLiveVehicles } from "@/lib/live-vehicles";

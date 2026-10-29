@@ -1,6 +1,6 @@
 "use client";
 
-import { GitCompareArrows, ListChecks, Scale } from "lucide-react";
+import { GitCompareArrows, ListChecks, Scale } from "@/components/icons";
 import { Callout, Card, Code, Empty, KeyValues, PageHeader, Progress, Stats, Tag, Tile } from "@/components/ops/kit";
 import { StreamsOff, formatSeconds, useStreamsOverview } from "@/components/ops/streams";
 import { formatNumber, formatPercent, formatTime } from "@/lib/format";

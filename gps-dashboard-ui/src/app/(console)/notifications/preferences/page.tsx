@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Moon, Newspaper } from "lucide-react";
+import { Moon, Newspaper } from "@/components/icons";
 import { Card, DemoButton, PageHeader, Segmented, Switch, Tag } from "@/components/ops/kit";
 
 type Digest = "off" | "hourly" | "daily";

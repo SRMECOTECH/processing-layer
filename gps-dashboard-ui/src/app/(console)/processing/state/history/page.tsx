@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Database, History, Server } from "lucide-react";
+import { Database, History, Server } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { Card, Empty, Segmented, Tag } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GitCompareArrows } from "lucide-react";
+import { GitCompareArrows } from "@/components/icons";
 import { Card, DemoButton, PageHeader, Tag } from "@/components/ops/kit";
 
 const CHANNELS = ["In-app", "Email", "SMS", "Push", "Webhook"];

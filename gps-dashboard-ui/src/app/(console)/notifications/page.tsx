@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCheck, Inbox } from "lucide-react";
+import { CheckCheck, Inbox } from "@/components/icons";
 import { Card, Empty, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo } from "@/lib/format";
 import { useNotifications } from "@/lib/notifications";

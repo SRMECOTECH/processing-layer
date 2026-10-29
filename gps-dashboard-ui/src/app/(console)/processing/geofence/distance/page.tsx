@@ -1,6 +1,6 @@
 "use client";
 
-import { Ruler, Sigma } from "lucide-react";
+import { Ruler, Sigma } from "@/components/icons";
 import { Card } from "@/components/ops/kit";
 import { ModuleHeader, PlannedNote } from "@/components/ops/module";
 import { formatDistance } from "@/lib/format";

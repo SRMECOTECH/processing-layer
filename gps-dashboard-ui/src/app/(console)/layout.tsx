@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { Geist_Mono, Inter } from "next/font/google";
 import { Offline } from "@/components/ops/kit";
 import { AppHeader } from "@/components/shell/app-header";
@@ -7,6 +9,7 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { NotificationsProvider } from "@/lib/notifications";
 import { OverviewProvider } from "@/lib/overview-context";
 import { APPLY_SAVED_THEME, PreferencesProvider } from "@/lib/preferences";
+import { SESSION_COOKIE, readSession } from "@/lib/session";
 import "./globals.css";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -28,7 +31,11 @@ export const viewport: Viewport = {
  * The console sits in one rounded frame: the black rail of sections, the white menu of the current
  * section's pages, and the scrolling page with its top bar.
  */
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // src/proxy.ts sends visitors without a session to /login; checked again here so the console never renders without one.
+  const session = await readSession((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!session) redirect("/login");
+
   return (
     <html
       lang="en"
@@ -51,7 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Rail />
                 <Sidebar />
                 <div className="app-scroll">
-                  <AppHeader />
+                  <AppHeader user={session.user} />
                   <main className="app-main">
                     <Offline />
                     {children}

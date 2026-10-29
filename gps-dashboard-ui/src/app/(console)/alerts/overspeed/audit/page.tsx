@@ -1,6 +1,6 @@
 "use client";
 
-import { ListChecks } from "lucide-react";
+import { ListChecks } from "@/components/icons";
 import { Card, Empty, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { moduleById } from "@/lib/modules";

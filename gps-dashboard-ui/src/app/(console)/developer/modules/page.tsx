@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Boxes } from "lucide-react";
+import { Boxes } from "@/components/icons";
 import { Card, Code, FeedTag, PageHeader } from "@/components/ops/kit";
 import { BUSINESS_RULES, PROCESSORS, SINKS, type PipelineModule } from "@/lib/modules";
 

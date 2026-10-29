@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Database, Radio, Send } from "lucide-react";
+import { ArrowRight, Database, Radio, Send } from "@/components/icons";
 import type { ReactNode } from "react";
 import { formatNumber } from "@/lib/format";
 import type { StreamsApp, StreamsNode, StreamsOverview, StreamsSubtopology } from "@/lib/types";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play, Square } from "lucide-react";
+import { Play, Square } from "@/components/icons";
 import { useOverview } from "@/lib/overview-context";
 import type { SimulationStatus } from "@/lib/types";
 import { post } from "@/lib/use-poll";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { DatabaseZap, X } from "lucide-react";
+import { DatabaseZap, X } from "@/components/icons";
 import { formatNumber } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";
 import type { ResetReport } from "@/lib/types";

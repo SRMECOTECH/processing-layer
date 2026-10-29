@@ -1,6 +1,6 @@
 "use client";
 
-import { Sigma } from "lucide-react";
+import { Sigma } from "@/components/icons";
 import { Callout, Card } from "@/components/ops/kit";
 import { ModuleHeader, SettingsCard } from "@/components/ops/module";
 import { moduleById } from "@/lib/modules";

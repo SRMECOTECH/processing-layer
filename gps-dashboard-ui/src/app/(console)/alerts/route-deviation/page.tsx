@@ -1,6 +1,6 @@
 "use client";
 
-import { Navigation, Waypoints } from "lucide-react";
+import { Navigation, Waypoints } from "@/components/icons";
 import { Card, DemoButton, KeyValues, Progress, Tag } from "@/components/ops/kit";
 import { ModuleHeader, PlannedNote, SettingsCard } from "@/components/ops/module";
 import { CORRIDORS } from "@/lib/examples";

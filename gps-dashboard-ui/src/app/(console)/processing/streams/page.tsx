@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Database, HardDrive, Layers, ServerCog, ShieldCheck } from "lucide-react";
+import { BookOpen, Database, HardDrive, Layers, ServerCog, ShieldCheck } from "@/components/icons";
 import { Fragment } from "react";
 import { Card, Code, Empty, KeyValues, PageHeader, Progress, Stats, Tag, Tile } from "@/components/ops/kit";
 import {

@@ -1,0 +1,128 @@
+@keyframes grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* The black capsule grows down from the top on load. */
+.sidebar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: 64px;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--rail);
+  padding: 22px 0 18px;
+  transform-origin: top;
+  animation: grow 0.5s var(--ease) backwards;
+}
+
+/* Logo and icons come in one by one after the capsule (--n is the item's place). */
+.appear {
+  animation: appear 0.35s var(--ease) backwards;
+  animation-delay: calc(0.3s + var(--n) * 0.04s);
+}
+
+.logo {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+}
+
+.nav {
+  margin-top: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.item {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--rail-icon);
+  transition: color 200ms ease;
+}
+
+.item:hover {
+  color: var(--rail-hover);
+}
+
+.item[aria-current="page"] {
+  color: var(--rail-active-icon);
+}
+
+.item:focus-visible {
+  box-shadow: 0 0 0 2px var(--rail-active);
+}
+
+.circle {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--rail-active);
+}
+
+.notch {
+  position: absolute;
+  top: 10px;
+  left: 56px;
+  width: 10px;
+  height: 20px;
+  border-radius: 0 999px 999px 0;
+  background: var(--rail);
+}
+
+.glyph {
+  position: relative;
+  display: grid;
+}
+
+/* The item's name, to the right of the capsule while hovered or focused. */
+.tip {
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: 70px;
+  margin-top: -11px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--ink-text);
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.item:hover .tip,
+.item:focus-visible .tip {
+  opacity: 1;
+  transform: none;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Globe, Plus, Save, SlidersHorizontal, Trash2, Truck } from "lucide-react";
+import { Building2, Globe, Plus, Save, SlidersHorizontal, Trash2, Truck } from "@/components/icons";
 import { Card, Empty, Tag } from "@/components/ops/kit";
 import { formatNumber } from "@/lib/format";
 import type { SpeedRule } from "@/lib/types";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogIn } from "lucide-react";
+import { LogIn } from "@/components/icons";
 import { Card, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader, PlannedNote } from "@/components/ops/module";
 import { GEOFENCE_EVENTS } from "@/lib/examples";

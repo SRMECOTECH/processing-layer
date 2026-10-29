@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Search } from "lucide-react";
+import { KeyRound, Search } from "@/components/icons";
 import { Card, Code, Empty, Tag } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { formatNumber } from "@/lib/format";

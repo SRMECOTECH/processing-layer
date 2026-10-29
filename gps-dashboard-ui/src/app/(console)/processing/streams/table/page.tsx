@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Crosshair, Search, Table2 } from "lucide-react";
+import { Crosshair, Search, Table2 } from "@/components/icons";
 import { Callout, Card, Code, Empty, KeyValues, PageHeader, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { StreamsOff, useStreamsOverview } from "@/components/ops/streams";
 import { formatAgo, formatCoordinate, formatDecimal, formatDistance, formatDuration, formatNumber, formatTime } from "@/lib/format";
