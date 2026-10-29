@@ -10,6 +10,12 @@
 #                + ingest journal      frames/events kept until Kafka has  the gps-ingest-journal volume
 #   dashboard    our Next.js web UI    PulseStream dashboard               http://localhost:3000
 #
+#   Profile "routing" (only with --profile routing, or COMPOSE_PROFILES=routing in .env):
+#   graphhopper    GraphHopper 11.1     road routing on the India map      http://localhost:8989/maps/
+#   route-service  our Spring Boot app  route planning / deviation API     http://localhost:8090
+#   Start:        docker compose --profile routing up -d --build graphhopper route-service
+#   First start downloads India (1.7 GB) and imports it - see docs/ROUTING_ENGINE_SETUP.md.
+#
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
 #   Shadow run:   $env:GPS_STREAMS_NORMALIZATION = 'shadow'; docker compose up -d gps-service   (listener + parity)
@@ -28,6 +34,10 @@
 # Inside the compose network the containers find each other by service name (postgres, kafka, redis).
 # The Windows-side ports differ from the Windows installs (5432, 9092, 6379) so both can run side by side.
 # smart_truck stays the existing MySQL on Windows, reached through host.docker.internal (read-only, as always).
+#
+# Memory: every service has a limit (deploy.resources.limits.memory) with headroom over what it uses today, so one runaway
+# container cannot take all of Docker's memory. The Java services size their heap from the limit (MaxRAMPercentage).
+# A container that hits its limit is killed (exit 137, OOMKilled in docker inspect) and restarted.
 
 name: gps-streaming-platform
 
@@ -36,6 +46,10 @@ services:
   postgres:
     image: postgres:14.22
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     environment:
       POSTGRES_DB: gps_tracking
       POSTGRES_USER: gps_app
@@ -53,6 +67,11 @@ services:
   kafka:
     image: apache/kafka:4.3.1
     restart: always
+    # The image starts Kafka with a fixed 1 GB heap (-Xmx1G -Xms1G); the rest is off-heap and page cache.
+    deploy:
+      resources:
+        limits:
+          memory: 1536m
     environment:
       # One node that is both broker and controller (KRaft mode, no ZooKeeper) - same as the Windows install.
       KAFKA_NODE_ID: 1
@@ -98,6 +117,11 @@ services:
   redis:
     image: redis/redis-stack:7.4.0-v8
     restart: always
+    # Redis keeps at most 512 MB of data (REDIS_ARGS); RedisInsight runs in the same container.
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     environment:
       # Live positions are rebuilt from the next reading of each vehicle, so nothing needs to be saved to disk.
       REDIS_ARGS: --save "" --appendonly no --maxmemory 512mb --maxmemory-policy noeviction
@@ -117,6 +141,11 @@ services:
     # Built locally with --build, or pulled ready-made from Docker Hub: docker compose pull gps-service
     image: ${GPS_SERVICE_IMAGE:-srmecotech/processing-layer:latest}
     restart: always
+    # Uses about 1 GB today with 150 vehicles; the heap is 70% of the limit (1.4 GB).
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
       # Kafka Streams: owner (it normalizes) | shadow (the listener does, Kafka Streams is compared) | off
@@ -128,6 +157,7 @@ services:
       GPS_JOURNAL_DIRECTORY: /var/lib/gps-journal
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
       GPS_SIMULATOR_VEHICLECOUNT: ${GPS_SIMULATOR_VEHICLE_COUNT:-150}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
       SPRING_DATASOURCE_USERNAME: gps_app
       SPRING_DATASOURCE_PASSWORD: ${GPS_DATABASE_PASSWORD}
@@ -149,6 +179,13 @@ services:
       - gps-ingest-journal:/var/lib/gps-journal
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      # Spring Actuator: UP only when the app and its database and Redis connections are up.
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     depends_on:
       postgres:
         condition: service_healthy
@@ -163,6 +200,10 @@ services:
     build: ./gps-dashboard-ui
     image: ${GPS_DASHBOARD_IMAGE:-srmecotech/processing-layer-dashboard:latest}
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512m
     environment:
       # The dashboard's server calls the service inside the compose network; the browser only talks to the dashboard.
       GPS_API_URL: http://gps-service:8080
@@ -182,9 +223,59 @@ services:
     depends_on:
       - gps-service
 
+  graphhopper:
+    profiles: ["routing"]
+    build: ./infrastructure/routing/graphhopper
+    image: ${GPS_ROUTING_ENGINE_IMAGE:-srmecotech/processing-layer-graphhopper:11.1}
+    restart: always
+    # Room for the one-time import (7 GB heap + graph buffers); serving needs far less. Raise both together.
+    deploy:
+      resources:
+        limits:
+          memory: ${GPS_ROUTING_MEMORY_LIMIT:-10g}
+    environment:
+      # Any Geofabrik region: asia/india (default, 1.7 GB), or one zone for a quick try, e.g. asia/india/eastern-zone.
+      GH_MAP_REGION: ${GPS_ROUTING_MAP_REGION:-asia/india}
+      # The one-time import needs the big heap; serving reads the memory-mapped graph and needs little.
+      GH_IMPORT_JAVA_OPTS: ${GPS_ROUTING_IMPORT_JAVA_OPTS:--Xmx7g}
+      GH_SERVER_JAVA_OPTS: ${GPS_ROUTING_SERVER_JAVA_OPTS:--Xmx3g}
+    ports:
+      - "8989:8989"                  # API + map UI: http://localhost:8989/maps/
+    volumes:
+      - gps-routing-data:/data       # the downloaded map and the imported graph (survive restarts and rebuilds)
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8989/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The first start downloads and imports the map before the API answers.
+      start_period: 3h
+
+  route-service:
+    profiles: ["routing"]
+    build:
+      context: .
+      target: route-service
+    image: ${GPS_ROUTE_SERVICE_IMAGE:-srmecotech/processing-layer-route:latest}
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    environment:
+      # The engine next to it by default; the home server's instead with GPS_ROUTING_ENGINE_URL=http://<hp-ip>:8989
+      # in .env (docs/HOME_SERVER_SETUP.md) - then start only this service, not graphhopper.
+      GPS_ROUTING_ENGINE_URL: ${GPS_ROUTING_ENGINE_URL:-http://graphhopper:8989}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    ports:
+      - "8090:8090"
+    # No depends_on on purpose: it starts on its own and /api/routing/engine says DOWN until an engine answers,
+    # so starting it never starts (or waits for) a local import.
+
 volumes:
   gps-postgres-data:
   gps-kafka-data:
   gps-redisinsight-data:
+  gps-routing-data:
   gps-streams-state:
   gps-ingest-journal:

@@ -69,6 +69,8 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | http://localhost:8080 | **Engine dashboard** – 3 producers, 3 topics, consumers, har partition ka load, lag, IMEI filter, simulator start/stop button |
 | http://localhost:8001 | **RedisInsight** (Docker mein) – `gps:` se shuru hone wali saari keys |
 | http://localhost:8080/actuator/health | PostgreSQL (`db`) aur Redis (`redis`) UP hai ya DOWN |
+| http://localhost:8989/maps/ | **GraphHopper** (profile `routing`) – India ka road map, do point click karo, truck/car ka raasta |
+| http://localhost:8090/api/routing/engine | **Route service** (`gps-route-service`) – engine UP/DOWN, algorithms; setup: [docs/ROUTING_ENGINE_SETUP.md](docs/ROUTING_ENGINE_SETUP.md) |
 
 ---
 
@@ -731,6 +733,7 @@ Kuch toota → kis module mein dekhna hai, turant pata.
 | `gps-processing` | Processing logic: `GpsFrameProcessor` + `step/` + `rule/`, aur trip detection `trip/`. **Plain Java, poora unit tested** | Frames reject ho rahe, distance/status galat, ya trip galat jagah shuru/band |
 | `gps-streams` | **Kafka Streams** topologies (normalizer, analytics) + runtime. Spring nahi, `TopologyTestDriver` se tested | Duplicate/stale/key wale rejections, KTable/windows galat, parity mismatch |
 | `gps-application` | Spring Boot service: dono flows, simulator, master data, storage, live location, trips, engine API + dashboard, Flyway migrations | Hisso ke beech ka flow galat hai |
+| `gps-route-service` | **Alag Spring Boot app** (port 8090): GraphHopper se India map pe route planning – Dijkstra, A\*, CH, alternatives. Aage: route deviation, recalculation, reassessment ([plan](docs/ROUTE_INTELLIGENCE_PLAN.md)) | Route/ETA galat, ya engine DOWN |
 
 ```
 processing-layer/
@@ -743,8 +746,10 @@ processing-layer/
 ├─ gps-streams/         Kafka Streams: normalize/ (exactly-once normalizer), analytics/ (KTable, windows, parity), runtime/
 ├─ gps-application/     flow/ (kafka, direct)  simulator/  masterdata/  storage/  livelocation/  trip/  rejection/
 │                       processing/  engine/  api/  archive/  safety/  resources/ (application.yml, db/migration, static/index.html)
+├─ gps-route-service/   engine/ (GraphHopperClient, RoutingAlgorithm)  api/ (/api/routing/*)
 ├─ infrastructure/      windows/ (Kafka, PostgreSQL setup + start/stop)  docker/ (.env banane ki script)
-├─ docs/                LEARNING_GUIDE.md, ENGINE_AND_DOCKER_GUIDE.md, KAFKA_STREAMS_GUIDE.md, DATA_SAFETY_GUIDE.md (English, aur bhi gehraai)
+│                       routing/graphhopper/ (Dockerfile, config.yml, truck_india.json, start script)
+├─ docs/                LEARNING_GUIDE.md, ENGINE_AND_DOCKER_GUIDE.md, KAFKA_STREAMS_GUIDE.md, DATA_SAFETY_GUIDE.md, ROUTING_ENGINE_SETUP.md (English, aur bhi gehraai)
 ├─ Dockerfile, docker-compose.yml (+ docker-compose.ha.yml: 3 brokers), .env.example, local-secrets.example.properties
 └─ pom.xml (parent), mvnw / mvnw.cmd
 ```
@@ -882,7 +887,7 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 | 4 | **Stoppage** – ignition ON + < 2-3 km/h; ignition OFF → points neutralise (fake km nahi) | Khadi gaadi 0 km jode |
 | 5 | **Nested geofencing** – City → Depot → Loading bay, ENTER/EXIT | Events sahi |
 | 6 | **Trip detection** (master table) + **Kalman filter** se cumulative distance – pehla version ban gaya: `gps-trip-service` (section 15) | Trip km route se match |
-| 7 | **Waypoint** + **route deviation** | Deviation alert |
+| 7 | **Waypoint** + **route deviation** – engine ready: GraphHopper on India + `gps-route-service` ([setup](docs/ROUTING_ENGINE_SETUP.md), [plan](docs/ROUTE_INTELLIGENCE_PLAN.md)) | Deviation alert |
 | 8 | Stoppage reason agent – weather (Open-Meteo) / traffic, alag consumer, hot path mein nahi | Stoppage pe reason |
 
 ---

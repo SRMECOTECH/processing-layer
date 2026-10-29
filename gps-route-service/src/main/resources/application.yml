@@ -1,0 +1,29 @@
+# Route service configuration (gps-route-service). No passwords needed yet: it only talks to the routing engine.
+
+server:
+  port: 8090
+
+spring:
+  application:
+    name: gps-route-service
+
+gps:
+  routing:
+    engine:
+      # GraphHopper: http://localhost:8989 when it runs on this machine, http://graphhopper:8989 inside docker compose.
+      url: ${GPS_ROUTING_ENGINE_URL:http://localhost:8989}
+      # Our fleet is trucks; ask for profile=car per request when needed.
+      default-profile: truck
+      connect-timeout-millis: 3000
+      # Flexible-mode Dijkstra over a region can take seconds; the engine itself stops at 60 s (config.yml).
+      request-timeout-millis: 65000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # http://localhost:8090/actuator/health shows "routingEngine" UP or DOWN. Local development only.
+      show-details: always

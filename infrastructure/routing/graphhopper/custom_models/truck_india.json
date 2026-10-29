@@ -1,0 +1,26 @@
+// Goods carrier (truck) on Indian roads - the "truck" profile in config.yml.
+// GraphHopper's own truck.json (access, hgv, width, height and weight limits from OpenStreetMap), plus for India:
+//  - speed at most 85% of the car speed the road type suggests, then capped at 80 km/h on expressways, national and
+//    state highways (motorway, trunk, primary) and 60 km/h on every other road - the MoRTH limits for goods carriers
+//    (2018 notification) - so ETAs fit a loaded truck, not a car
+//  - residential lanes and service roads count half, so a truck only uses them to reach its stop
+// distance_influence 90 (as the car profile): a shorter road wins unless the longer one is clearly faster -
+// diesel is paid per kilometre.
+//
+// Changing this file changes the prepared graph: delete the graph-cache folder and restart (import again).
+{
+  "distance_influence": 90,
+  "priority": [
+    { "if": "hgv == NO", "multiply_by": "0" },
+    { "if": "!car_access && road_access != PRIVATE && hgv != DELIVERY && hgv != DESTINATION", "multiply_by": "0" },
+    { "if": "road_access == PRIVATE || hgv == DELIVERY || hgv == DESTINATION", "multiply_by": "0.1" },
+    { "if": "max_width < 3 || max_height < 4", "multiply_by": "0" },
+    { "if": "max_weight < 18 && max_weight_except == MISSING", "multiply_by": "0" },
+    { "if": "road_class == RESIDENTIAL || road_class == LIVING_STREET || road_class == SERVICE", "multiply_by": "0.5" }
+  ],
+  "speed": [
+    { "if": "true", "limit_to": "car_average_speed * 0.85" },
+    { "if": "road_class == MOTORWAY || road_class == TRUNK || road_class == PRIMARY", "limit_to": "80" },
+    { "else": "", "limit_to": "60" }
+  ]
+}

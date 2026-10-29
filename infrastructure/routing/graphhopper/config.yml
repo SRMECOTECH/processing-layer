@@ -1,0 +1,90 @@
+# GraphHopper configuration for the GPS platform: road routing on the India map.
+# Based on GraphHopper 11.1's config-example.yml; every setting here is one we chose on purpose.
+#
+# Changing profiles, custom models, encoded values, CH/LM lists or ignored highways changes the graph:
+# delete the graph-cache folder so the next start imports again (docs/ROUTING_ENGINE_SETUP.md, "Change the profiles").
+
+graphhopper:
+
+  # Both are set by start-graphhopper.sh (map region -> file and folder), these are only fallbacks.
+  datareader.file: ""
+  graph.location: graph-cache
+  datareader.preferred_language: en
+  custom_models.directory: /app/custom_models
+
+  #### Profiles: what is being routed ####
+  #   truck : our fleet - goods carriers on Indian roads (custom_models/truck_india.json)
+  #   car   : light vehicles, and the reference a truck route is compared with (GraphHopper's own car.json)
+  profiles:
+    - name: truck
+      custom_model_files: [truck_india.json]
+    - name: car
+      custom_model_files: [car.json]
+
+  #### The three ways a route can be searched ####
+  # Speed mode, Contraction Hierarchies (CH): the default. Shortcuts are prepared once at import, so a route across
+  #   India takes milliseconds. Used for route planning and for recalculating a route the moment a truck leaves it.
+  profiles_ch:
+    - profile: truck
+    - profile: car
+  # Hybrid mode, Landmarks (LM = A* with landmark distances as the estimate): ch.disable=true per request. Slower than
+  #   CH but accepts a custom model per request - avoid tolls, avoid a closed road or area - for recalculation.
+  profiles_lm:
+    - profile: truck
+  # Flexible mode (ch.disable=true and lm.disable=true): no preparation at all, the plain textbook algorithms -
+  #   algorithm=dijkstra | dijkstrabi | astar | astarbi | alternative_route. Fine within a region; guarded below so a
+  #   Dijkstra across India cannot use up the memory.
+
+  #### What is stored for every road (used by the profiles, by custom models per request, and as path details) ####
+  graph.encoded_values: car_access, car_average_speed, road_access, hgv, max_width, max_height, max_weight, max_weight_except, road_class, road_class_link, road_environment, max_speed, toll, surface
+
+  #### Import ####
+  # Not roads for motor vehicles. Tracks stay: trucks use them at mines, quarries and plants.
+  import.osm.ignored_highways: footway,construction,cycleway,path,steps,pedestrian,bridleway,corridor,platform,proposed,raceway
+  # Islands of road with fewer edges than this are dropped, so a point is never snapped to a road that leads nowhere.
+  prepare.min_network_size: 200
+  prepare.subnetworks.threads: 1
+  # One profile after the other keeps the import inside the memory of a laptop. With more RAM, use 2.
+  prepare.ch.threads: 1
+  prepare.lm.threads: 1
+  # MMAP: the graph lives in files and the operating system keeps the busy parts in memory, so the Java heap stays
+  # small (the India graph does not have to fit in it). RAM_STORE is a little faster on a server with spare memory.
+  graph.dataaccess.default_type: MMAP
+  # Except while importing: the landmark and CH tables are written all over during their preparation, and memory-mapped
+  # the operating system writes the same pages back to disk again and again (India: about 800 GB of disk writes in
+  # 40 minutes of landmarks, before this). start-graphhopper.sh switches these two lines to RAM_STORE for the import -
+  # built in the heap, written to disk once - and serving maps them like everything else. Keep them as they are here.
+  "graph.dataaccess.type.landmarks_.*": MMAP
+  "graph.dataaccess.type.(nodes_ch|shortcuts)_.*": MMAP
+
+  #### Routing guards ####
+  routing.snap_preventions_default: tunnel, bridge, ferry
+  # Flexible mode only: stop a search after this many nodes or this long (a Dijkstra from Kolkata to Mumbai would
+  # visit most of India). CH and LM visit far fewer and are not affected in practice.
+  routing.max_visited_nodes: 6000000
+  routing.timeout_ms: 60000
+  # LM and flexible requests: the furthest two consecutive points may be apart. India is about 3,000 km across.
+  routing.non_ch.max_waypoint_distance: 3500000
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      # All interfaces inside the container, so other containers reach graphhopper:8989; docker compose publishes
+      # it on the machine as localhost:8989. No login: keep it off the public internet.
+      bind_host: 0.0.0.0
+      # Long GET requests from the /maps/ UI with custom models.
+      max_request_header_size: 50k
+  request_log:
+    appenders: []
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: localhost
+
+logging:
+  level: INFO
+  appenders:
+    - type: console
+      time_zone: UTC
+      log_format: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

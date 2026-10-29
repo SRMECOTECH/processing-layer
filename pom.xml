@@ -24,6 +24,8 @@
           gps-processing    : the processing logic: validation + movement calculation (plain Java)
           gps-streams       : the Kafka Streams layer: normalization with exactly-once state, vehicle table, windows (no Spring)
           gps-application   : the runnable Spring Boot service that wires the modules into the Kafka or the direct flow
+          gps-route-service : a second runnable service - route planning on the India road map (GraphHopper),
+                              later route deviation, recalculation and reassessment
     -->
     <modules>
         <module>gps-configuration</module>
@@ -31,6 +33,7 @@
         <module>gps-processing</module>
         <module>gps-streams</module>
         <module>gps-application</module>
+        <module>gps-route-service</module>
     </modules>
 
     <properties>
