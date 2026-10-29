@@ -1,0 +1,7 @@
+{
+  "name": "srs-generator",
+  "private": true,
+  "description": "Builds the SRS, database schema and SRS rules Word documents in the srs folder",
+  "scripts": { "build": "python -I diagrams.py figures && node build.js" },
+  "dependencies": { "docx": "9.5.1" }
+}
