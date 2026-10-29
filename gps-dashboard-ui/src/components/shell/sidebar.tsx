@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
-import { SECTIONS, itemContains, sectionFor, type NavGroup, type NavItem } from "@/lib/nav";
+import { ChevronRight, PanelLeftClose, PanelLeftOpen, Search, X } from "@/components/icons";
+import { SlideMarker } from "@/components/slide-marker";
+import { itemContains, sectionFor, type NavGroup, type NavItem } from "@/lib/nav";
 import { useOverview } from "@/lib/overview-context";
 import { isKafkaFlow } from "@/lib/pipeline";
 import { usePreferences } from "@/lib/preferences";
 
 /**
  * The white menu card of the current section: groups, items and, under an item, its sub-pages. A black pill
- * slides to the open page. Collapses to icons on wide screens and becomes a drawer on narrow ones.
+ * slides to the open page. Only this section's pages are here (the sections are in the top bar). Collapses to icons
+ * on wide screens and becomes a drawer on narrow ones.
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -36,23 +37,9 @@ export function Sidebar() {
     <>
       <div className={`drawer-scrim${drawerOpen ? " open" : ""}`} onClick={() => setDrawerOpen(false)} aria-hidden="true" />
       <aside className={`sidebar${drawerOpen ? " open" : ""}`} aria-label={`${section.label} menu`}>
-        <div className="drawer-sections">
-          <div className="side-title">Sections</div>
-          <div className="drawer-section-list">
-            {SECTIONS.map((s) => {
-              const Icon = s.icon;
-              return (
-                <Link key={s.href} href={s.href} className="drawer-section" aria-current={s.href === section.href ? "page" : undefined}>
-                  <Icon size={15} />
-                  {s.label}
-                </Link>
-              );
-            })}
-          </div>
-          <button type="button" className="icon-button drawer-close" aria-label="Close the menu" onClick={() => setDrawerOpen(false)}>
-            <X size={18} />
-          </button>
-        </div>
+        <button type="button" className="icon-button drawer-close" aria-label="Close the menu" onClick={() => setDrawerOpen(false)}>
+          <X size={18} />
+        </button>
 
         <div className="side-head">
           <div className="side-section">
@@ -145,9 +132,9 @@ function SideItem({ item, pathname, open, onToggle }: { item: NavItem; pathname:
   );
 }
 
-/** The black pill behind the open page; one shared layoutId, so it slides from page to page. */
+/** The black pill behind the open page; it slides from page to page. */
 function ActivePill() {
-  return <motion.span layoutId="side-active" className="side-active" transition={{ type: "spring", stiffness: 400, damping: 34 }} />;
+  return <SlideMarker id="side-active" className="side-active" />;
 }
 
 function filterGroups(groups: NavGroup[], filter: string): NavGroup[] {

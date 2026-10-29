@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCheck, FileJson } from "lucide-react";
+import { FileCheck, FileJson } from "@/components/icons";
 import { Card, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatNumber, formatPercent } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";

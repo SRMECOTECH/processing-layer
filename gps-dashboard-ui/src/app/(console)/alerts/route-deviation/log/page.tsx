@@ -1,6 +1,6 @@
 "use client";
 
-import { History } from "lucide-react";
+import { History } from "@/components/icons";
 import { Card, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader, PlannedNote } from "@/components/ops/module";
 import { DEVIATIONS } from "@/lib/examples";

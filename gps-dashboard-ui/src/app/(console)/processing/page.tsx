@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Workflow } from "lucide-react";
+import { Boxes, Workflow } from "@/components/icons";
 import { Callout, Card, Code, PageHeader } from "@/components/ops/kit";
 import { ModuleCard, PipelineDiagram } from "@/components/ops/module";
 import { formatNumber } from "@/lib/format";
@@ -18,6 +18,7 @@ export default function PipelineOverviewPage() {
         title="Pipeline overview"
         description="Everything that happens after the Kafka output topic. Each processor is its own consumer group, so all of them read every reading in parallel; their results feed the business logic, then ingestion control writes to PostgreSQL and ClickHouse."
         meta={[
+          ["Normalized by", normalizedBy(o?.normalization?.engine)],
           ["Output topic", <Code key="t">{OUTPUT_TOPIC}</Code>],
           ["Partitions", "3 · keyed by IMEI"],
           ["Processors", `${built} built · ${PROCESSORS.length - built} planned`],
@@ -48,4 +49,11 @@ export default function PipelineOverviewPage() {
       </Callout>
     </div>
   );
+}
+
+function normalizedBy(engine: string | undefined): string {
+  if (engine === "kafka-streams") return "Kafka Streams · exactly-once";
+  if (engine === "listener") return "Listener · at-least-once";
+  if (engine === "direct") return "Direct flow";
+  return "–";
 }

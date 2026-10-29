@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { GitCompareArrows, ListChecks, Sigma } from "lucide-react";
+import { GitCompareArrows, ListChecks, Sigma } from "@/components/icons";
 import { EventTable } from "@/components/ops/events";
 import { Card, Empty, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader, SettingsCard } from "@/components/ops/module";

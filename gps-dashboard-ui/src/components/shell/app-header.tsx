@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, CheckCheck, CircleUser, Menu, SlidersHorizontal, Waves } from "lucide-react";
+import { Bell, CheckCheck, CircleUser, LogOut, Menu, SlidersHorizontal, Waves } from "@/components/icons";
+import { signOut } from "@/lib/auth-actions";
 import { formatAgo, formatRate } from "@/lib/format";
 import { useNotifications } from "@/lib/notifications";
 import { useOverview } from "@/lib/overview-context";
@@ -10,15 +11,19 @@ import { usePreferences, type Accent, type Background, type Density, type Theme 
 import { Switch } from "@/components/ops/kit";
 import { SearchButton } from "./command-palette";
 import { Popover } from "./popover";
+import { SectionTabs } from "./section-tabs";
 
-/** The bar above each page, on the canvas: brand, search, live rate, notifications, appearance and user. The sections are in the rail. */
-export function AppHeader() {
+/**
+ * The bar across the top of the frame: brand, the sections, then search, live rate, notifications, appearance and
+ * user. It stays the same on every page of a section; the section's own pages are in the menu on the left.
+ */
+export function AppHeader({ user }: { user: string }) {
   const { setDrawerOpen } = usePreferences();
 
   return (
     <header className="topbar">
       <div className="topbar-start">
-        <button type="button" className="icon-button menu-button" aria-label="Open the menu" onClick={() => setDrawerOpen(true)}>
+        <button type="button" className="icon-button menu-button" aria-label="Open this section's pages" onClick={() => setDrawerOpen(true)}>
           <Menu size={20} />
         </button>
         <Link href="/live" className="brand" aria-label="PulseStream home">
@@ -29,13 +34,14 @@ export function AppHeader() {
         </Link>
       </div>
 
-      <SearchButton />
+      <SectionTabs />
 
       <div className="topbar-end">
+        <SearchButton />
         <LivePill />
         <NotificationBell />
         <AppearanceMenu />
-        <UserMenu />
+        <UserMenu user={user} />
       </div>
     </header>
   );
@@ -219,17 +225,17 @@ function AppearanceMenu() {
   );
 }
 
-function UserMenu() {
+function UserMenu({ user }: { user: string }) {
   const { data: o } = useOverview();
   return (
     <Popover label="Account and environment" width={280} button={<CircleUser size={19} strokeWidth={1.7} />} buttonClassName="icon-button avatar-button">
       {() => (
         <div>
           <div className="user-card">
-            <span className="user-avatar">OP</span>
+            <span className="user-avatar">{user.slice(0, 2).toUpperCase()}</span>
             <span>
-              <span className="notice-heading">Operator</span>
-              <span className="notice-sub">Local console</span>
+              <span className="notice-heading">{user}</span>
+              <span className="notice-sub">Signed in to this console</span>
             </span>
           </div>
           <dl className="kv compact">
@@ -254,6 +260,12 @@ function UserMenu() {
               <kbd>/</kbd> Search
             </span>
           </div>
+          <form action={signOut} className="sign-out">
+            <button type="submit" className="btn primary sign-out-button">
+              <LogOut size={14} strokeWidth={1.9} />
+              Sign out
+            </button>
+          </form>
         </div>
       )}
     </Popover>

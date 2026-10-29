@@ -30,9 +30,31 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      # Bring EXISTING topics in line with their declaration at every start (retention 7 days -> 31, min in-sync ...).
+      modify-topic-configs: true
+    producer:
+      # No acknowledged record is ever lost by a producer:
+      #   acks=all            "ok" only once every in-sync copy has the record
+      #   idempotence         a retry never writes a record twice, and order per partition is kept
+      #   retries / timeout   retry inside the client for 5 minutes; after that the ingest journal keeps the record
+      #   max.block.ms        do not hang a caller for a minute when Kafka is down: fail fast, the journal has it
+      #   zstd                a month of JSON takes a fraction of the disk
+      acks: all
+      retries: 2147483647
+      compression-type: zstd
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 300000
+        max.block.ms: 5000
+        linger.ms: 5
     consumer:
       # A brand-new consumer group starts from the oldest message instead of only new ones.
       auto-offset-reset: earliest
+      # The Kafka Streams normalizer writes in transactions (exactly-once): read only what was committed,
+      # never the records of a transaction it had to abort.
+      isolation-level: read_committed
 
   # The dashboard page changes with every release: make browsers always ask for the current version.
   web:
@@ -43,6 +65,8 @@ spring:
 
   # Redis: latest position of every vehicle + engine load counters (browse with RedisInsight).
   data:
+    # This laptop's Redis: the default, and the "This laptop" choice on Developer -> Connections. Switching to the HP's
+    # Redis there is saved in PostgreSQL (connection_setting) and wins over this at the next start.
     redis:
       host: localhost
       port: 6379
@@ -58,6 +82,18 @@ gps:
   #   direct : frame -> processing -> PostgreSQL in one call, no Kafka at all                    (Kafka may be stopped)
   # Override at start-up:  --gps.processing-flow=direct
   processing-flow: kafka
+  # The outside connections (Developer -> Connections, GET /api/connections). The HP home server is reached over its
+  # Wi-Fi hotspot "SANJOY-HP 0161" and is always 192.168.137.1. What is saved in the console wins over these defaults.
+  #   valhalla-url           routing engine, all-India map (route deviation will use it)
+  #   ingestion-api-url      the HP's FastAPI, which writes devices' points into the HP's Redis; only checked here
+  #   home-server-redis-url  the "HP home server" choice for Redis: database 1, because the ingestion API uses 0 there
+  connections:
+    valhalla-url: ${VALHALLA_URL:http://192.168.137.1:8002}
+    ingestion-api-url: ${GPS_INGESTION_API_URL:http://192.168.137.1:8000}
+    home-server-redis-url: ${HOME_SERVER_REDIS_URL:redis://192.168.137.1:6379/1}
+    redis-command-timeout: 5s
+    redis-connect-timeout: 3s
+    http-timeout: 5s
   simulator:
     vehicle-count: 150
     pings-per-vehicle: 500
@@ -112,9 +148,75 @@ gps:
       tomtom-api-key: ${TOMTOM_API_KEY:}
       traffic-radius-meters: 1000
       timeout-millis: 3000
+  # Kafka: how long and how safely the platform's topics are kept (docs/DATA_SAFETY_GUIDE.md).
+  #   retention              31 days on every platform topic: a full month of data stays in Kafka
+  #   replication-factor     copies on different brokers: 1 with the single local broker, 3 with docker-compose.ha.yml
+  #   min-insync-replicas    copies written before a producer hears "ok": 1 local, 2 in HA
+  kafka:
+    retention: 31d
+    replication-factor: ${GPS_KAFKA_REPLICATION_FACTOR:1}
+    min-insync-replicas: ${GPS_KAFKA_MIN_INSYNC_REPLICAS:1}
+  # Ingest journal: device frames and vehicle events are fsynced to this folder BEFORE they are sent to Kafka, and stay
+  # until Kafka confirms them - Kafka down, the service killed, a power cut: they are sent again, in order.
+  # Docker: a volume (GPS_JOURNAL_DIRECTORY=/var/lib/gps-journal).
+  journal:
+    directory: ${GPS_JOURNAL_DIRECTORY:./data/ingest-journal}
+    records-per-segment: 1000
+    fsync-every-record: true
+    drain-batch-size: 5000
+  # Kafka Streams (Kafka flow only), see docs/KAFKA_STREAMS_GUIDE.md. Two apps run inside this service:
+  #   normalizer : raw frames -> processed positions / rejections, exactly-once, state in RocksDB + changelog topics
+  #   analytics  : processed positions -> vehicle KTable, 5-minute event-time windows (gps.vehicle-activity), parity
+  # normalization - who turns raw frames into positions (one owner, never two):
+  #   owner  : Kafka Streams; the @KafkaListener consumer is not created. It continues from the listener's offsets.
+  #   shadow : the listener; Kafka Streams writes the same results to gps.shadow.* and GET /api/streams/parity
+  #            compares both, reading by reading - validate here before switching to owner.
+  #   off    : the listener; Kafka Streams only runs the analytics.
+  # Read the state: GET /api/streams/overview, /api/streams/vehicles/{imei}, /api/streams/fleet/activity
+  streams:
+    enabled: true
+    normalization: owner
+    # one stream thread per partition, so each task has a thread of its own
+    threads: 3
+    # warm copies of every store on OTHER instances: 0 with one instance, 1 as soon as there are two
+    standby-replicas: 0
+    # internal changelog topics: -1 = the broker's default (1 here), 3 on a real cluster
+    replication-factor: -1
+    # where RocksDB keeps the stores (default: Kafka Streams' temp folder). Keep it on a volume - a restart then
+    # reuses the local stores instead of replaying the changelogs. Docker: GPS_STREAMS_STATEDIR=/var/lib/gps-streams
+    # state-dir: /var/lib/gps-streams
+    # how other instances reach this one for Interactive Queries (application.server = host:server.port)
+    advertised-host: localhost
+    leave-group-on-close: true
+    # ordering and duplicate policies of the normalizer (event time = the device's recordedAt)
+    max-lateness: 24h
+    seen-readings-retention: 24h
+    # activity windows: size, how late a reading may still count, how long closed windows stay queryable
+    window-size: 5m
+    window-grace: 2m
+    window-retention: 6h
+    parity-grace: 2m
+    rocksdb-off-heap-mb: 64
+    normalizer-guarantee: exactly_once_v2
+    analytics-guarantee: at_least_once
+    # anything else, passed on to Kafka Streams as is, e.g. client.rack, rack.aware.assignment.tags
+    properties: {}
   # "Empty DB" for demo practice (POST /api/admin/reset). Switch off anywhere that is not a demo.
   admin:
     reset-enabled: true
+  # Reports (GET /api/reports/*): one summary row per vehicle per day (vehicle_day_summary), rebuilt for today and
+  # yesterday every refresh-every, so a month report reads a few thousand rows whatever the number of positions.
+  # Fuel price, mileage and the other cost assumptions are edited in the console (Reports -> Cost assumptions).
+  #   zone              a report day runs midnight to midnight here
+  #   max-gap-seconds          a longer silence before a moving reading counts neither as driving nor as standing
+  #   max-stopped-gap-seconds  the same before a standing reading (a parked tracker reports rarely)
+  #   backfill-days            days back summarized once after a start (when they still have positions)
+  reports:
+    zone: Asia/Kolkata
+    refresh-every: 5m
+    max-gap-seconds: 600
+    max-stopped-gap-seconds: 3600
+    backfill-days: 62
   # Trip and stop detection (consumer group gps-trip-service), Traccar's defaults:
   #   a trip starts once the vehicle is min-distance away from where it stopped,
   #   it stops when it stays within min-distance for min-duration,

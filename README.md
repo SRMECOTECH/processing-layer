@@ -22,11 +22,15 @@ Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (
 8. [Do raaste: Kafka flow vs Direct flow](#8-do-raaste-kafka-flow-vs-direct-flow)
 9. [Processing ka andar ka logic (step by step)](#9-processing-ka-andar-ka-logic-step-by-step)
 10. [Data kabhi gum na ho – reliability ke rules](#10-data-kabhi-gum-na-ho--reliability-ke-rules)
+    - [10a. Ek mahina Kafka mein, ek bhi record gum nahi](#10a-ek-mahina-kafka-mein-ek-bhi-record-gum-nahi)
 11. [Database: gps_tracking (PostgreSQL + Flyway + Hibernate)](#11-database-gps_tracking-postgresql--flyway--hibernate)
 12. [Master data: IMEI → gaadi → company](#12-master-data-imei--gaadi--company)
 13. [Simulator – nakli trucks jo asli jaise chalte hain](#13-simulator--nakli-trucks-jo-asli-jaise-chalte-hain)
 14. [Redis – live board](#14-redis--live-board)
+    - [14a. Connections – is laptop ka Redis ya HP home server ka](#14a-connections--is-laptop-ka-redis-ya-hp-home-server-ka-ui-developer--connections)
 15. [Trips aur stops – gps-trip-service](#15-trips-aur-stops--gps-trip-service)
+    - [15c. Kafka Streams – processing layer ka engine](#15c-kafka-streams--processing-layer-ka-engine)
+    - [15d. Reports – din aur mahine ka hisaab](#15d-reports--din-aur-mahine-ka-hisaab-ui-reports)
 16. [Engine dashboard aur REST APIs](#16-engine-dashboard-aur-rest-apis)
 17. [Classified logs – har line bataye kaun, kis truck ka, kahan se](#17-classified-logs--har-line-bataye-kaun-kis-truck-ka-kahan-se)
 18. [Maven modules – har module ka ek hi kaam](#18-maven-modules--har-module-ka-ek-hi-kaam)
@@ -63,7 +67,6 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 |---|---|
 | http://localhost:3000 | **PulseStream IoT console** (Next.js, `gps-dashboard-ui/`) – operations UI: Live, Processing, Alerts, Storage, Analytics, Notifications, Developer |
 | http://localhost:8080 | **Engine dashboard** – 3 producers, 3 topics, consumers, har partition ka load, lag, IMEI filter, simulator start/stop button |
-| http://localhost:8085 | **Kafka UI** (Docker mein) – topics, messages, key (= IMEI) se search, consumer groups |
 | http://localhost:8001 | **RedisInsight** (Docker mein) – `gps:` se shuru hone wali saari keys |
 | http://localhost:8080/actuator/health | PostgreSQL (`db`) aur Redis (`redis`) UP hai ya DOWN |
 | http://localhost:8989/maps/ | **GraphHopper** (profile `routing`) – India ka road map, do point click karo, truck/car ka raasta |
@@ -79,6 +82,7 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | **Spring Boot** | 4.1.1 | Kafka, JPA, Redis, REST, Actuator sab ek jagah, kam configuration |
 | **Apache Kafka** | 4.3.1 (KRaft, ZooKeeper nahi) | GPS data ka **buffer + post office**. Database down ho to data Kafka mein intezaar karta hai, gum nahi hota |
 | **Spring for Apache Kafka** | Boot ke saath | `@KafkaListener`, `KafkaTemplate`, retry (`DefaultErrorHandler`) |
+| **Kafka Streams** (+ RocksDB) | 4.2.1 (Boot ke saath) | Raw frame → position ka kaam **exactly-once**, har gaadi ki state RocksDB + changelog topic mein, KTable, 5-min event-time windows, Interactive Queries (section 15c) |
 | **PostgreSQL** | 14.22 | Hamara apna naya database `gps_tracking` – positions aur master data |
 | **Hibernate / Spring Data JPA** | Boot ke saath | Java class ↔ table. `ddl-auto: validate` – Hibernate sirf check karta hai, table nahi banata |
 | **Flyway** | Boot ke saath | Tables numbered SQL files se bante hain (`V1__`, `V2__`). Kaunsi file chal chuki, wo yaad rakhta hai |
@@ -87,12 +91,11 @@ Bas, yahi poora project hai. Baaki sab is kahani ki detail hai. 😄
 | **HikariCP** | Boot ke saath | smart_truck ke liye alag **read-only** connection pool |
 | **Jackson 3** (`tools.jackson`) | Boot ke saath | Messages ko JSON banana aur wapas padhna, ek hi tarike se |
 | **Maven** (multi-module + wrapper `mvnw`) | – | 4 modules, har ek ka ek kaam. Maven install karne ki zarurat nahi, `mvnw` khud le aata hai |
-| **Docker + Docker Compose** | – | Poora system ek command mein: postgres, kafka, kafka-ui, redis, service |
-| **Kafka UI** (kafbat) | 1.3.0 | Kafka ke andar jhaank ke dekhne ke liye |
+| **Docker + Docker Compose** | – | Poora system ek command mein: postgres, kafka, redis, service, dashboard |
 | **Spring Actuator** | Boot ke saath | `/actuator/health` – sab zinda hai ya nahi |
 | **JUnit 5** | – | Processing ke har rule ka test, bina kuch start kiye |
 
-**Apache Flink nahi hai** – pehle tha, hata diya. Saari processing Spring Boot ke andar plain Java mein hoti hai. Kyun? Simple rakhna tha, har cheez debug ho sake, aur 150 trucks ke liye Spring kaafi hai.
+**Apache Flink nahi hai** – pehle tha, hata diya. Processing ke rules `gps-processing` mein plain Java mein hain. Unko chalata hai **Kafka Streams** – ek library jo isi Spring service ke andar chalti hai, alag cluster nahi (section 15c). State, windows aur exactly-once Kafka se hi milte hain, bina naye system ke.
 
 ---
 
@@ -122,6 +125,8 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 
 **Ginti yaad rakho: 3 topics, 3 producers, 5 consumer groups.**
 
+> **Update (Kafka Streams):** C1 ka kaam (raw → processed / rejected) ab default se **Kafka Streams normalizer** karta hai – wahi group id `gps-raw-frame-processing-service`, wahi rules, lekin **exactly-once** aur state RocksDB + changelog mein. Ek doosra Kafka Streams app (`gps-streams-analytics`) processed positions se har gaadi ki KTable aur 5-minute windows banata hai. Poori kahani: section 15c.
+
 ---
 
 ## 5. Topics – 3 trays
@@ -131,10 +136,14 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 | 1 | `gps.raw-device-frames` | Frame bilkul waisa jaisa device ne bheja: IMEI, time, lat, lon, speed |
 | 2 | `gps.processed-positions` | Jo frame check pass kar gaya + distance, kitne second baad aaya, MOVING/STOPPED |
 | 3 | `gps.rejected-frames` | Jo fail hua + **reason** (jaise "Latitude 95.0 is outside -90..90") |
+| 4 | `gps.vehicle-events` | Stream consumers ke events: over-speed, stoppage, ignition … |
+| 5 | `gps.vehicle-activity` | **Kafka Streams**: har gaadi ka har 5-minute window ka final hisaab (window band hone ke baad ek hi record) |
+| 6 | `gps.dead-letters` | Jo record koi consumer handle hi nahi kar paaya – original payload + kahan se aaya + error (section 10a) |
+| – | `gps.shadow.processed-positions`, `gps.shadow.rejected-frames` | Sirf **shadow mode** mein: Kafka Streams ka output, listener ke output se milaane ke liye |
 
-- Har topic mein **3 partitions** hain.
+- Har topic mein **3 partitions** hain, aur har topic **31 din** ka data rakhta hai (section 10a).
 - **Key = IMEI.** Kafka key ka hash leta hai (`murmur2(key) % 3`), to ek truck ke saare frames hamesha **ek hi partition** mein jaate hain → **order bana rehta hai**. Truck ka 10:01 wala ping 10:00 wale se pehle process nahi hoga.
-- Topics haath se nahi banane padte – `KafkaTopicDeclarations` service start hote hi khud bana deta hai.
+- Topics haath se nahi banane padte – `KafkaTopicDeclarations` service start hote hi khud bana deta hai, aur pehle se bane topics ki settings (retention) bhi theek kar deta hai.
 - Topic ke naam sirf ek jagah likhe hain: `KafkaTopicNames.java`. Spelling mistake ka chance hi nahi.
 
 ---
@@ -150,7 +159,7 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 ⚠️ **Sabse confusing part:** P2 aur P3 alag app nahi hain. Ye **consumer 1 ke andar** chalte hain. Consumer 1 raw frame padhta hai, process karta hai, aur phir **producer ban ke** result agle topic mein daal deta hai. Matlab consumer 1 = **consumer bhi, producer bhi**.
 
 **Chhoti si baat jo important hai:**
-- **P1 wait nahi karta** (device bhi bhej ke aage badh jata hai). Kafka ka jawab aane pe ginti hoti hai.
+- **P1 Kafka ka wait nahi karta** (device bhi bhej ke aage badh jata hai). Lekin bhejne se **pehle** frame disk pe journal mein likhta hai (fsync). Kafka down ho to frame journal mein rukta hai, gum nahi hota (section 10a).
 - **P2 aur P3 wait karte hain** (`.join()`) jab tak Kafka bole "mil gaya". Tabhi raw frame ka offset commit hota hai. Isliye beech mein crash ho jaye to bhi frame gum nahi hota.
 
 ---
@@ -164,8 +173,12 @@ P2                       ▼  (achha)                   P3       ▼  (kharab)
 | C1 | `gps-raw-frame-processing-service` | `gps.raw-device-frames` | Validate + movement calculate + duplicate pakdo | Achha → topic 2, kharab → topic 3 |
 | C2 | `gps-position-storage-service` | `gps.processed-positions` | Position save karo | PostgreSQL `gps_position` |
 | C3 | `gps-live-location-service` | `gps.processed-positions` | Har gaadi ki **sirf latest** position rakho | Redis |
-| C4 | `gps-rejected-frame-logger` | `gps.rejected-frames` | Reject reason log karo | Service ka log |
+| C4 | `gps-rejected-frame-logger` | `gps.rejected-frames` | Reject ko archive karo + reason log karo | PostgreSQL `rejected_frame` + service ka log |
 | C5 | `gps-trip-service` | `gps.processed-positions` | Trips aur stops pehchano (section 15) | PostgreSQL `gps_trip`, `gps_stop` |
+| KS | `gps-streams-analytics` | `gps.processed-positions` | **Kafka Streams**: vehicle KTable + 5-min windows (+ shadow parity) | RocksDB stores, `gps.vehicle-activity` |
+| DL | `gps-dead-letter-archive` | `gps.dead-letters` | Har dead letter hamesha ke liye save (section 10a) | PostgreSQL `dead_letter` |
+
+C1 (`gps-raw-frame-processing-service`) ab default se **Kafka Streams** chalata hai (listener tab banta hi nahi) – group id same hai, isliye dono taraf switch karne pe offsets wahin se chalte hain.
 
 ### Group ka asli funda (sabse important Kafka concept)
 
@@ -261,12 +274,55 @@ Ye thread-safe kyun hai? Ek IMEI → ek partition → ek thread. Ek device ko ka
 ## 10. Data kabhi gum na ho – reliability ke rules
 
 1. **Offset baad mein commit.** Consumer ka kaam poora hone ke baad hi Spring offset commit karta hai. Beech mein crash = message dobara aayega, gum nahi hoga (**at-least-once**).
-2. **Retry with backoff** (`KafkaRetrySettings`): DB ya Kafka down → 1s, 2s, 4s … max har 60s pe retry, **jab tak wapas na aaye**. Message skip nahi hota.
-3. **Toota hua message skip.** Invalid JSON ya database rule tootna (`DataIntegrityViolationException`) – retry se theek nahi hoga, to log karke turant skip, taaki peeche wale messages block na hon.
+2. **Retry with backoff** (`KafkaRetrySettings`): DB, Redis ya Kafka down → 1s, 2s, 4s … max har 60s pe retry, **jab tak wapas na aaye**. Message skip nahi hota.
+3. **Toota hua message skip nahi – dead-letter queue mein.** Invalid JSON ya database rule tootna (`DataIntegrityViolationException`) – retry se theek nahi hoga, to turant `gps.dead-letters` mein park (koi anjaan error ho to 3 try ke baad). Peeche wale messages block nahi hote, aur message gum bhi nahi hota (section 10a).
 4. **Idempotent storage.** Kafka ek message do baar de sakta hai. `gps_position` mein `UNIQUE (imei, recorded_at)` hai aur save se pehle `existsByImeiAndRecordedAt` check hota hai – ek reading ek hi baar save hoti hai.
 5. **Live location mein purana naye ko replace nahi karta.** Late ya replay reading Redis ki newer position ko overwrite nahi karti.
 6. **Direct flow mein Redis aur trips best-effort hain.** `gps_position` asli record hai – Redis ya trip detection ki hichki log hoti hai, frame fail nahi hota.
 7. **Trip service: state + trip ek hi transaction mein.** Har reading pe `vehicle_motion_state` ka update `WHERE last_recorded_at < :recordedAt` se guarded hai. Dobara aayi reading → 0 rows update → rollback, kuch nahi likha. Isse "message do baar aaya" ka asar **exactly-once** jaisa hota hai (section 15).
+
+---
+
+## 10a. Ek mahina Kafka mein, ek bhi record gum nahi
+
+> Poori gehraai English mein: [docs/DATA_SAFETY_GUIDE.md](docs/DATA_SAFETY_GUIDE.md) – har woh jagah jahan record gum ho sakta tha, aur usko kya band karta hai.
+
+**Desi version:** courier office socho 📦. Counter wala clerk (**ingest journal**) har parcel van ko dene se **pehle** carbon-copy register mein likhta hai, aur entry tabhi band karta hai jab godown (**Kafka**) sign kar de. Godown har parcel **ek mahina** rakhta hai. Delivery boy (**consumer**) parcel kabhi nahi phenkta: dukaan band hai (PostgreSQL down) to bahar wait karta hai, address padhne layak hi nahi (toota record) to **problem-parcel room** (dead-letter queue) mein note ke saath rakh deta hai. Aur ek auditor (**data-safety report**) check karta rehta hai ki koi delivery boy itna peeche to nahi reh gaya ki godown ne uska parcel saaf kar diya.
+
+| Layer | Kya karta hai | Kahan |
+|---|---|---|
+| **31 din retention** | Har topic 31 din rakhta hai, sirf umar se delete (size se kabhi nahi). Purane 7 din wale topics start pe khud 31 din ho jaate hain | `KafkaTopicDeclarations.durable`, `gps.kafka.retention` |
+| **Broker settings** | Consumer bookmarks bhi 31 din, galat spelling wala topic khud nahi banta, peeche reh gaya replica leader nahi banta, single broker record disk pe likh ke hi "ok" bolta hai | `docker-compose.yml`, `setup-kafka.ps1` |
+| **Producers** | `acks=all` + idempotent + zstd | `application.yml` |
+| **Ingest journal** | Device frames aur vehicle events pehle disk pe (fsync), phir Kafka. Kafka "mil gaya" bole tabhi journal se hatte hain. Outage ya crash ke baad **usi order** mein dobara jaate hain | `journal/`, `gps.journal.*` |
+| **Dead-letter queue** | `gps.dead-letters`: listeners aur dono Kafka Streams apps (KIP-1034) toota record yahan park karte hain – original topic, partition, offset, group aur error headers mein | `KafkaRetrySettings`, `DeadLetterProcessingExceptionHandler` |
+| **Archive (hamesha ke liye)** | Dead letters PostgreSQL `dead_letter` mein, rejected frames `rejected_frame` mein – Kafka ke mahine ke baad bhi. Rows kabhi delete nahi hoti | `archive/`, `V6__…sql` |
+| **Data-safety report** | Har consumer group ka bookmark vs Kafka mein bacha data. Bookmark log start se peeche = data gaya → **FAIL**, `/actuator/health` DOWN | `safety/` |
+
+**Kuch toota to kya hota hai:**
+
+| Kya hua | Kya hota hai |
+|---|---|
+| Kafka down | Frames journal mein rukte hain, simulator/device ko wait nahi karna padta. Kafka wapas aaya → order mein chale jaate hain |
+| Service crash (kill -9) | Restart pe journal padha jaata hai, jo confirm nahi hua tha wo dobara jaata hai. Do baar pahuncha record duplicate store + `UNIQUE (imei, recorded_at)` sambhal leta hai |
+| PostgreSQL ya Redis down | Consumer wait karta hai (1s → 2s → … har 60s), **hamesha**. Record Kafka mein intezaar karta hai |
+| Record hi kharab | `gps.dead-letters` → `dead_letter` table. Wahan se replay, ya note ke saath discard |
+| Kafka Streams ko database fallback nahi mila | Park nahi hota – task fail, naya thread usi record ko dobara process karta hai (record theek tha, DB nahi tha) |
+
+**Dekho kahan:** console mein Storage → **Data safety** (har check, har group ka bookmark vs log start, disk pe kitna data) aur **Dead letters** (replay / discard). API section 16 mein.
+
+**Ek broker ya teen:** default `docker-compose.yml` mein 1 broker, har record ki 1 copy – crash, restart, power cut sab jhel leta hai, lekin disk hi khoyi to data gaya. Teen copies chahiye to:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d --build
+```
+
+3 brokers, har record 3 jagah, 2 pe likhne ke baad hi "ok". Ek broker mar jaye to bhi platform chalta rehta hai.
+
+**Dhyan rakho:**
+- Consumer 31 din se zyada band raha to Kafka purana data delete kar dega – report **FAIL** dikhayegi, chhupayegi nahi.
+- **Direct flow** mein ye kuch nahi hai (na Kafka, na journal, na DLQ) – wo sirf debugging ke liye hai.
+- Demo reset (`POST /api/admin/reset`) jaan-boojh ke sab khali karta hai, archive bhi.
 
 ---
 
@@ -285,12 +341,14 @@ Tables Flyway banata hai (`gps-application/src/main/resources/db/migration`), Hi
 | `gps_trip` | Ek trip: start/end time + jagah, distance, duration, max/avg speed, `status` OPEN/CLOSED. Unique `(imei, start_recorded_at)` |
 | `gps_stop` | Ek stop (gaadi khadi): start/end, jagah, duration. Unique `(imei, start_recorded_at)` |
 | `gps_trip_late_reading` | Jo reading late aayi aur trip service ne skip ki – ek baar note hoti hai (baad wale "repair job" ki list) |
+| `dead_letter` | Har dead letter, hamesha ke liye: payload, kahan se aaya, error, status PARKED / REPLAYED / DISCARDED (section 10a) |
+| `rejected_frame` | Har rejected frame original payload + reason ke saath (log rotate ho jaata hai, ye nahi) |
 
 **Kuch design decisions:**
 - **Period mein store, "current vehicle" nahi.** Late reading ko us gaadi se match karna hai jisme device **reading ke time** laga tha, aaj wali gaadi se nahi.
 - **Exclusion constraint** (`btree_gist` extension): `EXCLUDE USING gist (device_id WITH =, tstzrange(valid_from, valid_to) WITH &&)` – ek device ek time pe sirf ek gaadi mein. Database khud guarantee karta hai.
 - `gps_position` mein tenant/vehicle **readable code** hain, foreign key nahi – telemetry fast likhi jaati hai aur baad mein time-series store (ClickHouse) mein jayegi.
-- **Applied Flyway file kabhi edit mat karo** – checksum mismatch pe service start hi nahi hogi. Naya `V5__...sql` banao (V3, V4 trip service ke hain).
+- **Applied Flyway file kabhi edit mat karo** – checksum mismatch pe service start hi nahi hogi. Naya `V7__...sql` banao (abhi V6 tak bane hain).
 - Indexes: `(vehicle_registration_no, recorded_at DESC)` aur `stored_at DESC`.
 
 ---
@@ -352,6 +410,22 @@ RedisInsight mein `gps:` filter karo:
 Saari key names ek jagah: `RedisKeyNames.java`.
 
 **Redis kyun, sirf PostgreSQL kyun nahi?** "Truck X abhi kahan hai?" ke liye crore rows wali `gps_position` table ko baar baar query karna mehnga hai. Redis memory mein hai, har gaadi ki ek entry, millisecond se kam mein jawab. Docker mein Redis disk pe save nahi karta – live position agle reading se khud ban jaati hai.
+
+### 14a. Connections – is laptop ka Redis ya HP home server ka (UI: Developer → Connections)
+
+HP home server laptop ke hotspot **`SANJOY-HP 0161`** pe hamesha `192.168.137.1` hai. Wahan teen cheezein chalti hain:
+
+| HP pe | Address | Hamare system mein kya role |
+|---|---|---|
+| **Valhalla** (poore India ka map) | `http://192.168.137.1:8002` | Routing engine – route deviation isi ko call karega. Address UI se badlo, **Test with a route** Kolkata ka chhota route nikaal ke dikhata hai |
+| **Redis 7.4** | `192.168.137.1:6379` | Optional: consumers ki working memory (live position, state, speed rules) yahan bhi rakh sakte ho – **database 1** pe |
+| **Ingestion API** (FastAPI) | `http://192.168.137.1:8000` | HP ka apna darwaza devices ke liye: `POST /ingest` → HP ka Redis (`gps:points`, `last:*`). **Hamari Kafka pipeline ka hissa nahi** – sirf health dikhti hai, address yahan se nahi badalta |
+
+- **Redis switch bina restart:** *This laptop / HP home server / Custom* chuno → **Test** (ping, memory, eviction policy, us database mein kya hai) → **Use this Redis**. Speed rules (`gps:config:*`) saath copy hote hain; gaadi ki state agle readings se dobara banti hai. Choice PostgreSQL (`connection_setting`) mein save – agle start pe bhi wahi.
+- **Database 1 kyun?** HP ka ingestion API database 0 use karta hai. Database 0 mein uski keys (`gps:points`, `devices`) dikhi to switch **mana** ho jaata hai. Empty DB bhi ab sirf hamari telemetry keys (`gps:live:*`, `gps:state:*` …) mitata hai – kisi aur program ki key kabhi nahi.
+- **Dhyan rakho:** HP ka Redis 256 MB, aur bhar jaaye to keys khud delete karta hai (LRU) – page pe warning aati hai. Har call Wi-Fi ke paar jaati hai. HP so gaya to consumers ruk ke retry karte hain; Kafka mein data 31 din safe.
+- HP ka Redis use ho raha ho to is laptop ka Redis band kar sakte ho: `docker compose stop redis` (gps-service ab uske bina bhi start hota hai).
+- Defaults badalne hon to env: `VALHALLA_URL`, `HOME_SERVER_REDIS_URL`, `GPS_INGESTION_API_URL` (application.yml → `gps.connections`).
 
 ---
 
@@ -437,7 +511,122 @@ Settings: `gps.stream.*` (stoppage, ignition, vehicle-state, enrichment). Speed 
 
 **Vehicle inspector** (UI: Live → Vehicle inspector): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
 
-**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → 4 topics ke saare messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → saare platform topics ke messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis ki hamari telemetry keys (`gps:live:*`, `gps:state:*` …; config aur doosre programs ki keys chhod ke) delete → memory/counters zero → **Kafka Streams reset** (local state, consumer groups, changelog topics saaf, apps dobara start) → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+
+---
+
+## 15c. Kafka Streams – processing layer ka engine
+
+> Poori gehraai English mein: [docs/KAFKA_STREAMS_GUIDE.md](docs/KAFKA_STREAMS_GUIDE.md) – Kafka 4.3 ke [architecture guide](https://kafka.apache.org/43/streams/architecture/) ka har concept, is code mein kahan hai.
+
+**Desi version:** pehle helper (listener) "har truck ne pichhli baar kya bheja" apni **jeb ki diary** (memory) mein rakhta tha. Ghar gaya (restart) to diary gayi, phir munshi ke register (PostgreSQL) se poochta tha. Ab har counter (partition) ka apna **locker** (state store, RocksDB) hai, aur locker ka har page back-office ke **ledger** (changelog topic, Kafka) mein bhi copy hota hai. Helper badla to naya helper wahi locker kholta hai, ya ledger se dobara bana leta hai. Aur teen kaam – tray pe maal rakhna, locker mein likhna, order slip pe tick – **ek hi thappa** (transaction) hain: ya teeno, ya koi nahi.
+
+**Do apps, service ke andar hi (Kafka Streams library hai, cluster nahi):**
+
+```
+normalizer  (application.id = gps-raw-frame-processing-service, exactly-once)
+  gps.raw-device-frames ─► normalize-frame ─► split ─┬─► gps.processed-positions   (timestamp = recordedAt)
+                            previous-reading-store    └─► gps.rejected-frames
+                            seen-reading-store
+
+analytics   (application.id = gps-streams-analytics, at-least-once, read_committed)
+  gps.processed-positions ─► group by IMEI ─┬─► vehicle-table-store    (KTable: har gaadi ki latest state)
+     (event time = recordedAt)              └─► 5 min window + 2 min grace ─► gps.vehicle-activity (band hone pe ek record)
+```
+
+**Architecture guide ke concepts, yahan:**
+
+| Concept | Is project mein |
+|---|---|
+| Partition + key | 3 partitions, key = IMEI. Normalizer **check** karta hai: record key ≠ frame ka IMEI → reject (warna ek gaadi ki state do jagah bat jaati) |
+| Task | Har app ke 3 tasks: `0_0`, `0_1`, `0_2` – task `0_1` hamesha partition 1 ka maalik |
+| Threads | Har app 3 stream threads, ek task per thread. Doosra instance chalao → Kafka tasks baant deta hai |
+| State store + changelog | `previous-reading-store`, `seen-reading-store`, `vehicle-table-store`, `activity-window-store` – sab RocksDB mein, har ek ka compacted changelog topic |
+| Restoration / standby | Task naye instance pe gaya → changelog se state wapas. `standby-replicas: 1` (2+ instances pe) → garam copy ready |
+| Exactly-once | Output record + state update + input offset = ek transaction |
+| Event time + grace | Window device ke time (`recordedAt`) pe, 2 min late reading bhi apne window mein ginti |
+| Interactive Queries | `GET /api/streams/...` seedha RocksDB store padhta hai; doosre instance ke paas wali gaadi → wahan forward |
+
+**Teen naye rules jo listener mein nahi the:**
+- **Key contract** – frame ka record key uska IMEI hi hona chahiye.
+- **Duplicate store** – listener sirf "sabse nayi reading dobara aayi" pakadta tha. Device reconnect hoke **purani** readings dobara bheje, to listener unko late maan ke dobara le leta tha. Ab 24 ghante ki har reading yaad hai (window store) → `Duplicate reading`.
+- **Stale** – device ki sabse nayi reading se 24 ghante se purani reading → `Stale reading` (reject topic mein, payload ke saath – kuch gum nahi).
+
+**Kaun normalize karega – ek hi maalik (`gps.streams.normalization`):**
+
+| Mode | Raw → position kaun | Kafka Streams aur kya |
+|---|---|---|
+| `owner` (default) | Kafka Streams | analytics |
+| `shadow` | listener | wahi logic `gps.shadow.*` mein + **parity** (dono ka output reading-by-reading match) |
+| `off` | listener | sirf analytics |
+
+**Hand-over ka jugaad:** Kafka Streams ka `application.id` hi uska consumer group hai. Isliye owner normalizer listener ka hi group id use karta hai. Listener se Kafka Streams pe (ya wapas) switch karo, to kaam **committed offsets se hi aage** chalta hai – na replay, na gap. Dono band hote waqt group chhod dete hain, to naya maalik turant partitions le leta hai (45 sec ka intezaar nahi).
+
+**Shadow parity kaise:** dono outputs IMEI se keyed hain, partitions same hain, aur dono ka timestamp `recordedAt` hai. Isliye **0 ke join window** wala outer join ek hi reading ke dono results ko jod deta hai. Verdict: `MATCH`, `MISMATCH` (kaunsa field), `WARMUP` (shadow ki pehli reading), `ONLY_LISTENER` / `ONLY_STREAMS`.
+
+**Dekho kahan:**
+
+| Kya | Kahan |
+|---|---|
+| Apps, topology, threads → tasks → partitions, stores, restore, metrics | UI: Processing → **Kafka Streams** → Topology & tasks · `GET /api/streams/overview` |
+| Har gaadi ki KTable row | Vehicle table · `GET /api/streams/vehicles`, `/api/streams/vehicles/{imei}` |
+| Fleet per 5-min window | Activity windows · `GET /api/streams/fleet/activity?windows=24` |
+| Listener vs Kafka Streams | Shadow parity · `GET /api/streams/parity` |
+| Health | `/actuator/health` → `kafkaStreams` |
+
+**Settings (`gps.streams.*`):**
+
+| Setting | Default |
+|---|---|
+| `enabled` | `true` |
+| `normalization` | `owner` |
+| `threads` | `3` |
+| `standby-replicas` | `0` |
+| `replication-factor` | `-1` (broker default) |
+| `state-dir` | Docker: `/var/lib/gps-streams` (volume pe) |
+| `advertised-host` | `localhost` |
+| `max-lateness`, `seen-readings-retention` | `24h`, `24h` |
+| `window-size`, `window-grace`, `window-retention` | `5m`, `2m`, `6h` |
+| `parity-grace` | `2m` |
+| `rocksdb-off-heap-mb` | `64` |
+| `normalizer-guarantee`, `analytics-guarantee` | `exactly_once_v2`, `at_least_once` |
+| `properties.*` | jaise `client.rack` |
+
+Docker mein env se badlo, jaise `GPS_STREAMS_NORMALIZATION=shadow`.
+
+**Dhyan rakhne wali baat:** exactly-once wale topics (`gps.processed-positions`, `gps.rejected-frames`) mein har transaction ek **commit marker** likhta hai. Isliye "latest − earliest offset" messages se zyada dikhata hai. msg/s aur totals sahi hain, lag bhi sahi hai. Saare listeners `isolation-level: read_committed` pe padhte hain – aborted transaction ka record kabhi nahi dikhta.
+
+**Code kahan:**
+- `gps-streams/` (plain Java, Spring nahi):
+  - `normalize/` – NormalizationTopology, NormalizeFrameProcessor
+  - `analytics/` – AnalyticsTopology, VehicleSnapshot, ActivityWindow, ParityVerdict
+  - `runtime/` – StreamsApp, RestoreTracker, BoundedMemoryRocksDbConfig, StreamsIntrospection
+- Spring wiring + IQ API: `gps-application/.../kafkastreams/`
+- Tests: `.\mvnw.cmd -pl gps-streams test` – 23 tests, `TopologyTestDriver` pe, broker ke bina.
+
+---
+
+## 15d. Reports – din aur mahine ka hisaab (UI: Reports)
+
+Din ya mahine ke end pe har gaadi ka hisaab: kitna chali, kahan kitni der khadi rahi, engine kitni der idle chala,
+diesel ka kharcha, aur **kitna bach sakta tha**. Har number ke neeche **"How is this calculated?"** drop-down – formula
+usi number ki values ke saath.
+
+| Page | Kya milta hai |
+|---|---|
+| **Day report** | Har gaadi ka din (IST raat 12 se raat 12): distance, driving/standing time, stops, idling, max speed, over-speed, fuel, ₹ kharcha, ₹ bachat. Row pe click = poora breakdown. Print/PDF, CSV |
+| **Month report** | Wahi mahine bhar ka + fleet roz ka bar chart |
+| **Vehicle day sheet** | Ek gaadi ka din time order mein: har trip (km, speed) aur har stop (kitni der, kahan, engine on/off, idling) |
+| **Fuel & savings** | Business case: idling aur tez driving se kitna ₹ gaya, kaun sabse zyada, target slider – mahine/saal ki bachat, CO₂ |
+| **Cost assumptions** | Diesel/petrol, ₹ per litre, mileage, idle burn, economical speed, penalty % – badlo to har report turant naye daam se |
+| **Clear database** | Report print karke database khaali – reports ke numbers by default bach jaate hain |
+
+**Formula (ek line mein):** fuel = distance ÷ mileage + idling ghante × idle burn + (economical speed se upar ke km ÷
+mileage × penalty %); bachat = idling + tez-driving wala fuel × ₹ per litre. Defaults: ₹92/L, 4 km/L, 2.5 L/h, 60 km/h, 20 %.
+
+**150 gaadiyon pe bhi tez kyun:** reports kabhi positions scan nahi karte. `vehicle_day_summary` mein har gaadi ka
+har din ek row (150 gaadi = 150 row/din, ~4,650/mahina); job har 5 min aaj + kal ka summary banata hai (ek SQL, ek din
+ki positions, `recorded_at` index se). Poori detail: [docs/REPORTS_GUIDE.md](docs/REPORTS_GUIDE.md).
 
 ---
 
@@ -472,8 +661,17 @@ Load counters (`PipelineMetrics`, `StageCounters`) memory mein hain – har mess
 | `GET /api/speed/active` | Abhi limit ke upar wali gaadiyan (CANDIDATE / VIOLATING) |
 | `GET /api/vehicles/{imei}/state?history=50` | Tracking window: gaadi ka saara cache (Redis keys), history stream, events, processing memory, trip state |
 | `GET /api/vehicles/states` | Har gaadi ka vehicle-state hash |
+| `GET /api/streams/overview` | Kafka Streams: dono apps, topology, threads/tasks, stores, restore, metrics |
+| `GET /api/streams/vehicles` · `/api/streams/vehicles/{imei}` | Vehicle KTable (Interactive Queries), ek gaadi ka partition + windows |
+| `GET /api/streams/fleet/activity?windows=24` | Fleet per 5-minute event-time window |
+| `GET /api/streams/parity` | Shadow mode: listener vs Kafka Streams |
+| `GET /api/data-safety` | Data-safety report: retention, har group ka bookmark vs log start, journal, dead letters (section 10a) |
+| `GET /api/dead-letters?status=PARKED&topic=…` · `/api/dead-letters/summary` | Dead letters ki list aur ginti |
+| `POST /api/dead-letters/{id}/replay` · `POST /api/dead-letters/replay?topic=…` | Dead letter wapas uske original topic mein (ek, ya sabse purane parked) |
+| `POST /api/dead-letters/{id}/discard?note=…` | Replay nahi karna – note ke saath DISCARDED |
+| `GET /api/rejected-frames?imei=…` · `/api/rejected-frames/summary` | Rejected frames ka archive |
 | `POST /api/admin/reset?restartFleet=true` | **Empty DB** (demo practice) – neeche section 15b |
-| `GET /actuator/health` | DB + Redis UP/DOWN |
+| `GET /actuator/health` | DB + Redis + `kafkaStreams` + `dataSafety` UP/DOWN |
 
 Try karo – ek kharab frame:
 ```powershell
@@ -491,7 +689,7 @@ Operations ka web UI. Upar ek hi bar mein fixed sections (Live, Processing, Aler
 | **Live** | Fleet overview, Live map, Vehicle list, Vehicle inspector, Throughput, Event stream, Fleet simulator |
 | **Processing** | Pipeline overview (Kafka output → parallel processors → business logic → ingestion → stores), Consumer groups; processors: **Speed violation** (live episodes, entity rules in Redis, distance cross-check, events), **Vehicle state** (state store, historical context, key layout), **Stoppage & ignition** (live stoppages, ignition on rules, ignition off neutralised, traffic & weather agents), **Geofencing** (zone hierarchy, nested distance, entry & exit), **Waypoints** (routes, arrivals & ETA), **Cumulative distance** (Kalman vs raw, trip increments, filter tuning) |
 | **Alerts** | All alerts, Escalations; business logic: **Over-speed** (dual verification, device log audit, alert policy), **Trip detection** (trips, master table lookup, stops), **Route deviation** (corridors, deviation log) |
-| **Storage** | Ingestion overview, Schema validation, Rejected frames, PostgreSQL, ClickHouse, Workers & backpressure |
+| **Storage** | Ingestion overview, Schema validation, Rejected frames, PostgreSQL, ClickHouse, Workers & backpressure; no data loss: **Data safety**, **Dead letters** |
 | **Analytics** | Live telemetry, Latency, Violations & anomalies, Trip efficiency |
 | **Notifications** | Inbox, Channels, Routing rules, Delivery log, Quiet hours & digest |
 | **Developer** | Engine overview, producers & consumers, topics & storage, trips/stops/readings, API reference, demo tools, service settings, module registry |
@@ -533,6 +731,7 @@ Kuch toota → kis module mein dekhna hai, turant pata.
 | `gps-configuration` | Topic, group, flow, stage, Redis key ke naam; message formats (records); JSON. **Plain Java** | Do hisse ek naam ya JSON field pe agree nahi kar rahe |
 | `gps-connectivity` | Bahar ki duniya se har connection: smart_truck reader, Kafka publishers/listeners/retry/inspector, Redis stores, Hibernate entities + repositories, load counters | Kuch connect/read/write nahi ho raha |
 | `gps-processing` | Processing logic: `GpsFrameProcessor` + `step/` + `rule/`, aur trip detection `trip/`. **Plain Java, poora unit tested** | Frames reject ho rahe, distance/status galat, ya trip galat jagah shuru/band |
+| `gps-streams` | **Kafka Streams** topologies (normalizer, analytics) + runtime. Spring nahi, `TopologyTestDriver` se tested | Duplicate/stale/key wale rejections, KTable/windows galat, parity mismatch |
 | `gps-application` | Spring Boot service: dono flows, simulator, master data, storage, live location, trips, engine API + dashboard, Flyway migrations | Hisso ke beech ka flow galat hai |
 | `gps-route-service` | **Alag Spring Boot app** (port 8090): GraphHopper se India map pe route planning – Dijkstra, A\*, CH, alternatives. Aage: route deviation, recalculation, reassessment ([plan](docs/ROUTE_INTELLIGENCE_PLAN.md)) | Route/ETA galat, ya engine DOWN |
 
@@ -540,17 +739,18 @@ Kuch toota → kis module mein dekhna hai, turant pata.
 processing-layer/
 ├─ gps-configuration/   message/ (RawGpsFrame, ProcessedGpsPosition, RejectedGpsFrame, MovementStatus)
 │                       json/GpsMessageJson, KafkaTopicNames, KafkaConsumerGroupNames, PipelineStage, RedisKeyNames
-├─ gps-connectivity/    kafka/ (publishers, listeners, retry, topics, inspector)  redis/  database/  smarttruck/
+├─ gps-connectivity/    kafka/ (publishers, listeners, retry + dead letters, topics, inspector)  journal/  redis/  database/  smarttruck/
 │                       flow/ (@OnlyInKafkaFlow, @OnlyInDirectFlow)  monitoring/ (metrics, MDC log context)
 ├─ gps-processing/      GpsFrameProcessor, step/ (validate, movement, previous reading), rule/ (validation, movement, distance)
 │                       trip/ (TripMotionProcessor: trips aur stops, pure function)
+├─ gps-streams/         Kafka Streams: normalize/ (exactly-once normalizer), analytics/ (KTable, windows, parity), runtime/
 ├─ gps-application/     flow/ (kafka, direct)  simulator/  masterdata/  storage/  livelocation/  trip/  rejection/
-│                       processing/  engine/  api/  resources/ (application.yml, db/migration, static/index.html)
+│                       processing/  engine/  api/  archive/  safety/  resources/ (application.yml, db/migration, static/index.html)
 ├─ gps-route-service/   engine/ (GraphHopperClient, RoutingAlgorithm)  api/ (/api/routing/*)
 ├─ infrastructure/      windows/ (Kafka, PostgreSQL setup + start/stop)  docker/ (.env banane ki script)
 │                       routing/graphhopper/ (Dockerfile, config.yml, truck_india.json, start script)
-├─ docs/                LEARNING_GUIDE.md, ENGINE_AND_DOCKER_GUIDE.md (English, aur bhi gehraai)
-├─ Dockerfile, docker-compose.yml, .env.example, local-secrets.example.properties
+├─ docs/                LEARNING_GUIDE.md, ENGINE_AND_DOCKER_GUIDE.md, KAFKA_STREAMS_GUIDE.md, DATA_SAFETY_GUIDE.md, ROUTING_ENGINE_SETUP.md (English, aur bhi gehraai)
+├─ Dockerfile, docker-compose.yml (+ docker-compose.ha.yml: 3 brokers), .env.example, local-secrets.example.properties
 └─ pom.xml (parent), mvnw / mvnw.cmd
 ```
 
@@ -575,9 +775,8 @@ processing-layer/
 |---|---|---|
 | `postgres` | PostgreSQL 14, `gps_tracking` | `localhost:5433` |
 | `kafka` | Apache Kafka 4.3.1 (KRaft, ek node) | `localhost:29092` |
-| `kafka-ui` | Kafka UI | http://localhost:8085 |
 | `redis` | Redis Stack + RedisInsight | `localhost:6380`, http://localhost:8001 |
-| `gps-service` | Humari Spring Boot app | http://localhost:8080 |
+| `gps-service` | Humari Spring Boot app (+ dono Kafka Streams apps; state `gps-streams-state` volume mein) | http://localhost:8080 |
 
 Windows wale ports (5432, 9092, 6379) se alag rakhe hain taaki dono saath chal sakein. Containers ek dusre ko service naam se dhoondhte hain (`postgres`, `kafka`, `redis`). Health checks ki wajah se `gps-service` tabhi start hota hai jab postgres, redis, kafka healthy hon.
 
@@ -663,6 +862,8 @@ Tests: `.\mvnw.cmd test`
 | Simulator status "Failed: Send failed" | Kafka band hai – start karo |
 | Simulator "Failed: ... Access denied" Docker mein | Section 20, smart_truck wala part |
 | Position save hui par vehicle/tenant khali | Us device ka `device_assignment` reading ke time ko cover nahi karta |
+| `/actuator/health` → `dataSafety` DOWN | Storage → **Data safety**: kaunsa check FAIL hai (jaise kisi group ka data Kafka ne delete kar diya) |
+| Dead letters badh rahe hain | Storage → **Dead letters**: error padho, bug theek karo, phir replay |
 
 ---
 
@@ -674,13 +875,13 @@ Ye repo ab **starting point** hai. Agla kaam: Kafka ke baad processing layer ke 
 gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compacted backup)
                         → gps.enriched-positions → [ speed | stoppage | geofence | waypoint | trip distance | route deviation ]  (sab parallel)
                         → gps.vehicle-events + gps.alerts → schema validation gate → PostgreSQL (7 din) + ClickHouse (poori history)
-                                                                                   → gps.dead-letter (invalid)
+                                                                                   → gps.dead-letters (invalid) ✅ ban gaya, section 10a
 ```
 
 | Phase | Kya | Done kab |
 |---|---|---|
 | 0 | Current base live data ke saath perfect chale | 150 trucks end to end |
-| 1 | Module framework + State Keeper + enriched topic + Redis config ladder (default → tenant → vehicle) + dead-letter + **ignition aur odometer** frame mein | Dummy module 1 config line se jud jaye |
+| 1 | Module framework + State Keeper + enriched topic + Redis config ladder (default → tenant → vehicle) + dead-letter (✅ `gps.dead-letters`) + **ignition aur odometer** frame mein | Dummy module 1 config line se jud jaye |
 | 2 | Storage gate: schema validation + PostgreSQL (7 din) + **ClickHouse** | Pings dono DB mein |
 | 3 | **Speed violation** – 1 min lagatar > 60 km/h, device speed vs lat/lon se calculated speed cross-check, alert ek baar | 60 nahi, 1 alert |
 | 4 | **Stoppage** – ignition ON + < 2-3 km/h; ignition OFF → points neutralise (fake km nahi) | Khadi gaadi 0 km jode |
@@ -704,6 +905,13 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 9. **Device ek gaadi se doosri mein shift hua to purani readings?** `device_assignment` periods mein hai – reading ke time wali gaadi milti hai.
 10. **Trip ka distance kabhi negative kyun nahi hoga?** Distance in-order readings ke legs ka jod hai, "end odometer − start" nahi. Late reading skip hoti hai (sirf ginti), aur DB mein `CHECK (distance_m >= 0)`.
 11. **Trip service ko same reading do baar mili to?** State update `WHERE last_recorded_at < :recordedAt` – doosri baar 0 rows, transaction rollback. Trip `(imei, start_recorded_at)` pe upsert, to duplicate row ban hi nahi sakti.
+12. **Kafka Streams normalizer listener ka group id kyun use karta hai?** `application.id` = consumer group. Same id → switch karne pe committed offsets se aage, na replay na gap. Dono kabhi saath nahi chalte.
+13. **Exactly-once mein exactly kya ek saath hota hai?** Output record + dono stores ke changelog writes + input offset – ek transaction.
+14. **Fleet ke numbers ke liye ek "fleet" key kyun nahi?** Saari fleet ek partition, ek thread pe aa jaati. Har gaadi ke window ko query ke waqt jod lo – partitions ke saath scale hota hai.
+15. **4 instances, 3 partitions?** Ek khali baithega (hot spare; standby replicas ho to garam spare).
+16. **Kafka down hai aur device frame bhej raha hai – frame kahan jaata hai?** Ingest journal mein disk pe (fsync), phir Kafka wapas aane pe usi order mein. Kafka "mil gaya" bole tabhi journal se hatta hai.
+17. **Toota message skip kyun nahi karte?** Skip = data gum. `gps.dead-letters` mein park, PostgreSQL mein hamesha ke liye – bug theek karke replay.
+18. **Kaise pata chale ki data gum nahi hua?** Data-safety report: har group ka committed offset Kafka ke log start se aage hona chahiye. Peeche = Kafka ne bina padhe delete kiya → FAIL, health DOWN.
 
 ---
 
@@ -712,6 +920,8 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 > **3 trays, 3 producers, 5 kaam.**
 > Raw tray → 1 cleaner (jo agli do trays bhi bharta hai) → saaf tray ko 3 alag log padhte hain (DB, Redis, trip diary) → reject tray ko 1 logger.
 > **Key = IMEI = order. Alag group = poori copy. Same group = kaam ka batwara.**
+> **Kafka Streams: state locker mein, locker ki copy Kafka mein, teen kaam ek thappe mein. Ek waqt pe ek hi maalik – pehle shadow, phir owner.**
+> **Data safety: pehle disk (journal), phir Kafka (31 din). Rukna chalega, phenkna nahi – kharab maal dead-letter room mein.**
 
 Har application ko kaise start/stop/check karein aur uski main files kaunsi hain: [docs/APPLICATIONS_GUIDE.md](docs/APPLICATIONS_GUIDE.md).
 

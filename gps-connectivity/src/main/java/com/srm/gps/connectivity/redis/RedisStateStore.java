@@ -100,18 +100,20 @@ public class RedisStateStore {
         return type == null ? "none" : type.code();
     }
 
-    /** Deletes every gps:* key except configuration (gps:config:*). Returns how many were deleted. */
+    /**
+     * Deletes the platform's telemetry keys, never configuration (gps:config:*) nor other programs' keys in a shared
+     * Redis. Returns how many were deleted.
+     */
     public long deleteTelemetry() {
         List<String> batch = new ArrayList<>();
         long deleted = 0;
-        for (String key : scanKeys(RedisKeyNames.TELEMETRY_PATTERN)) {
-            if (key.startsWith(RedisKeyNames.CONFIG_PREFIX)) {
-                continue;
-            }
-            batch.add(key);
-            if (batch.size() >= DELETE_BATCH) {
-                deleted += unlink(batch);
-                batch.clear();
+        for (String pattern : RedisKeyNames.TELEMETRY_PATTERNS) {
+            for (String key : scanKeys(pattern)) {
+                batch.add(key);
+                if (batch.size() >= DELETE_BATCH) {
+                    deleted += unlink(batch);
+                    batch.clear();
+                }
             }
         }
         if (!batch.isEmpty()) {

@@ -1,0 +1,39 @@
+@keyframes leave {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+.page {
+  height: 100dvh;
+  min-height: 760px;
+  min-width: 1180px;
+  background: var(--page);
+  padding: 40px;
+}
+
+/* The rounded lilac frame (deep grey in the dark theme). */
+.frame {
+  display: flex;
+  height: 100%;
+  gap: 20px;
+  border-radius: var(--radius-frame);
+  background: var(--canvas);
+  padding: 20px;
+}
+
+.main {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.view {
+  height: 100%;
+}
+
+.leaving {
+  pointer-events: none;
+  animation: leave 180ms ease forwards;
+}

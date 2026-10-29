@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Sigma } from "lucide-react";
+import { Activity, Sigma } from "@/components/icons";
 import { Card, Empty, KeyValues, Stats, Tile } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader } from "@/components/ops/module";
 import { moduleById } from "@/lib/modules";

@@ -100,7 +100,6 @@ Container Apps. Docker is one tool that builds and runs OCI images, and it isn't
  redis   → localhost:6380 / :8001 ───────────▶ redis-stack     
                                                    ├──▶ kafka:9092      ──▶ volume gps-kafka-data
  tools   → localhost:29092 ──────────────────▶ kafka (EXTERNAL listener)
- browser → localhost:8085 ───────────────────▶ kafka-ui ──▶ kafka:9092
                                                    └──▶ host.docker.internal:3306 ──▶ MySQL smart_truck on Windows
 
  profile "routing" (off unless asked for):
@@ -295,7 +294,7 @@ container when it exits. The same pattern backs up Postgres.
 These are honest gaps in **our** setup, each with the exact change.
 
 1. **Memory and CPU limits.** *Memory limits now added to every service in `docker-compose.yml` (gps-service 2g,
-   Kafka 1.5g, Postgres and Redis 1g, kafka-ui and route-service 768m, dashboard 512m, GraphHopper 10g for the
+   Kafka 1.5g, Postgres and Redis 1g, route-service 768m, dashboard 512m, GraphHopper 10g for the
    import); they take effect the next time each container is recreated.* Before that, `mem=0` meant any container
    could take the whole 12 GB VM. The shape is:
    ```yaml
@@ -305,7 +304,7 @@ These are honest gaps in **our** setup, each with the exact change.
    ```
    For Java, also set `-XX:MaxRAMPercentage=75` so the JVM sizes its heap to the limit. This is the first thing the
    HP with 8 GB needs.
-2. **Health checks on gps-service, kafka-ui and route-service.** *gps-service now has one (below).* Before, it had none, so `docker ps` says
+2. **Health checks on gps-service and route-service.** *gps-service now has one (below).* Before, it had none, so `docker ps` says
    "Up" even when Spring is broken, and the dashboard can't wait for it to be *ready*. Spring Actuator already
    exists, and the Temurin JRE image already ships `curl`, so this is one block:
    `test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]`.
@@ -435,5 +434,5 @@ system df          disk use                          builder prune / image prune
 exit 137 = killed (OOM or stopped)                   exit 143 = SIGTERM (normal stop)
 ```
 
-Our ports: dashboard 3000, gps-service 8080, kafka-ui 8085, RedisInsight 8001, Postgres 5433, Redis 6380,
+Our ports: dashboard 3000, gps-service 8080, RedisInsight 8001, Postgres 5433, Redis 6380,
 Kafka 29092, GraphHopper 8989, route-service 8090.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Car, Search } from "lucide-react";
+import { Car, Search } from "@/components/icons";
 import { Card, Empty, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader } from "@/components/ops/module";
 import { formatAgo, formatDecimal, formatDistance, formatNumber } from "@/lib/format";

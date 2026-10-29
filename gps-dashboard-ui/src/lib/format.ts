@@ -84,3 +84,24 @@ export function humanize(value: string): string {
 export function vehicleName(registrationNo: string | null | undefined, imei: string): string {
   return registrationNo && registrationNo.length > 0 ? registrationNo : imei;
 }
+
+/** "512 B", "3.4 MB", "1.2 GB". */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "–";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return unit === 0 ? `${whole.format(value)} B` : `${oneDecimal.format(value)} ${units[unit]}`;
+}
+
+/** Milliseconds as whole days ("31 days"); -1 means kept forever. */
+export function formatRetention(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return "–";
+  if (ms < 0) return "forever";
+  const days = ms / 86_400_000;
+  return Number.isInteger(days) ? `${days} days` : `${oneDecimal.format(days)} days`;
+}

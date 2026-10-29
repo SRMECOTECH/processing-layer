@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useId } from "react";
+import a from "./art.module.css";
 
 /** useId() returns characters that break `url(#…)` references, so keep only safe ones. */
 function useSvgId(name: string) {
@@ -40,13 +40,7 @@ export function Flower({ className = "", spin = true }: { className?: string; sp
   const outer = Array.from({ length: 12 }, (_, k) => k * 30);
   const inner = Array.from({ length: 8 }, (_, k) => k * 45 + 18);
   return (
-    <motion.svg
-      viewBox="-125 -125 250 250"
-      className={className}
-      aria-hidden
-      animate={spin ? { rotate: 360 } : undefined}
-      transition={spin ? { duration: 90, ease: "linear", repeat: Infinity } : undefined}
-    >
+    <svg viewBox="-125 -125 250 250" className={`${spin ? a.spin : ""} ${className}`} aria-hidden>
       <defs>
         <linearGradient id={`${id}-p`} x1="0" y1="1" x2="0.3" y2="0">
           <stop offset="0" stopColor="#a993e6" />
@@ -83,7 +77,7 @@ export function Flower({ className = "", spin = true }: { className?: string; sp
         </g>
       ))}
       <circle r="13" fill={`url(#${id}-c)`} filter={`url(#${id}-s)`} />
-    </motion.svg>
+    </svg>
   );
 }
 
@@ -144,13 +138,8 @@ export function Blob({ tone = "violet", seed = 3, className = "" }: { tone?: Blo
   const id = useSvgId("blob");
   const c = BLOB_TONES[tone];
   return (
-    // The backdrop is CSS so it fills any box; the drawing keeps its proportions (wide tiles don't blow the blob up).
-    <svg
-      viewBox="0 0 200 130"
-      overflow="visible"
-      className={`bg-[linear-gradient(180deg,#f7f6f9,#e9e7ee)] ${className}`}
-      aria-hidden
-    >
+    // The backdrop is CSS (light or dark) so it fills any box; the drawing keeps its proportions (wide tiles don't blow the blob up).
+    <svg viewBox="0 0 200 130" overflow="visible" className={`${a.blob} ${className}`} aria-hidden>
       <defs>
         <radialGradient id={`${id}-g`} cx="0.36" cy="0.3" r="0.75">
           <stop offset="0" stopColor={c.light} />
@@ -173,7 +162,7 @@ export function Blob({ tone = "violet", seed = 3, className = "" }: { tone?: Blo
           <feGaussianBlur stdDeviation="4" />
         </filter>
       </defs>
-      <path d="M-200 100 C -120 80, -60 110, -10 96 C 40 76, 80 112, 130 92 S 190 70, 240 84 S 340 104, 400 90" fill="none" stroke="#fff" strokeWidth="9" opacity="0.7" />
+      <path d="M-200 100 C -120 80, -60 110, -10 96 C 40 76, 80 112, 130 92 S 190 70, 240 84 S 340 104, 400 90" fill="none" strokeWidth="9" opacity="0.7" style={{ stroke: "var(--blob-wave)" }} />
       <ellipse cx="100" cy="108" rx="46" ry="6" fill="#2a1a4a" opacity="0.18" filter={`url(#${id}-sh)`} />
       <ellipse cx="100" cy="62" rx="50" ry="37" fill={`url(#${id}-g)`} filter={`url(#${id}-f)`} />
     </svg>

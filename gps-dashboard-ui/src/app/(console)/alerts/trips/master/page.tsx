@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Building2, Cpu, Link2, Search, Truck } from "lucide-react";
+import { ArrowRight, Building2, Cpu, Link2, Search, Truck } from "@/components/icons";
 import { Card, Empty, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { formatAgo } from "@/lib/format";

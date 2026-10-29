@@ -1,13 +1,13 @@
 "use client";
 
-import { Database, MapPin, Route, Table2, Truck, Users } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Database, MapPin, Route, Table2, Truck, Users } from "@/components/icons";
+import type { IconComponent } from "@/components/icons";
 import { Card, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatNumber, formatRate } from "@/lib/format";
 import { useOverview } from "@/lib/overview-context";
 import { STAGE, consumer, isKafkaFlow, storage } from "@/lib/pipeline";
 
-const TABLES: [LucideIcon, string, string][] = [
+const TABLES: [IconComponent, string, string][] = [
   [MapPin, "gps_position", "Every stored reading · UNIQUE (imei, recorded_at)"],
   [Route, "gps_trip", "Trips from trip detection · OPEN / CLOSED"],
   [MapPin, "gps_stop", "Stops between trips"],

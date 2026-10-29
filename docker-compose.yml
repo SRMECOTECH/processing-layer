@@ -1,11 +1,13 @@
 # The whole GPS platform in containers.
 #
 #   postgres     PostgreSQL 14         gps_tracking database              Windows: localhost:5433
-#   kafka        Apache Kafka (KRaft)  the 3 topics                       Windows: localhost:29092
-#   kafka-ui     Kafka UI              browse topics, messages, groups     http://localhost:8085
+#   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
+#                (optional: Developer -> Connections can switch the service to the HP home server's Redis)
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
+#                + Kafka Streams       normalizer + analytics apps         state in the gps-streams-state volume
+#                + ingest journal      frames/events kept until Kafka has  the gps-ingest-journal volume
 #   dashboard    our Next.js web UI    PulseStream dashboard               http://localhost:3000
 #
 #   Profile "routing" (only with --profile routing, or COMPOSE_PROFILES=routing in .env):
@@ -16,6 +18,8 @@
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
+#   Shadow run:   $env:GPS_STREAMS_NORMALIZATION = 'shadow'; docker compose up -d gps-service   (listener + parity)
+#   3 brokers:    docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d    (3 copies, fresh volumes)
 #   Direct flow:  docker compose up -d postgres redis
 #                 $env:GPS_PROCESSING_FLOW = 'direct'; docker compose up -d --no-deps --build gps-service
 #   Logs:         docker compose logs -f gps-service
@@ -80,12 +84,25 @@ services:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      # A single broker can only keep one copy of everything.
+      # A single broker can only keep one copy of everything (docker-compose.ha.yml runs three, with 3 copies).
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_RETENTION_HOURS: 168
+      # No data loss (docs/DATA_SAFETY_GUIDE.md):
+      #   one month of data: 744 h = 31 days for any topic without its own setting (the platform's topics set it too)
+      #   a consumer group stopped for up to a month keeps its place (committed offsets kept as long as the data)
+      #   only declared topics: a misspelled topic name fails instead of silently creating a topic nobody reads
+      #   a replica that missed records never becomes leader
+      #   one copy only, so it is on disk before the broker says "ok" (a power cut loses nothing acknowledged)
+      KAFKA_LOG_RETENTION_HOURS: 744
+      KAFKA_LOG_RETENTION_BYTES: -1
+      KAFKA_OFFSETS_RETENTION_MINUTES: 44640
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"
+      KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: ${KAFKA_LOG_FLUSH_INTERVAL_MESSAGES:-1}
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     ports:
       - "29092:29092"
@@ -96,24 +113,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 20
-
-  kafka-ui:
-    image: kafbat/kafka-ui:v1.3.0
-    restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-    environment:
-      KAFKA_CLUSTERS_0_NAME: gps-local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
-    ports:
-      - "8085:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-        required: false
 
   redis:
     image: redis/redis-stack:7.4.0-v8
@@ -149,20 +148,35 @@ services:
           memory: 2g
     environment:
       GPS_PROCESSING_FLOW: ${GPS_PROCESSING_FLOW:-kafka}
+      # Kafka Streams: owner (it normalizes) | shadow (the listener does, Kafka Streams is compared) | off
+      GPS_STREAMS_ENABLED: ${GPS_STREAMS_ENABLED:-true}
+      GPS_STREAMS_NORMALIZATION: ${GPS_STREAMS_NORMALIZATION:-owner}
+      GPS_STREAMS_STATEDIR: /var/lib/gps-streams
+      GPS_STREAMS_ADVERTISEDHOST: gps-service
+      # every frame and event is fsynced here before it is sent to Kafka, until Kafka confirms it
+      GPS_JOURNAL_DIRECTORY: /var/lib/gps-journal
       GPS_SIMULATOR_STARTWHENAPPLICATIONSTARTS: ${GPS_SIMULATOR_AUTOSTART:-true}
       GPS_SIMULATOR_VEHICLECOUNT: ${GPS_SIMULATOR_VEHICLE_COUNT:-150}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
       SPRING_DATASOURCE_USERNAME: gps_app
       SPRING_DATASOURCE_PASSWORD: ${GPS_DATABASE_PASSWORD}
+      # This laptop's Redis is the default; Developer -> Connections can move the service to the HP's Redis while it
+      # runs (saved in PostgreSQL, kept across restarts). The HP home server is 192.168.137.1 on its hotspot.
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      HOME_SERVER_REDIS_URL: ${HOME_SERVER_REDIS_URL:-redis://192.168.137.1:6379/1}
+      VALHALLA_URL: ${VALHALLA_URL:-http://192.168.137.1:8002}
+      GPS_INGESTION_API_URL: ${GPS_INGESTION_API_URL:-http://192.168.137.1:8000}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SMARTTRUCK_DATABASE_URL: jdbc:mysql://host.docker.internal:3306/smart_truck
       SMARTTRUCK_DATABASE_USERNAME: ${SMART_TRUCK_DATABASE_USERNAME}
       SMARTTRUCK_DATABASE_PASSWORD: ${SMART_TRUCK_DATABASE_PASSWORD}
     ports:
       - "8080:8080"
+    volumes:
+      - gps-streams-state:/var/lib/gps-streams
+      - gps-ingest-journal:/var/lib/gps-journal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -177,6 +191,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+        required: false              # optional once the service uses the HP's Redis: docker compose stop redis
       kafka:
         condition: service_healthy
         required: false              # the direct flow runs without Kafka
@@ -192,11 +207,15 @@ services:
     environment:
       # The dashboard's server calls the service inside the compose network; the browser only talks to the dashboard.
       GPS_API_URL: http://gps-service:8080
+      # Sign-in account for the console (abc / abc until set in .env) and the key that signs its session cookie.
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-abc}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-abc}
+      AUTH_SECRET: ${DASHBOARD_AUTH_SECRET:-}
     ports:
       - "3000:3000"
     healthcheck:
-      # The page itself, not the service behind it: the console stays up (showing "offline") while gps-service restarts.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/live"]
+      # The sign-in page: public, and served by the dashboard alone, so it stays healthy while gps-service restarts.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -258,3 +277,5 @@ volumes:
   gps-kafka-data:
   gps-redisinsight-data:
   gps-routing-data:
+  gps-streams-state:
+  gps-ingest-journal:

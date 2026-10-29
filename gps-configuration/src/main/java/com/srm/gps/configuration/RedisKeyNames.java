@@ -1,5 +1,7 @@
 package com.srm.gps.configuration;
 
+import java.util.List;
+
 /**
  * The single list of Redis keys. Open RedisInsight (http://localhost:8001) and look for "gps:".
  *
@@ -18,6 +20,9 @@ package com.srm.gps.configuration;
  *   gps:config:speed-rule:{scope}    hash    speed rule; scope = default | tenant:{code} | vehicle:{registration}
  *   gps:config:speed-rules           set     every scope that has a rule
  *   gps:context:weather:{cell}       string  cached weather around a 0.1 degree cell (expires)
+ *
+ * The Redis can be shared (the HP home server's, Developer -> Connections), so nothing here matches other programs'
+ * keys there: the HP ingestion API writes gps:points, last:*, track:* and devices.
  */
 public final class RedisKeyNames {
 
@@ -25,9 +30,13 @@ public final class RedisKeyNames {
     public static final String SPEED_RULE_SCOPES = "gps:config:speed-rules";
     public static final String DEFAULT_SPEED_RULE_SCOPE = "default";
 
-    /** Everything telemetry-related; the demo reset deletes these (configuration is kept). */
-    public static final String TELEMETRY_PATTERN = "gps:*";
-    public static final String CONFIG_PREFIX = "gps:config:";
+    /**
+     * Everything telemetry-related the platform writes; the demo reset deletes these. Configuration (gps:config:*) is
+     * kept, and so is any key another program keeps in the same Redis (the HP ingestion API's gps:points).
+     */
+    public static final List<String> TELEMETRY_PATTERNS =
+            List.of("gps:live:*", "gps:engine:*", "gps:state:*", "gps:history:*", "gps:events:*", "gps:context:*");
+    public static final String CONFIG_PATTERN = "gps:config:*";
 
     private static final String LIVE_VEHICLE_PREFIX = "gps:live:vehicle:";
     private static final String ENGINE_STAGE_PREFIX = "gps:engine:stage:";

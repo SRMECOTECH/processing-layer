@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Grid3x3, Layers } from "lucide-react";
+import { ChevronRight, Grid3x3, Layers } from "@/components/icons";
 import { Card, DemoButton, Tag } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader, PlannedNote, SettingsCard } from "@/components/ops/module";
 import { ZONE_TREE, type Zone } from "@/lib/examples";

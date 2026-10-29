@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { Bell, Mail, MessageSquare, Smartphone, Webhook, Hash } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
+import { Bell, Mail, MessageSquare, Smartphone, Webhook, Hash } from "@/components/icons";
 import { Callout, DemoButton, PageHeader, Switch, Tag } from "@/components/ops/kit";
 
-type Channel = { id: string; name: string; icon: LucideIcon; target: string; note: string; built: boolean };
+type Channel = { id: string; name: string; icon: IconComponent; target: string; note: string; built: boolean };
 
 const CHANNELS: Channel[] = [
   { id: "inapp", name: "In-app", icon: Bell, target: "This console: bell and inbox", note: "Platform problems and high/critical vehicle alerts", built: true },

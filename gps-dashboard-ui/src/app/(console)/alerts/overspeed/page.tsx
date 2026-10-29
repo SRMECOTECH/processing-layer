@@ -1,6 +1,6 @@
 "use client";
 
-import { GitCompareArrows, ListChecks, ShieldCheck } from "lucide-react";
+import { GitCompareArrows, ListChecks, ShieldCheck } from "@/components/icons";
 import { CompareChart } from "@/components/ops/charts";
 import { EventTable } from "@/components/ops/events";
 import { Card, Stats, Tag, Tile } from "@/components/ops/kit";

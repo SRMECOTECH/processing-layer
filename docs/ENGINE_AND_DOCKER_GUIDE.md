@@ -21,13 +21,12 @@ Docker gives every dish its own **tiffin box**:
 - **Port mapping** = a window from the kitchen to the street: `"5433:5432"` means "Windows `localhost:5433` → container port 5432".
 - **docker-compose.yml** = the tiffin order list: which boxes, in which order, with which labels.
 
-### 1.2 Our six containers
+### 1.2 Our containers
 
 | Service | Image | Inside the network | From Windows | Job |
 |---|---|---|---|---|
 | `postgres` | `postgres:14.22` | `postgres:5432` | `localhost:5433` | `gps_tracking` database |
 | `kafka` | `apache/kafka:4.3.1` | `kafka:9092` | `localhost:29092` | the 3 topics |
-| `kafka-ui` | `kafbat/kafka-ui:v1.3.0` | `kafka-ui:8080` | http://localhost:8085 | look inside Kafka |
 | `redis` | `redis/redis-stack:7.4.0-v8` | `redis:6379` | `localhost:6380`, http://localhost:8001 | live positions + RedisInsight |
 | `gps-service` | built from our `Dockerfile` | `gps-service:8080` | http://localhost:8080 | the Spring Boot engine |
 | (smart_truck) | not a container | `host.docker.internal:3306` | `localhost:3306` | stays your Windows MySQL, read-only |
@@ -174,7 +173,12 @@ WARN [stage=rejected-frame-logger imei=0861000000000003 p=0 o=0] ... Frame rejec
 | Engine load every 30 s | `... \| Select-String "ENGINE"` |
 | Per-message detail | start with `LOGGING_LEVEL_COM_SRM_GPS=DEBUG` |
 
-With partition and offset you can open **exactly that message** in Kafka UI: Topics → topic → Messages → partition 0, offset N.
+With partition and offset you can read **exactly that message** with Kafka's console consumer:
+
+```powershell
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 `
+  --topic gps.raw-device-frames --partition 0 --offset N --max-messages 1 --property print.key=true
+```
 
 **[Teacher's note]** Lines from start-up and background jobs show `stage=none`. That's correct: they don't belong to any one message.
 

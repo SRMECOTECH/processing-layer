@@ -1,67 +1,57 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { FileText, Film, Folder, Image as ImageIcon, Presentation, Search, Upload } from "lucide-react";
 import { useState } from "react";
-import { Avatar, BlurIn, Card, CardTitle, CountUp, EASE, PillButton, RevealText, useDelay } from "../kit";
+import { FileText, Film, Folder, Image as ImageIcon, Presentation, Search, Upload } from "@/components/icons";
+import { Avatar, BlurIn, Card, CardTitle, CountUp, PageTop, PillButton, after, cx, kit, useDelay } from "../kit";
+import s from "./cloud.module.css";
 
 // Arc lengths are a share of the ring (drawn for legibility), the legend carries the sizes.
 const STORAGE = [
-  { label: "Videos", gb: 6.2, arc: 0.2, stroke: "#111014", dot: "bg-ink" },
-  { label: "Images", gb: 2.1, arc: 0.06, stroke: "#cbbfea", dot: "bg-lav" },
-  { label: "Documents", gb: 1.2, arc: 0.045, stroke: "#f5ceec", dot: "bg-pink" },
-  { label: "Other", gb: 0.6, arc: 0.03, stroke: "#bfbcc0", dot: "bg-[#bfbcc0]" },
+  { label: "Videos", gb: 6.2, arc: 0.2, stroke: "var(--ink)", dot: kit.fillInk },
+  { label: "Images", gb: 2.1, arc: 0.06, stroke: "var(--lav)", dot: kit.fillLav },
+  { label: "Documents", gb: 1.2, arc: 0.045, stroke: "var(--pink)", dot: kit.fillPink },
+  { label: "Other", gb: 0.6, arc: 0.03, stroke: "var(--grey)", dot: kit.fillGrey },
 ];
 
 const FOLDERS = [
-  { name: "Surgery footage", files: 128, size: "24.1 GB", tint: "bg-lav-soft text-lav-deep" },
-  { name: "Lecture slides", files: 64, size: "2.6 GB", tint: "bg-pink-soft text-[#a0428c]" },
-  { name: "Brand assets", files: 118, size: "9.1 GB", tint: "bg-mint text-[#2f7a4c]" },
-  { name: "Team recordings", files: 46, size: "6.8 GB", tint: "bg-sky text-[#3d5bb0]" },
+  { name: "Surgery footage", files: 128, size: "24.1 GB", tint: kit.tintLav },
+  { name: "Lecture slides", files: 64, size: "2.6 GB", tint: kit.tintPink },
+  { name: "Brand assets", files: 118, size: "9.1 GB", tint: kit.tintMint },
+  { name: "Team recordings", files: 46, size: "6.8 GB", tint: kit.tintSky },
 ];
 
 const FILES = [
-  { name: "brain-aneurysm-clipping.mp4", icon: Film, tint: "bg-lav-soft text-lav-deep", size: "1.2 GB", modified: "May 17, 2023", shared: [47, 12, 33] },
-  { name: "q2-design-review.pdf", icon: FileText, tint: "bg-pink-soft text-[#a0428c]", size: "4.8 MB", modified: "May 16, 2023", shared: [44, 32] },
-  { name: "lecture-03-neuroanatomy.key", icon: Presentation, tint: "bg-sky text-[#3d5bb0]", size: "86 MB", modified: "May 15, 2023", shared: [12, 59, 47, 33] },
-  { name: "brand-guidelines-v4.png", icon: ImageIcon, tint: "bg-mint text-[#2f7a4c]", size: "32 MB", modified: "May 12, 2023", shared: [32] },
-  { name: "team-sync-may-10.mp4", icon: Film, tint: "bg-lav-soft text-lav-deep", size: "640 MB", modified: "May 10, 2023", shared: [44, 12, 33] },
-  { name: "onboarding-checklist.pdf", icon: FileText, tint: "bg-pink-soft text-[#a0428c]", size: "220 KB", modified: "May 8, 2023", shared: [59, 47] },
+  { name: "brain-aneurysm-clipping.mp4", icon: Film, tint: kit.tintLav, size: "1.2 GB", modified: "May 17, 2023", shared: ["Sophia Brown", "Alex Johnson", "Daniel Turner"] },
+  { name: "q2-design-review.pdf", icon: FileText, tint: kit.tintPink, size: "4.8 MB", modified: "May 16, 2023", shared: ["Jennifer Campbell", "Sarah Thompson"] },
+  { name: "lecture-03-neuroanatomy.key", icon: Presentation, tint: kit.tintSky, size: "86 MB", modified: "May 15, 2023", shared: ["Alex Johnson", "Michael Reed", "Sophia Brown", "Daniel Turner"] },
+  { name: "brand-guidelines-v4.png", icon: ImageIcon, tint: kit.tintMint, size: "32 MB", modified: "May 12, 2023", shared: ["Sarah Thompson"] },
+  { name: "team-sync-may-10.mp4", icon: Film, tint: kit.tintLav, size: "640 MB", modified: "May 10, 2023", shared: ["Jennifer Campbell", "Alex Johnson", "Daniel Turner"] },
+  { name: "onboarding-checklist.pdf", icon: FileText, tint: kit.tintPink, size: "220 KB", modified: "May 8, 2023", shared: ["Michael Reed", "Sophia Brown"] },
 ];
 
 export function CloudPage() {
   return (
-    <div className="no-scrollbar h-full overflow-y-auto">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <h1 className="text-[30px] leading-tight">
-            <RevealText text="Cloud storage" />
-          </h1>
-          <BlurIn i={1} className="mt-1 text-[13px] text-muted">
-            Everything your team has uploaded, organised and backed up.
-          </BlurIn>
-        </div>
-        <BlurIn i={1} className="pt-2">
-          <PillButton icon={Upload}>Upload file</PillButton>
-        </BlurIn>
-      </div>
+    <div className={kit.scroll}>
+      <PageTop title="Cloud storage" lead="Everything your team has uploaded, organised and backed up.">
+        <PillButton icon={Upload}>Upload file</PillButton>
+      </PageTop>
 
-      <div className="mt-6 grid grid-cols-[45fr_55fr] gap-5">
+      <div className={s.split}>
         <StorageCard />
         <div>
-          <BlurIn i={3} className="flex items-baseline justify-between px-1">
+          <BlurIn i={3} className={s.foldersHead}>
             <CardTitle>Folders</CardTitle>
-            <span className="text-[11px] text-muted">4 folders</span>
+            <span className={s.count}>4 folders</span>
           </BlurIn>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className={s.folders}>
             {FOLDERS.map((f, n) => (
-              <Card key={f.name} i={4 + n} className="flex items-center gap-3 !rounded-tile !p-4">
-                <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${f.tint}`}>
+              <Card key={f.name} i={4 + n} tile className={s.folderCard}>
+                <span className={cx(s.folderIcon, f.tint)}>
                   <Folder size={17} strokeWidth={1.7} />
                 </span>
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium">{f.name}</div>
-                  <div className="mt-0.5 text-[11px] text-muted">
+                <div className={s.folderText}>
+                  <div className={s.folderName}>{f.name}</div>
+                  <div className={s.folderMeta}>
                     {f.files} files · {f.size}
                   </div>
                 </div>
@@ -83,48 +73,46 @@ function StorageCard() {
   const gap = 0.035; // between segments, as a share of the ring (round caps eat into it)
   let start = 0;
   return (
-    <Card i={2} className="flex flex-col">
+    <Card i={2} className={s.storage}>
       <CardTitle>Storage</CardTitle>
-      <div className="mt-3 flex flex-1 items-center gap-8">
-        <div className="relative size-[150px] shrink-0">
-          <svg viewBox="0 0 130 130" className="size-full -rotate-90">
-            <circle cx="65" cy="65" r={r} fill="none" stroke="#f1eff3" strokeWidth="13" />
-            {STORAGE.map((s, n) => {
+      <div className={s.storageBody}>
+        <div className={s.ring}>
+          <svg viewBox="0 0 130 130" className={s.ringSvg}>
+            <circle cx="65" cy="65" r={r} fill="none" strokeWidth="13" style={{ stroke: "var(--track)" }} />
+            {STORAGE.map((seg, n) => {
               const offset = start;
-              start += s.arc + gap;
-              const length = s.arc * circumference;
+              start += seg.arc + gap;
+              const length = seg.arc * circumference;
               return (
-                <motion.circle
-                  key={s.label}
+                <circle
+                  key={seg.label}
                   cx="65"
                   cy="65"
                   r={r}
                   fill="none"
-                  stroke={s.stroke}
                   strokeWidth="13"
                   strokeLinecap="round"
                   strokeDasharray={`${length} ${circumference}`}
                   transform={`rotate(${offset * 360} 65 65)`}
-                  initial={{ strokeDashoffset: length }}
-                  animate={{ strokeDashoffset: 0 }}
-                  transition={{ duration: 0.9, delay: delay + n * 0.08, ease: EASE }}
+                  className={s.segment}
+                  style={after(delay + n * 0.08, { stroke: seg.stroke, "--length": length } as React.CSSProperties)}
                 />
               );
             })}
           </svg>
-          <div className="absolute inset-0 grid place-content-center text-center">
-            <div className="text-[28px] leading-none font-medium tracking-[-0.02em]">
+          <div className={s.ringCenter}>
+            <div className={s.ringValue}>
               <CountUp value={10.1} i={2} format={(n) => n.toFixed(1)} />
             </div>
-            <div className="mt-1 text-[10px] text-muted">of 100 GB used</div>
+            <div className={s.ringLabel}>of 100 GB used</div>
           </div>
         </div>
-        <ul className="flex flex-1 flex-col gap-3">
-          {STORAGE.map((s) => (
-            <li key={s.label} className="flex items-center gap-2 text-[12px]">
-              <span className={`size-2 rounded-full ${s.dot}`} />
-              <span className="flex-1 text-text-2">{s.label}</span>
-              <span className="font-medium">{s.gb} GB</span>
+        <ul className={s.legend}>
+          {STORAGE.map((seg) => (
+            <li key={seg.label} className={s.legendRow}>
+              <span className={cx(s.legendDot, seg.dot)} />
+              <span className={s.legendLabel}>{seg.label}</span>
+              <span className={s.legendValue}>{seg.gb} GB</span>
             </li>
           ))}
         </ul>
@@ -137,20 +125,15 @@ function RecentFiles() {
   const [query, setQuery] = useState("");
   const files = FILES.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
-    <Card i={8} className="mt-5">
-      <div className="flex items-center justify-between gap-4">
+    <Card i={8} className={s.recent}>
+      <div className={s.recentHead}>
         <CardTitle>Recent files</CardTitle>
-        <label className="flex h-9 w-[240px] items-center gap-2 rounded-full bg-track px-3.5 text-muted focus-within:ring-2 focus-within:ring-lav">
+        <label className={s.search}>
           <Search size={14} strokeWidth={1.8} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search files"
-            className="w-full bg-transparent text-[12px] text-text outline-none placeholder:text-muted"
-          />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files" className={s.searchInput} />
         </label>
       </div>
-      <div className="mt-3 grid grid-cols-[minmax(0,3fr)_1fr_1.3fr_1.2fr] gap-x-4 border-b border-track pb-2 text-[11px] text-muted">
+      <div className={cx(s.columns, s.columnHead)}>
         <span>Name</span>
         <span>Size</span>
         <span>Modified</span>
@@ -158,23 +141,23 @@ function RecentFiles() {
       </div>
       <ul>
         {files.map((f) => (
-          <li key={f.name} className="grid grid-cols-[minmax(0,3fr)_1fr_1.3fr_1.2fr] items-center gap-x-4 border-b border-track py-2.5 text-[12px] last:border-0">
-            <span className="flex min-w-0 items-center gap-3">
-              <span className={`grid size-8 shrink-0 place-items-center rounded-[10px] ${f.tint}`}>
+          <li key={f.name} className={cx(s.columns, s.file)}>
+            <span className={s.fileName}>
+              <span className={cx(s.fileIcon, f.tint)}>
                 <f.icon size={14} strokeWidth={1.7} />
               </span>
-              <span className="truncate font-medium">{f.name}</span>
+              <span className={s.fileText}>{f.name}</span>
             </span>
-            <span className="text-text-2">{f.size}</span>
-            <span className="text-text-2">{f.modified}</span>
-            <span className="flex -space-x-2">
-              {f.shared.map((img) => (
-                <Avatar key={img} img={img} size={24} ring />
+            <span className={s.dim}>{f.size}</span>
+            <span className={s.dim}>{f.modified}</span>
+            <span className={s.shared}>
+              {f.shared.map((name) => (
+                <Avatar key={name} name={name} size={24} ring />
               ))}
             </span>
           </li>
         ))}
-        {!files.length && <li className="py-6 text-center text-[12px] text-muted">No files match “{query}”.</li>}
+        {!files.length && <li className={s.empty}>No files match “{query}”.</li>}
       </ul>
     </Card>
   );

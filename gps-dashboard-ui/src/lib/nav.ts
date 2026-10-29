@@ -1,10 +1,13 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
 import {
   Activity,
+  Archive,
   Bell,
   BellRing,
   Boxes,
   Braces,
+  CalendarClock,
+  CalendarDays,
   Car,
   ChartLine,
   Cpu,
@@ -12,12 +15,15 @@ import {
   Database,
   DatabaseZap,
   FileCheck,
+  FileText,
   FileX,
   Gauge,
   GitCompareArrows,
   Grid3x3,
   History,
   Inbox,
+  Layers,
+  Link2,
   ListChecks,
   Map,
   MapPinned,
@@ -30,7 +36,9 @@ import {
   ScanLine,
   Send,
   Server,
+  Settings2,
   ShieldCheck,
+  Sigma,
   Siren,
   SlidersHorizontal,
   Table2,
@@ -40,15 +48,15 @@ import {
   Truck,
   Waypoints,
   Workflow,
-} from "lucide-react";
+} from "@/components/icons";
 
 /** Where a page's numbers come from, shown as a small mark in the menu. */
 export type Feed = "live" | "partial" | "planned";
 
 export type NavLeaf = { href: string; label: string; feed?: Feed };
-export type NavItem = { href: string; label: string; icon: LucideIcon; feed?: Feed; children?: NavLeaf[] };
+export type NavItem = { href: string; label: string; icon: IconComponent; feed?: Feed; children?: NavLeaf[] };
 export type NavGroup = { title: string; items: NavItem[] };
-export type Section = { href: string; label: string; icon: LucideIcon; description: string; groups: NavGroup[] };
+export type Section = { href: string; label: string; icon: IconComponent; description: string; groups: NavGroup[] };
 
 /**
  * The whole navigation. Sections are the fixed top bar; each section has its own left menu of groups,
@@ -96,6 +104,18 @@ export const SECTIONS: Section[] = [
         items: [
           { href: "/processing", label: "Pipeline overview", icon: Workflow, feed: "live" },
           { href: "/processing/consumers", label: "Consumer groups", icon: Network, feed: "live" },
+          {
+            href: "/processing/streams",
+            label: "Kafka Streams",
+            icon: Layers,
+            feed: "live",
+            children: [
+              { href: "/processing/streams", label: "Topology & tasks", feed: "live" },
+              { href: "/processing/streams/table", label: "Vehicle table", feed: "live" },
+              { href: "/processing/streams/windows", label: "Activity windows", feed: "live" },
+              { href: "/processing/streams/parity", label: "Shadow parity", feed: "live" },
+            ],
+          },
         ],
       },
       {
@@ -225,10 +245,37 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    href: "/reports",
+    label: "Reports",
+    icon: FileText,
+    description: "End-of-day and end-of-month reports for every vehicle: stops, idling, distance, fuel and money.",
+    groups: [
+      {
+        title: "Reports",
+        items: [
+          { href: "/reports", label: "Day report", icon: CalendarClock, feed: "live" },
+          { href: "/reports/month", label: "Month report", icon: CalendarDays, feed: "live" },
+          { href: "/reports/vehicle", label: "Vehicle day sheet", icon: Truck, feed: "live" },
+        ],
+      },
+      {
+        title: "Business value",
+        items: [{ href: "/reports/savings", label: "Fuel & savings", icon: Sigma, feed: "live" }],
+      },
+      {
+        title: "Setup",
+        items: [
+          { href: "/reports/assumptions", label: "Cost assumptions", icon: Settings2, feed: "live" },
+          { href: "/reports/clear", label: "Clear database", icon: DatabaseZap, feed: "live" },
+        ],
+      },
+    ],
+  },
+  {
     href: "/storage",
     label: "Storage",
     icon: Database,
-    description: "Ingestion control: schema validation, then PostgreSQL and ClickHouse.",
+    description: "Ingestion control, no data loss, then PostgreSQL and ClickHouse.",
     groups: [
       {
         title: "Ingestion control",
@@ -236,6 +283,13 @@ export const SECTIONS: Section[] = [
           { href: "/storage", label: "Ingestion overview", icon: Workflow, feed: "live" },
           { href: "/storage/schema", label: "Schema validation", icon: FileCheck, feed: "live" },
           { href: "/storage/rejected", label: "Rejected frames", icon: FileX, feed: "live" },
+        ],
+      },
+      {
+        title: "No data loss",
+        items: [
+          { href: "/storage/safety", label: "Data safety", icon: ShieldCheck, feed: "live" },
+          { href: "/storage/dead-letters", label: "Dead letters", icon: Archive, feed: "live" },
         ],
       },
       {
@@ -322,6 +376,7 @@ export const SECTIONS: Section[] = [
         title: "Tools",
         items: [
           { href: "/developer/demo", label: "Demo tools (Empty DB)", icon: DatabaseZap },
+          { href: "/developer/connections", label: "Connections", icon: Link2 },
           { href: "/developer/settings", label: "Service settings", icon: SlidersHorizontal },
           { href: "/developer/modules", label: "Module registry", icon: Boxes },
         ],
@@ -354,7 +409,7 @@ export function trailFor(pathname: string): Trail {
   return { section };
 }
 
-export type PageEntry = { href: string; label: string; section: string; parent?: string; icon: LucideIcon; feed?: Feed };
+export type PageEntry = { href: string; label: string; section: string; parent?: string; icon: IconComponent; feed?: Feed };
 
 /** Every page once, for search. A sub-page carries the name of the item it belongs to. */
 export function allPages(): PageEntry[] {

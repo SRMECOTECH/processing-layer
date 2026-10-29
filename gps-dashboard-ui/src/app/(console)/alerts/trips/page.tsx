@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Route } from "lucide-react";
+import { Route } from "@/components/icons";
 import { Card, Empty, Segmented, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { moduleById } from "@/lib/modules";

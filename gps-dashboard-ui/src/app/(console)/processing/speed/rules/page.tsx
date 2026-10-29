@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Building2, Globe, Truck } from "lucide-react";
+import { ArrowRight, Building2, Globe, Truck } from "@/components/icons";
 import { Card } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";
 import { RuleEditor, scopeKind } from "@/components/ops/speed-rules";

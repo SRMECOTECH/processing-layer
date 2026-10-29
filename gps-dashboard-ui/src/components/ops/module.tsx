@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ListOrdered, Radio, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, ListOrdered, Radio, SlidersHorizontal } from "@/components/icons";
 import type { ReactNode } from "react";
 import { formatNumber, formatRate } from "@/lib/format";
 import { EVENTS_TOPIC, OUTPUT_TOPIC, PROCESSORS, BUSINESS_RULES, SINKS, type PipelineModule } from "@/lib/modules";

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartLine, Layers } from "lucide-react";
+import { ChartLine, Layers } from "@/components/icons";
 import { AreaChart } from "@/components/ops/charts";
 import { Card, Empty, PageHeader, Stats, Tag, Tile } from "@/components/ops/kit";
 import { formatAgo, formatNumber, formatRate } from "@/lib/format";

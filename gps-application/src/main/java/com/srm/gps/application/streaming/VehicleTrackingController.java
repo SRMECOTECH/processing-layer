@@ -1,9 +1,11 @@
 package com.srm.gps.application.streaming;
 
+import com.srm.gps.application.kafkastreams.KafkaStreamsQueryService;
 import com.srm.gps.application.processing.DatabaseBackedPreviousReadingStore;
 import com.srm.gps.configuration.RedisKeyNames;
 import com.srm.gps.configuration.json.GpsMessageJson;
 import com.srm.gps.connectivity.redis.RedisStateStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Everything the platform remembers about one vehicle, for the vehicle tracking window.
@@ -23,7 +26,8 @@ import java.util.Map;
  *     cache        every Redis key of the vehicle, with its type and contents (hashes as field/value)
  *     history      the newest readings from the Redis stream gps:history:{imei}
  *     events       the vehicle's latest events from Redis gps:events:{imei}
- *     processing   the previous reading the processing step holds in memory (distance is measured from it)
+ *     processing   the previous reading the normalizer measures the next one from: the Kafka Streams state store
+ *                  when Kafka Streams owns normalization, otherwise the listener's memory
  *     tripMotion   the trip detector's state row (PostgreSQL vehicle_motion_state)
  */
 @RestController
@@ -32,12 +36,14 @@ public class VehicleTrackingController {
     private final RedisStateStore redis;
     private final DatabaseBackedPreviousReadingStore previousReadings;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ObjectProvider<KafkaStreamsQueryService> kafkaStreams;
 
     public VehicleTrackingController(RedisStateStore redis, DatabaseBackedPreviousReadingStore previousReadings,
-                                     NamedParameterJdbcTemplate jdbc) {
+                                     NamedParameterJdbcTemplate jdbc, ObjectProvider<KafkaStreamsQueryService> kafkaStreams) {
         this.redis = redis;
         this.previousReadings = previousReadings;
         this.jdbc = jdbc;
+        this.kafkaStreams = kafkaStreams;
     }
 
     public record CacheEntry(String key, String type, String purpose, Object value) {
@@ -66,7 +72,9 @@ public class VehicleTrackingController {
             events.add(GpsMessageJson.fromJson(json, LinkedHashMap.class));
         }
         answer.put("events", events);
-        answer.put("processing", previousReadings.findInMemory(imei).orElse(null));
+        KafkaStreamsQueryService streams = kafkaStreams.getIfAvailable();
+        answer.put("processing", Optional.ofNullable(streams).flatMap(s -> s.previousReading(imei))
+                .or(() -> previousReadings.findInMemory(imei)).orElse(null));
         answer.put("tripMotion", tripMotion(imei));
         return answer;
     }

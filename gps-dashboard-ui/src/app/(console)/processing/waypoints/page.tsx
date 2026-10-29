@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Route } from "lucide-react";
+import { MapPin, Route } from "@/components/icons";
 import { Card, DemoButton, Tag } from "@/components/ops/kit";
 import { HowItWorks, ModuleHeader, PlannedNote, SettingsCard } from "@/components/ops/module";
 import { ROUTE_PLANS } from "@/lib/examples";

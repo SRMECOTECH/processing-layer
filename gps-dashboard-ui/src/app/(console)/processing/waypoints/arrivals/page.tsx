@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock } from "@/components/icons";
 import { Card, Stats, Tag, Tile } from "@/components/ops/kit";
 import { ModuleHeader, PlannedNote } from "@/components/ops/module";
 import { ARRIVALS } from "@/lib/examples";

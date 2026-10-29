@@ -1,6 +1,6 @@
 "use client";
 
-import { DatabaseZap, Play } from "lucide-react";
+import { DatabaseZap, Play } from "@/components/icons";
 import { Card, KeyValues, PageTitle, Tag } from "@/components/ops/kit";
 import { EmptyDbButton } from "@/components/ops/empty-db";
 import { FleetButton } from "@/components/simulator-control";

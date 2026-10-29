@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BellRing, Siren, Webhook } from "lucide-react";
+import { BellRing, Siren, Webhook } from "@/components/icons";
 import { EventTable } from "@/components/ops/events";
 import { Card, DemoButton, Empty, PageHeader, Tag } from "@/components/ops/kit";
 import { alertsFrom } from "@/lib/alerts";

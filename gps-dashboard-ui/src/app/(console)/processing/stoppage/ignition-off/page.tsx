@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ParkingSquare } from "lucide-react";
+import { ParkingSquare } from "@/components/icons";
 import { EventTable } from "@/components/ops/events";
 import { Callout, Card, Segmented, Stats, Tile } from "@/components/ops/kit";
 import { ModuleHeader } from "@/components/ops/module";

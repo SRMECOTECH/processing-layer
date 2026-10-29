@@ -60,7 +60,6 @@
     <span class="chip muted" id="updated">…</span>
   </div>
   <div class="row">
-    <a id="kafkaUi" href="#" target="_blank" rel="noopener">Kafka UI</a>
     <a id="redisInsight" href="#" target="_blank" rel="noopener">RedisInsight</a>
     <a href="/actuator/health" target="_blank" rel="noopener">Health</a>
   </div>
@@ -113,7 +112,6 @@
 
 <script>
 const host = window.location.hostname;
-document.getElementById('kafkaUi').href = `http://${host}:8085`;
 document.getElementById('redisInsight').href = `http://${host}:8001`;
 
 const SHORT = {
