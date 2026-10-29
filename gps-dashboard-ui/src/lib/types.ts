@@ -1,6 +1,165 @@
 // JSON shapes returned by gps-streaming-service. They mirror the Java records:
-//   EngineViews, KafkaTopologyInspector, SimulationStatus, GpsPositionView, TripView, StopView, KafkaStreamsViews.
+//   EngineViews, KafkaTopologyInspector, SimulationStatus, GpsPositionView, TripView, StopView, KafkaStreamsViews,
+//   ConnectionViews.
 // Times are ISO-8601 strings (java.time.Instant).
+
+// ---- Developer -> Connections (/api/connections) ----
+
+export type RedisCheck = {
+  url: string;
+  reachable: boolean;
+  millis: number | null;
+  version: string | null;
+  usedMemoryBytes: number | null;
+  maxMemoryBytes: number | null;
+  evictionPolicy: string | null;
+  keys: number | null;
+  hasPlatformConfiguration: boolean;
+  otherProgramsKeys: string[];
+  warnings: string[];
+  problem: string | null;
+};
+export type RedisChoice = "local" | "home-server" | "custom";
+export type RedisView = {
+  url: string;
+  choice: RedisChoice;
+  saved: boolean;
+  since: string;
+  localUrl: string;
+  homeServerUrl: string;
+  status: RedisCheck;
+};
+export type ValhallaCheck = {
+  url: string;
+  reachable: boolean;
+  millis: number | null;
+  version: string | null;
+  tilesBuilt: string | null;
+  actions: string[];
+  sampleRouteKm: number | null;
+  sampleRouteMinutes: number | null;
+  sampleRouteMillis: number | null;
+  problem: string | null;
+};
+export type ValhallaView = { url: string; defaultUrl: string; saved: boolean; savedAt: string | null; status: ValhallaCheck };
+export type IngestionApiCheck = {
+  url: string;
+  reachable: boolean;
+  millis: number | null;
+  health: Record<string, unknown>;
+  problem: string | null;
+};
+export type ConnectionsOverview = {
+  redis: RedisView;
+  valhalla: ValhallaView;
+  ingestionApi: { url: string; status: IngestionApiCheck };
+  checkedAt: string;
+};
+export type RedisSwitch = { from: string; to: string; configurationKeysCopied: number; notes: string[]; redis: RedisView };
+
+// ---- Reports (/api/reports): ReportViews, FuelAssumptions, FuelEstimate ----
+
+export type FuelAssumptions = {
+  fuelType: "diesel" | "petrol";
+  pricePerLitre: number;
+  mileageKmPerLitre: number;
+  idleLitresPerHour: number;
+  economicalSpeedKmph: number;
+  fastDrivingPenaltyPercent: number;
+  co2KgPerLitre: number;
+};
+export type FuelEstimate = {
+  drivingLitres: number;
+  idleLitres: number;
+  fastLitres: number;
+  usedLitres: number;
+  savableLitres: number;
+  cost: number;
+  savableCost: number;
+  co2Kg: number;
+  savableCo2Kg: number;
+};
+/** One vehicle over the period, or the fleet (imei null). Distances in km, times in seconds. */
+export type ReportRow = {
+  imei: string | null;
+  registration: string | null;
+  tenant: string | null;
+  vehicles: number;
+  days: number;
+  readings: number;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  distanceKm: number;
+  movingSeconds: number;
+  stoppedSeconds: number;
+  idleSeconds: number;
+  stops: number;
+  stopSeconds: number;
+  engineOnStops: number;
+  trips: number;
+  maxSpeedKmph: number;
+  avgMovingSpeedKmph: number;
+  fastKm: number;
+  economicalSpeedKmph: number;
+  overspeedEvents: number;
+  harshEvents: number;
+  utilisationPercent: number;
+  fuel: FuelEstimate;
+};
+export type ReportDayRow = {
+  day: string;
+  vehicles: number;
+  distanceKm: number;
+  movingSeconds: number;
+  idleSeconds: number;
+  stops: number;
+  trips: number;
+  overspeedEvents: number;
+  fuel: FuelEstimate;
+};
+export type FleetReport = {
+  kind: "day" | "month";
+  from: string;
+  to: string;
+  zone: string;
+  tenant: string | null;
+  imei: string | null;
+  assumptions: FuelAssumptions;
+  summarizedAt: string | null;
+  totals: ReportRow;
+  vehicles: ReportRow[];
+  days: ReportDayRow[];
+};
+export type TimelineEntry = {
+  kind: "TRIP" | "STOP";
+  start: string;
+  end: string;
+  seconds: number;
+  distanceKm: number | null;
+  maxSpeedKmph: number | null;
+  avgSpeedKmph: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  engine: "ON" | "OFF" | "UNKNOWN" | null;
+  idleSeconds: number;
+  status: string;
+};
+export type ReportEvent = { type: string; severity: string; status: string; startedAt: string; endedAt: string | null; seconds: number | null };
+export type VehicleDaySheet = {
+  day: string;
+  zone: string;
+  imei: string;
+  summary: ReportRow | null;
+  timeline: TimelineEntry[];
+  events: ReportEvent[];
+  assumptions: FuelAssumptions;
+};
+export type ReportFilters = {
+  zone: string;
+  today: string;
+  tenants: { code: string; name: string }[];
+  vehicles: { imei: string; registration: string | null; tenant: string | null }[];
+};
 
 export type SimulationStatus = {
   processingFlow: string;
@@ -232,6 +391,7 @@ export type ResetReport = {
   kafkaRecordsDeleted: Record<string, number>;
   tablesEmptied: string[];
   redisKeysDeleted: number;
+  reportsKept: boolean;
   notes: string[];
 };
 

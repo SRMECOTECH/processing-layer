@@ -11,13 +11,13 @@ import { post } from "@/lib/use-poll";
 /**
  * "Empty DB" for demo practice: asks first, then calls POST /api/admin/reset and shows what was cleared.
  */
-export function EmptyDbButton({ compact }: { compact?: boolean }) {
+export function EmptyDbButton({ label = "Empty DB" }: { label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button type="button" className="btn danger-soft" onClick={() => setOpen(true)}>
         <DatabaseZap size={15} />
-        {compact ? "Empty DB" : "Empty DB"}
+        {label}
       </button>
       {/* At the document root: a card that lifts on hover would otherwise become the dialog's frame. */}
       {open && createPortal(<EmptyDbDialog onClose={() => setOpen(false)} />, document.body)}
@@ -28,6 +28,7 @@ export function EmptyDbButton({ compact }: { compact?: boolean }) {
 function EmptyDbDialog({ onClose }: { onClose: () => void }) {
   const { refresh } = useOverview();
   const [restart, setRestart] = useState(true);
+  const [keepReports, setKeepReports] = useState(true);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<ResetReport>();
   const [problem, setProblem] = useState<string>();
@@ -44,7 +45,7 @@ function EmptyDbDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setProblem(undefined);
     try {
-      const result = await post<ResetReport>(`/api/admin/reset?restartFleet=${restart}`);
+      const result = await post<ResetReport>(`/api/admin/reset?restartFleet=${restart}&keepReports=${keepReports}`);
       setReport(result);
       refresh();
     } catch (error) {
@@ -80,9 +81,13 @@ function EmptyDbDialog({ onClose }: { onClose: () => void }) {
               <li>Deletes the live positions, vehicle states, history and engine counters in Redis</li>
             </ul>
             <p className="faint" style={{ fontSize: 12.5, margin: "12px 0 16px" }}>
-              Kept: vehicles, devices, companies and their assignments, and your speed rules.
+              Kept: vehicles, devices, companies and their assignments, your speed rules and the report cost assumptions.
             </p>
             <label className="check">
+              <input type="checkbox" checked={keepReports} onChange={(e) => setKeepReports(e.target.checked)} />
+              Keep the day and month reports (their numbers are saved first)
+            </label>
+            <label className="check" style={{ marginTop: 10 }}>
               <input type="checkbox" checked={restart} onChange={(e) => setRestart(e.target.checked)} />
               Start the fleet again afterwards
             </label>
@@ -114,6 +119,10 @@ function EmptyDbDialog({ onClose }: { onClose: () => void }) {
               <div className="kv-row">
                 <dt>Consumers moved to the end</dt>
                 <dd className="mono">{report.listenersSkippedToEnd}</dd>
+              </div>
+              <div className="kv-row">
+                <dt>Reports</dt>
+                <dd>{report.reportsKept ? "kept (numbers saved before emptying)" : "emptied too"}</dd>
               </div>
               <div className="kv-row">
                 <dt>Fleet</dt>

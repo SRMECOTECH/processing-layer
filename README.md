@@ -27,8 +27,10 @@ Ye README maine apni bhasha mein likha hai – desi Hinglish – taaki koi bhi (
 12. [Master data: IMEI → gaadi → company](#12-master-data-imei--gaadi--company)
 13. [Simulator – nakli trucks jo asli jaise chalte hain](#13-simulator--nakli-trucks-jo-asli-jaise-chalte-hain)
 14. [Redis – live board](#14-redis--live-board)
+    - [14a. Connections – is laptop ka Redis ya HP home server ka](#14a-connections--is-laptop-ka-redis-ya-hp-home-server-ka-ui-developer--connections)
 15. [Trips aur stops – gps-trip-service](#15-trips-aur-stops--gps-trip-service)
     - [15c. Kafka Streams – processing layer ka engine](#15c-kafka-streams--processing-layer-ka-engine)
+    - [15d. Reports – din aur mahine ka hisaab](#15d-reports--din-aur-mahine-ka-hisaab-ui-reports)
 16. [Engine dashboard aur REST APIs](#16-engine-dashboard-aur-rest-apis)
 17. [Classified logs – har line bataye kaun, kis truck ka, kahan se](#17-classified-logs--har-line-bataye-kaun-kis-truck-ka-kahan-se)
 18. [Maven modules – har module ka ek hi kaam](#18-maven-modules--har-module-ka-ek-hi-kaam)
@@ -407,6 +409,22 @@ Saari key names ek jagah: `RedisKeyNames.java`.
 
 **Redis kyun, sirf PostgreSQL kyun nahi?** "Truck X abhi kahan hai?" ke liye crore rows wali `gps_position` table ko baar baar query karna mehnga hai. Redis memory mein hai, har gaadi ki ek entry, millisecond se kam mein jawab. Docker mein Redis disk pe save nahi karta – live position agle reading se khud ban jaati hai.
 
+### 14a. Connections – is laptop ka Redis ya HP home server ka (UI: Developer → Connections)
+
+HP home server laptop ke hotspot **`SANJOY-HP 0161`** pe hamesha `192.168.137.1` hai. Wahan teen cheezein chalti hain:
+
+| HP pe | Address | Hamare system mein kya role |
+|---|---|---|
+| **Valhalla** (poore India ka map) | `http://192.168.137.1:8002` | Routing engine – route deviation isi ko call karega. Address UI se badlo, **Test with a route** Kolkata ka chhota route nikaal ke dikhata hai |
+| **Redis 7.4** | `192.168.137.1:6379` | Optional: consumers ki working memory (live position, state, speed rules) yahan bhi rakh sakte ho – **database 1** pe |
+| **Ingestion API** (FastAPI) | `http://192.168.137.1:8000` | HP ka apna darwaza devices ke liye: `POST /ingest` → HP ka Redis (`gps:points`, `last:*`). **Hamari Kafka pipeline ka hissa nahi** – sirf health dikhti hai, address yahan se nahi badalta |
+
+- **Redis switch bina restart:** *This laptop / HP home server / Custom* chuno → **Test** (ping, memory, eviction policy, us database mein kya hai) → **Use this Redis**. Speed rules (`gps:config:*`) saath copy hote hain; gaadi ki state agle readings se dobara banti hai. Choice PostgreSQL (`connection_setting`) mein save – agle start pe bhi wahi.
+- **Database 1 kyun?** HP ka ingestion API database 0 use karta hai. Database 0 mein uski keys (`gps:points`, `devices`) dikhi to switch **mana** ho jaata hai. Empty DB bhi ab sirf hamari telemetry keys (`gps:live:*`, `gps:state:*` …) mitata hai – kisi aur program ki key kabhi nahi.
+- **Dhyan rakho:** HP ka Redis 256 MB, aur bhar jaaye to keys khud delete karta hai (LRU) – page pe warning aati hai. Har call Wi-Fi ke paar jaati hai. HP so gaya to consumers ruk ke retry karte hain; Kafka mein data 31 din safe.
+- HP ka Redis use ho raha ho to is laptop ka Redis band kar sakte ho: `docker compose stop redis` (gps-service ab uske bina bhi start hota hai).
+- Defaults badalne hon to env: `VALHALLA_URL`, `HOME_SERVER_REDIS_URL`, `GPS_INGESTION_API_URL` (application.yml → `gps.connections`).
+
 ---
 
 ## 15. Trips aur stops – gps-trip-service
@@ -491,7 +509,7 @@ Settings: `gps.stream.*` (stoppage, ignition, vehicle-state, enrichment). Speed 
 
 **Vehicle inspector** (UI: Live → Vehicle inspector): gaadi chuno → har Redis key (live, state, speed, ignition, stoppage) field-by-field, history stream (speed chart + table), events, processing ki memory, trip detector ki state.
 
-**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → saare platform topics ke messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis `gps:*` (config chhod ke) delete → memory/counters zero → **Kafka Streams reset** (local state, consumer groups, changelog topics saaf, apps dobara start) → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
+**Empty DB** (UI: Developer → Demo tools; API `POST /api/admin/reset`): fleet roko → saare consumers pause + topic ke end pe seek → saare platform topics ke messages delete → telemetry tables TRUNCATE (master data aur speed rules bachte hain) → Redis ki hamari telemetry keys (`gps:live:*`, `gps:state:*` …; config aur doosre programs ki keys chhod ke) delete → memory/counters zero → **Kafka Streams reset** (local state, consumer groups, changelog topics saaf, apps dobara start) → consumers resume → fleet dobara (2 ghante ka catch-up). ~6 sec. Production mein band: `gps.admin.reset-enabled=false`.
 
 ---
 
@@ -583,6 +601,30 @@ Docker mein env se badlo, jaise `GPS_STREAMS_NORMALIZATION=shadow`.
   - `runtime/` – StreamsApp, RestoreTracker, BoundedMemoryRocksDbConfig, StreamsIntrospection
 - Spring wiring + IQ API: `gps-application/.../kafkastreams/`
 - Tests: `.\mvnw.cmd -pl gps-streams test` – 23 tests, `TopologyTestDriver` pe, broker ke bina.
+
+---
+
+## 15d. Reports – din aur mahine ka hisaab (UI: Reports)
+
+Din ya mahine ke end pe har gaadi ka hisaab: kitna chali, kahan kitni der khadi rahi, engine kitni der idle chala,
+diesel ka kharcha, aur **kitna bach sakta tha**. Har number ke neeche **"How is this calculated?"** drop-down – formula
+usi number ki values ke saath.
+
+| Page | Kya milta hai |
+|---|---|
+| **Day report** | Har gaadi ka din (IST raat 12 se raat 12): distance, driving/standing time, stops, idling, max speed, over-speed, fuel, ₹ kharcha, ₹ bachat. Row pe click = poora breakdown. Print/PDF, CSV |
+| **Month report** | Wahi mahine bhar ka + fleet roz ka bar chart |
+| **Vehicle day sheet** | Ek gaadi ka din time order mein: har trip (km, speed) aur har stop (kitni der, kahan, engine on/off, idling) |
+| **Fuel & savings** | Business case: idling aur tez driving se kitna ₹ gaya, kaun sabse zyada, target slider – mahine/saal ki bachat, CO₂ |
+| **Cost assumptions** | Diesel/petrol, ₹ per litre, mileage, idle burn, economical speed, penalty % – badlo to har report turant naye daam se |
+| **Clear database** | Report print karke database khaali – reports ke numbers by default bach jaate hain |
+
+**Formula (ek line mein):** fuel = distance ÷ mileage + idling ghante × idle burn + (economical speed se upar ke km ÷
+mileage × penalty %); bachat = idling + tez-driving wala fuel × ₹ per litre. Defaults: ₹92/L, 4 km/L, 2.5 L/h, 60 km/h, 20 %.
+
+**150 gaadiyon pe bhi tez kyun:** reports kabhi positions scan nahi karte. `vehicle_day_summary` mein har gaadi ka
+har din ek row (150 gaadi = 150 row/din, ~4,650/mahina); job har 5 min aaj + kal ka summary banata hai (ek SQL, ek din
+ki positions, `recorded_at` index se). Poori detail: [docs/REPORTS_GUIDE.md](docs/REPORTS_GUIDE.md).
 
 ---
 

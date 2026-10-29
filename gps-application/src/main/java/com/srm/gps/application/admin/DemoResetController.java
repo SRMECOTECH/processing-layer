@@ -25,10 +25,11 @@ public class DemoResetController {
     }
 
     @PostMapping("/api/admin/reset")
-    public ResponseEntity<?> reset(@RequestParam(defaultValue = "false") boolean restartFleet) {
+    public ResponseEntity<?> reset(@RequestParam(defaultValue = "false") boolean restartFleet,
+                                   @RequestParam(defaultValue = "true") boolean keepReports) {
         if (!enabled) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "The demo reset is switched off (gps.admin.reset-enabled=false)"));
         }
-        return ResponseEntity.ok(resetService.reset(restartFleet));
+        return ResponseEntity.ok(resetService.reset(restartFleet, keepReports));
     }
 }

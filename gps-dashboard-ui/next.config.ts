@@ -27,7 +27,9 @@ const MOVED: [string, string][] = [
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  // No framework branding anywhere: no "X-Powered-By" header, and no dev-mode indicator bubble in the corner.
   poweredByHeader: false,
+  devIndicators: false,
   async redirects() {
     return MOVED.map(([source, destination]) => ({ source, destination, permanent: false }));
   },

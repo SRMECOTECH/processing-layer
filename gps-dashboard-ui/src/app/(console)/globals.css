@@ -1,5 +1,5 @@
-/* PulseStream console, in the Workspace Studio look: a rounded lilac frame on white, a black capsule rail of
-   sections, a white menu card per section, borderless white cards, small refined type, black pill buttons and
+/* PulseStream console, in the Workspace Studio look: a rounded lilac frame on white, a black capsule of sections
+   in the top bar, a white menu card of the section's pages on the left, borderless white cards, small refined type, black pill buttons and
    pastel accents. Theme, accent, canvas and density are set on <html> (data-theme / data-accent / data-bg /
    data-density) from the appearance menu. */
 
@@ -264,6 +264,7 @@ kbd {
 /* =================================================================== top bar */
 
 .topbar {
+  grid-area: top;
   position: relative;
   z-index: 40;
   display: grid;
@@ -271,7 +272,6 @@ kbd {
   align-items: center;
   gap: 16px;
   min-height: var(--topbar-h);
-  margin-bottom: var(--gap);
   animation: blur-in 500ms var(--ease-out) backwards;
   animation-delay: 400ms;
 }
@@ -290,9 +290,8 @@ kbd {
   border-radius: 10px;
 }
 
-/* The rail carries the mark on wide screens; the bar shows it only when the rail is hidden. */
 .brand-mark {
-  display: none;
+  display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
@@ -336,14 +335,13 @@ kbd {
 }
 
 .search-button {
-  justify-self: center;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  width: 100%;
-  max-width: 460px;
+  width: 38px;
   height: 38px;
-  padding: 0 8px 0 15px;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: var(--surface);
@@ -357,9 +355,9 @@ kbd {
   box-shadow: 0 0 0 3px var(--focus);
 }
 
-.search-button-text {
-  flex: 1;
-  text-align: left;
+.search-button-text,
+.search-button kbd {
+  display: none;
 }
 
 .live-pill {
@@ -818,14 +816,17 @@ kbd {
 
 /* =================================================================== layout + left menu */
 
-/* The frame: rail | menu | page, inset from the white viewport. */
+/* The frame: the top bar across, then menu | page, inset from the white viewport. */
 
 .frame {
   position: fixed;
   inset: var(--frame-inset);
   display: grid;
-  grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr);
-  grid-template-areas: "rail menu main";
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "top top"
+    "menu main";
   gap: var(--gap);
   padding: var(--frame-pad);
   border-radius: 32px;
@@ -846,92 +847,76 @@ kbd {
   padding-top: 2px;
 }
 
-/* rail of sections */
+/* sections, in the top bar: a black capsule, the current one under a sliding lavender pill */
 
-.rail {
-  grid-area: rail;
+.sections {
+  justify-self: center;
   position: relative;
-  z-index: 5;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 22px 0 18px;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px;
+  overflow-x: auto;
   border-radius: 999px;
   background: var(--rail);
-  transform-origin: top;
-  animation: rail-grow 500ms var(--ease-out) backwards;
+  scrollbar-width: none;
 }
 
-.rail-logo {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  color: #ffffff;
+.sections::-webkit-scrollbar {
+  display: none;
 }
 
-.rail-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-top: 40px;
-}
-
-.rail-item {
+.section-tab {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 15px;
+  border-radius: 999px;
   color: var(--rail-icon);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   transition: color 200ms var(--ease);
 }
 
-.rail-item:hover {
+.section-tab:hover {
   color: #ffffff;
 }
 
-.rail-item[aria-current="page"] {
+.section-tab[aria-current="page"] {
   color: #111014;
 }
 
-.rail-bottom {
-  margin-top: auto;
+.section-tab:focus-visible {
+  outline: 2px solid var(--lavender-nav);
+  outline-offset: 1px;
 }
 
-.rail-icon {
-  position: relative;
-}
-
-.rail-circle {
+.section-pill {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--lavender-nav);
 }
 
-/* 12px from the item to the rail's edge, then a 4px gap before the notch. */
-.rail-notch {
-  position: absolute;
-  top: 10px;
-  left: 56px;
-  width: 10px;
-  height: 20px;
-  border-radius: 0 999px 999px 0;
-  background: var(--rail);
+.section-icon,
+.section-label {
+  position: relative;
 }
 
-.rail-count {
-  position: absolute;
-  top: -2px;
-  right: -4px;
+.section-count {
+  position: relative;
   display: grid;
   place-items: center;
   min-width: 17px;
   height: 17px;
   padding: 0 4px;
-  border: 2px solid var(--rail);
   border-radius: 9px;
   background: #e2557f;
   color: #ffffff;
@@ -939,37 +924,10 @@ kbd {
   font-weight: 700;
 }
 
-.rail-tip {
-  position: absolute;
-  top: 50%;
-  left: 70px;
-  z-index: 10;
-  margin-top: -11px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: var(--rail);
-  color: #ffffff;
-  font-size: 11px;
-  line-height: 14px;
-  white-space: nowrap;
-  box-shadow: var(--shadow-float);
-  opacity: 0;
-  transform: translateX(-4px);
-  pointer-events: none;
-  transition:
-    opacity var(--fast) var(--ease),
-    transform var(--fast) var(--ease);
-}
-
-.rail-item:hover .rail-tip,
-.rail-item:focus-visible .rail-tip {
-  opacity: 1;
-  transform: none;
-}
-
-.rail-appear {
-  animation: rise-in 350ms var(--ease-out) backwards;
-  animation-delay: calc(300ms + var(--n, 0) * 40ms);
+@media (max-width: 1599px) {
+  .section-icon {
+    display: none;
+  }
 }
 
 /* menu of the section's pages */
@@ -996,7 +954,7 @@ kbd {
   display: none;
 }
 
-.drawer-sections,
+.drawer-close,
 .drawer-scrim {
   display: none;
 }
@@ -1305,7 +1263,7 @@ kbd {
 
 @media (min-width: 1025px) {
   :root[data-sidebar="closed"] .frame {
-    grid-template-columns: var(--rail-w) var(--menu-icons-w) minmax(0, 1fr);
+    grid-template-columns: var(--menu-icons-w) minmax(0, 1fr);
   }
 
   :root[data-sidebar="closed"] .sidebar {
@@ -4190,12 +4148,6 @@ pre.code {
   }
 }
 
-@keyframes rail-grow {
-  from {
-    transform: scaleY(0);
-  }
-}
-
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -4362,11 +4314,11 @@ pre.code {
     min-width: 0;
   }
 
-  .brand-mark {
-    display: grid;
+  .brand-name {
+    display: none;
   }
 
-  /* No rail: the menu becomes a drawer that also lists the sections. */
+  /* The sections stay in the top bar; the menu of the section's pages becomes a drawer. */
   :root {
     --frame-inset: 8px;
     --frame-pad: 12px;
@@ -4375,11 +4327,9 @@ pre.code {
   .frame,
   :root[data-sidebar="closed"] .frame {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "main";
-  }
-
-  .rail {
-    display: none;
+    grid-template-areas:
+      "top"
+      "main";
   }
 
   .sidebar {
@@ -4417,44 +4367,12 @@ pre.code {
     pointer-events: auto;
   }
 
-  .drawer-sections {
-    position: relative;
-    display: block;
-    margin-bottom: 16px;
-    padding: 0 6px 16px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .drawer-sections .side-title {
-    padding-left: 4px;
-  }
-
-  .drawer-section-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-  }
-
-  .drawer-section {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 999px;
-    color: var(--text-2);
-    font-size: 13px;
-  }
-
-  .drawer-section[aria-current="page"] {
-    background: var(--ink);
-    color: var(--ink-text);
-    font-weight: 500;
-  }
-
   .drawer-close {
     position: absolute;
-    top: -8px;
-    right: 0;
+    top: 12px;
+    right: 10px;
+    z-index: 2;
+    display: inline-grid;
   }
 
   .side-collapse {
@@ -4508,8 +4426,26 @@ pre.code {
     font-size: 25px;
   }
 
-  .brand-name {
-    display: none;
+  .topbar {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "start end"
+      "tabs tabs";
+    gap: 10px;
+  }
+
+  .topbar-start {
+    grid-area: start;
+  }
+
+  .topbar-end {
+    grid-area: end;
+    justify-self: end;
+  }
+
+  .sections {
+    grid-area: tabs;
+    justify-self: stretch;
   }
 
   .live-pill {
@@ -5392,4 +5328,95 @@ pre.code {
 
 .data-table td.good {
   color: var(--good);
+}
+
+/* =================================================================== Developer -> Connections (.cn-*) */
+
+.cn-body {
+  display: grid;
+  gap: 14px;
+}
+
+.cn-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.cn-section-title {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cn-check {
+  margin-top: 0;
+}
+
+.cn-result {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.cn-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cn-list {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.cn-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cn-actions {
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/* =================================================================== printed pages (reports) */
+
+@media print {
+  .topbar,
+  .sidebar,
+  .offline,
+  .drawer-scrim {
+    display: none !important;
+  }
+
+  .frame {
+    position: static;
+    display: block;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .app-scroll {
+    overflow: visible;
+  }
+
+  .card,
+  .tile {
+    break-inside: avoid;
+    border: 1px solid #dddddd;
+    box-shadow: none;
+  }
 }
