@@ -1,0 +1,386 @@
+/* The highway on the sign-in page. Colours follow the Studio light / dark theme; motion is CSS only. */
+
+.scene {
+  --scene-hill-far: #cbbcee;
+  --scene-plant: #b6a3e4;
+  --scene-smoke: #ffffff;
+  --scene-field: #d3dfcb;
+  --scene-tree: #9ebb9b;
+  --scene-tree-top: #b2cbaf;
+  --scene-trunk: #8b7a99;
+  --scene-road: #4b4562;
+  --scene-verge: #c5d3bc;
+  --scene-line: #ffffff;
+  --scene-centre: #f3c74a;
+  --scene-pole: #8f84a8;
+  --scene-wire: rgba(80, 66, 120, 0.35);
+  --scene-sun: #fff6dc;
+  --scene-sun-glow: rgba(255, 244, 214, 0.75);
+  --scene-sat: #ffffff;
+  --scene-sat-line: #5a4ea6;
+  --scene-beam: #5a4ea6;
+  --scene-chip: rgba(255, 255, 255, 0.82);
+  --scene-chip-line: rgba(255, 255, 255, 0.95);
+  --scene-chip-text: #18151c;
+
+  position: relative;
+  min-height: 150px;
+  pointer-events: none;
+}
+
+:global(:root[data-theme="dark"]) .scene {
+  --scene-hill-far: #3b3266;
+  --scene-plant: #463b74;
+  --scene-smoke: #a99fd0;
+  --scene-field: #2c3638;
+  --scene-tree: #3c5649;
+  --scene-tree-top: #476556;
+  --scene-trunk: #5b5170;
+  --scene-road: #1e1b2a;
+  --scene-verge: #263031;
+  --scene-line: #d9d4e8;
+  --scene-pole: #6c6288;
+  --scene-wire: rgba(203, 191, 234, 0.25);
+  --scene-sun: #ece7ff;
+  --scene-sun-glow: rgba(203, 191, 234, 0.22);
+  --scene-sat: #d9d1f4;
+  --scene-sat-line: #cbbfea;
+  --scene-beam: #cbbfea;
+  --scene-chip: rgba(24, 21, 32, 0.8);
+  --scene-chip-line: rgba(255, 255, 255, 0.14);
+  --scene-chip-text: #f2eefb;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- colours ---- */
+
+.sun {
+  fill: var(--scene-sun);
+}
+
+.sunGlowStop {
+  stop-color: var(--scene-sun-glow);
+}
+
+.sunGlowEnd {
+  stop-color: var(--scene-sun-glow);
+  stop-opacity: 0;
+}
+
+.panel {
+  fill: var(--scene-sat-line);
+}
+
+.panelBar {
+  fill: var(--scene-sat-line);
+}
+
+.satBody {
+  fill: var(--scene-sat);
+  stroke: var(--scene-sat-line);
+  stroke-width: 1.2;
+}
+
+.satDish {
+  fill: none;
+  stroke: var(--scene-sat-line);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.hillFar {
+  fill: var(--scene-hill-far);
+}
+
+.plant {
+  fill: var(--scene-plant);
+}
+
+.smoke {
+  fill: var(--scene-smoke);
+  opacity: 0;
+}
+
+.field {
+  fill: var(--scene-field);
+}
+
+.tree {
+  fill: var(--scene-tree);
+}
+
+.treeTop {
+  fill: var(--scene-tree-top);
+}
+
+.trunk {
+  fill: var(--scene-trunk);
+}
+
+.road {
+  fill: var(--scene-road);
+}
+
+.verge {
+  fill: var(--scene-verge);
+}
+
+.edgeLine {
+  stroke: var(--scene-line);
+  stroke-width: 2.2;
+  opacity: 0.85;
+}
+
+.centreLine {
+  stroke: var(--scene-centre);
+  stroke-width: 3;
+  stroke-dasharray: 36 28;
+}
+
+.pole {
+  fill: var(--scene-pole);
+}
+
+.wire {
+  fill: none;
+  stroke: var(--scene-wire);
+  stroke-width: 1;
+}
+
+.tuft {
+  fill: var(--scene-tree);
+}
+
+.mileTop {
+  fill: #3a2f12;
+  font-size: 6.4px;
+  font-weight: 700;
+}
+
+.mileText {
+  fill: #3a3550;
+  font-size: 6px;
+  font-weight: 700;
+}
+
+.signText {
+  fill: #ffffff;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.truckText {
+  fill: #fff8e6;
+  font-size: 8.4px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.beam {
+  stroke: var(--scene-beam);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 7;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--scene-beam);
+  stroke-width: 1.6;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.chipBox {
+  fill: var(--scene-chip);
+  stroke: var(--scene-chip-line);
+  stroke-width: 1;
+}
+
+.chipText {
+  fill: var(--scene-chip-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.liveDot {
+  fill: #2f8f5b;
+}
+
+/* ---- motion ---- */
+
+/* each scrolling layer is drawn at -1000, 0 and +1000 and slides by 1000: the loop has no seam */
+@keyframes scroll {
+  to {
+    transform: translateX(-1000px);
+  }
+}
+
+/* the dashes move at the road's speed: 64 units (one dash and gap) per 1000 / 12 s */
+@keyframes dash {
+  to {
+    stroke-dashoffset: 64;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bob {
+  to {
+    transform: translateY(-1.3px);
+  }
+}
+
+@keyframes oncoming {
+  0% {
+    transform: translateX(1180px);
+  }
+  58%,
+  100% {
+    transform: translateX(-220px);
+  }
+}
+
+@keyframes ring {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.25);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes beam {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+
+@keyframes hover {
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes smoke {
+  0% {
+    opacity: 0.55;
+    transform: translate(0, 0) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-16px, -34px) scale(1.7);
+  }
+}
+
+@keyframes live {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.far {
+  animation: scroll 110s linear infinite;
+}
+
+.mid {
+  animation: scroll 46s linear infinite;
+}
+
+.near {
+  animation: scroll 12s linear infinite;
+}
+
+.centreLine {
+  animation: dash 0.768s linear infinite;
+}
+
+.wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 0.82s linear infinite;
+}
+
+.bob {
+  animation: bob 0.85s ease-in-out infinite alternate;
+}
+
+.bobSlow {
+  animation: bob 1.1s ease-in-out 0.3s infinite alternate;
+}
+
+.oncoming {
+  animation: oncoming 13s linear 2s infinite backwards;
+}
+
+.ring {
+  animation: ring 2.6s ease-out infinite;
+}
+
+.ringLate {
+  animation-delay: 1.3s;
+}
+
+.beam {
+  animation: beam 1.1s linear infinite;
+}
+
+.satellite {
+  animation: hover 3.2s ease-in-out infinite alternate;
+}
+
+.chip {
+  animation: hover 2.8s ease-in-out infinite alternate;
+}
+
+.smoke {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: smoke 4.5s ease-out infinite;
+}
+
+.smoke2 {
+  animation-delay: 1.5s;
+}
+
+.smoke3 {
+  animation-delay: 3s;
+}
+
+.liveDot {
+  animation: live 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene * {
+    animation: none !important;
+  }
+
+  .smoke {
+    opacity: 0.35;
+  }
+
+  .ring {
+    opacity: 0.4;
+  }
+
+  .oncoming {
+    transform: translateX(-220px);
+  }
+}

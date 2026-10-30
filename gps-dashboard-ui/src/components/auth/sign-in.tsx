@@ -21,11 +21,11 @@ import {
   Waves,
   Workflow,
 } from "@/components/icons";
-import { Flower } from "@/components/studio/art";
 import { RevealText, after, cx } from "@/components/studio/kit";
 import { useTheme } from "@/components/studio/use-theme";
 import { signIn, type SignInState } from "@/lib/auth-actions";
 import type { Role } from "@/lib/session";
+import { HighwayScene } from "./highway-scene";
 import s from "./sign-in.module.css";
 
 /** The three kinds of login: who you are decides what you see. */
@@ -51,7 +51,7 @@ const SHAKE: Keyframe[] = [
 ];
 
 /**
- * The sign-in page: a lavender panel about the console on the left, the form on the right. The form posts to
+ * The sign-in page: a lavender panel with trucks on an Indian highway on the left, the form on the right. The form posts to
  * the signIn server action, so it works before the page's script has loaded; with it, a wrong password shakes
  * the card and keeps the user name.
  */
@@ -84,6 +84,8 @@ export function SignIn({ next }: { next: string }) {
             PulseStream IoT
           </div>
 
+          <HighwayScene className={s.scene} />
+
           <div className={s.heroCopy}>
             <h2 className={s.heroTitle}>
               <RevealText text="Every vehicle, every event, live." i={1} />
@@ -108,8 +110,6 @@ export function SignIn({ next }: { next: string }) {
             ))}
           </ul>
 
-          <Flower className={s.flowerBig} />
-          <Flower className={s.flowerSmall} />
         </section>
 
         <main className={s.panel}>

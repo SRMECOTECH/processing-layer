@@ -171,26 +171,11 @@
   color: var(--hero-text-2);
 }
 
-.flowerBig {
-  pointer-events: none;
-  position: absolute;
-  right: -130px;
-  bottom: -150px;
-  width: 520px;
-  height: 520px;
-  opacity: 0.95;
-  animation: spin 120s linear infinite;
-}
-
-.flowerSmall {
-  pointer-events: none;
-  position: absolute;
-  top: 36px;
-  right: 44px;
-  width: 120px;
-  height: 120px;
-  opacity: 0.75;
-  animation: spin 70s linear infinite reverse;
+/* The highway between the brand and the copy: edge to edge, as tall as the panel leaves room for. */
+.scene {
+  flex: 1 1 auto;
+  margin: 10px -32px 22px;
+  animation: blurIn 0.7s var(--ease) 0.15s backwards;
 }
 
 /* ---- Form panel ---- */
