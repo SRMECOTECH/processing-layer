@@ -2,6 +2,8 @@ package com.srm.gps.application.flow.direct;
 
 import com.srm.gps.application.flow.RawGpsFrameSender;
 import com.srm.gps.application.livelocation.LiveLocationService;
+import com.srm.gps.application.modules.ModuleRegistry;
+import com.srm.gps.application.modules.ModuleRunner;
 import com.srm.gps.application.rejection.RejectedGpsFrameLoggingService;
 import com.srm.gps.application.storage.GpsPositionStorageService;
 import com.srm.gps.application.trip.TripDetectionService;
@@ -14,6 +16,7 @@ import com.srm.gps.configuration.message.RejectedGpsFrame;
 import com.srm.gps.connectivity.flow.OnlyInDirectFlow;
 import com.srm.gps.connectivity.monitoring.PipelineLogContext;
 import com.srm.gps.connectivity.monitoring.PipelineMetrics;
+import com.srm.gps.module.GpsModule;
 import com.srm.gps.processing.GpsFrameProcessor;
 import com.srm.gps.processing.ProcessingResultHandler;
 import org.slf4j.Logger;
@@ -23,7 +26,8 @@ import org.springframework.stereotype.Component;
 /**
  * The direct flow: no Kafka at all. One method call does everything:
  *
- *   raw frame -> processing -> accepted: store in PostgreSQL, update the live position in Redis, then trips and stops
+ *   raw frame -> processing -> accepted: store in PostgreSQL, update the live position in Redis, trips and stops,
+ *                                        then every enabled processing module
  *                           -> rejected: write to the log
  *
  * Same processing, storage and live-location code as the Kafka flow - only the transport differs.
@@ -52,10 +56,8 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
                                 TripDetectionService tripDetectionService,
                                 RejectedGpsFrameLoggingService rejectedGpsFrameLoggingService,
                                 PipelineMetrics metrics,
-                                com.srm.gps.application.streaming.SpeedViolationService speedViolationService,
-                                com.srm.gps.application.streaming.VehicleStateService vehicleStateService,
-                                com.srm.gps.application.streaming.StoppageService stoppageService,
-                                com.srm.gps.application.streaming.IgnitionService ignitionService) {
+                                ModuleRegistry modules,
+                                ModuleRunner moduleRunner) {
         this.gpsFrameProcessor = gpsFrameProcessor;
         this.metrics = metrics;
         this.storeOrLogResult = new ProcessingResultHandler() {
@@ -77,21 +79,14 @@ public class DirectProcessingFlow implements RawGpsFrameSender {
                     metrics.recordFailure(PipelineStage.TRIP_DETECTION);
                     LOG.warn("Trips not updated: {}", tripProblem.getMessage());
                 }
-                // The four stream consumers, in the order the Kafka flow usually finishes them; ignition first
-                // so the stoppage consumer sees this reading's virtual ignition.
-                bestEffort(PipelineStage.IGNITION, position, ignitionService::handle);
-                bestEffort(PipelineStage.VEHICLE_STATE, position, vehicleStateService::handle);
-                bestEffort(PipelineStage.SPEED_VIOLATION, position, speedViolationService::handle);
-                bestEffort(PipelineStage.STOPPAGE_DETECTION, position, stoppageService::handle);
-            }
-
-            private void bestEffort(PipelineStage stage, ProcessedGpsPosition position, java.util.function.Consumer<ProcessedGpsPosition> step) {
-                try {
-                    step.accept(position);
-                    metrics.recordMessage(stage, position.imei(), -1);
-                } catch (RuntimeException problem) {
-                    metrics.recordFailure(stage);
-                    LOG.warn("{} not updated: {}", stage.label(), problem.getMessage());
+                // The processing modules, in their descriptors' order (the order the Kafka flow usually finishes them):
+                // ignition first, so the stoppage module sees this reading's virtual ignition.
+                for (GpsModule module : modules.enabled()) {
+                    try {
+                        moduleRunner.run(module, position, -1);
+                    } catch (RuntimeException problem) {
+                        LOG.warn("{} not updated: {}", module.descriptor().name(), problem.getMessage());
+                    }
                 }
             }
 

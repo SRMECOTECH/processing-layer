@@ -153,6 +153,27 @@ export const PROCESSORS: PipelineModule[] = [
       "Keep the raw Traccar distance next to it (odometer first, otherwise haversine, jitter clamped, jumps ignored).",
     ],
   },
+  {
+    id: "shipments",
+    name: "Shipment tracking",
+    summary: "Every uploaded shipment followed with its truck's GPS: departure from the plant fence, arrival at the destination fence, delay against the ETA.",
+    href: "/tms/shipments",
+    icon: Route,
+    status: "live",
+    stages: ["SHIPMENT_TRACKING"],
+    consumerGroups: ["gps-shipment-tracking-service"],
+    reads: OUTPUT_TOPIC,
+    state: ["shipment (PostgreSQL): left_origin_at, arrived_at, last_*"],
+    config: "Places & geofences (place) · gps.modules.shipment-tracking.enabled",
+    emits: ["SHIPMENT_DEPARTED", "SHIPMENT_ARRIVED", "SHIPMENT_DELAYED"],
+    logic: [
+      "Find the truck's shipments the reading can still tell something about: past the gate-out, not closed or arrived before the reading, at most a week old.",
+      "Departure = the first reading outside the origin (plant) fence; on an intra-fence trip (destination inside the plant fence) the first moving reading.",
+      "Arrival = the first reading inside the destination fence after one outside it, so a trip that starts inside its destination fence is not arrived at once.",
+      "Every moment kept is the earliest reading proving it: a redelivered, late (device memory) or replayed reading can only confirm it or move it earlier.",
+      "The first reading after the ETA without an arrival opens SHIPMENT_DELAYED; the arrival closes it.",
+    ],
+  },
   // Kafka Streams: the analytics app is one more processor on the output topic (the normalizer sits before it)
   {
     id: "streams",

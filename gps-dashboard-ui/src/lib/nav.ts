@@ -1,4 +1,5 @@
 import type { IconComponent } from "@/components/icons";
+import type { Role } from "./session";
 import {
   Activity,
   Archive,
@@ -6,6 +7,7 @@ import {
   BellRing,
   Boxes,
   Braces,
+  Building2,
   CalendarClock,
   CalendarDays,
   Car,
@@ -24,6 +26,7 @@ import {
   Inbox,
   Layers,
   Link2,
+  LayoutGrid,
   ListChecks,
   Map,
   MapPinned,
@@ -46,6 +49,8 @@ import {
   Timer,
   TriangleAlert,
   Truck,
+  Upload,
+  Users,
   Waypoints,
   Workflow,
 } from "@/components/icons";
@@ -89,6 +94,37 @@ export const SECTIONS: Section[] = [
           { href: "/live/throughput", label: "Throughput", icon: ChartLine, feed: "live" },
           { href: "/live/events", label: "Event stream", icon: ListChecks, feed: "live" },
           { href: "/live/simulator", label: "Fleet simulator", icon: Play, feed: "live" },
+        ],
+      },
+    ],
+  },
+  {
+    href: "/tms",
+    label: "TMS",
+    icon: Truck,
+    description: "Transport management: shipments, transporters, consigners and the device ↔ truck mapping.",
+    groups: [
+      {
+        title: "Shipments",
+        items: [
+          { href: "/tms", label: "TMS overview", icon: LayoutGrid, feed: "live" },
+          { href: "/tms/shipments", label: "All shipments", icon: Route, feed: "live" },
+          { href: "/tms/upload", label: "Upload shipments", icon: Upload, feed: "live" },
+        ],
+      },
+      {
+        title: "Customer views",
+        items: [
+          { href: "/tms/transporter", label: "As a transporter", icon: Truck, feed: "live" },
+          { href: "/tms/consigner", label: "As a consigner", icon: Building2, feed: "live" },
+        ],
+      },
+      {
+        title: "Master data",
+        items: [
+          { href: "/tms/mapping", label: "Device ↔ vehicle mapping", icon: Link2, feed: "live" },
+          { href: "/tms/companies", label: "Companies & users", icon: Users, feed: "live" },
+          { href: "/tms/places", label: "Places & geofences", icon: MapPinned, feed: "live" },
         ],
       },
     ],
@@ -385,8 +421,90 @@ export const SECTIONS: Section[] = [
   },
 ];
 
-export function sectionFor(pathname: string): Section {
-  return SECTIONS.find((s) => pathname === s.href || pathname.startsWith(`${s.href}/`)) ?? SECTIONS[0];
+/** A transporter's portal: its trucks, the shipments it carries, and what happened on the road. */
+export const TRANSPORTER_SECTIONS: Section[] = [
+  {
+    href: "/transporter",
+    label: "Overview",
+    icon: LayoutGrid,
+    description: "Your fleet and your shipments today.",
+    groups: [{ title: "Today", items: [{ href: "/transporter", label: "Overview", icon: LayoutGrid, feed: "live" }] }],
+  },
+  {
+    href: "/transporter/fleet",
+    label: "Fleet",
+    icon: Truck,
+    description: "Every truck you own or carry shipments with, live.",
+    groups: [{ title: "Fleet", items: [{ href: "/transporter/fleet", label: "Fleet board", icon: Truck, feed: "live" }] }],
+  },
+  {
+    href: "/transporter/shipments",
+    label: "Shipments",
+    icon: Route,
+    description: "The trips you carry, from gate-out to the consignee.",
+    groups: [
+      {
+        title: "Shipments",
+        items: [
+          { href: "/transporter/shipments", label: "My shipments", icon: Route, feed: "live" },
+          { href: "/transporter/shipments/upload", label: "Upload shipments", icon: Upload, feed: "live" },
+        ],
+      },
+    ],
+  },
+  {
+    href: "/transporter/alerts",
+    label: "Alerts",
+    icon: Siren,
+    description: "Over-speed, stoppages, delays: on your trucks and the trips you carry.",
+    groups: [{ title: "Alerts", items: [{ href: "/transporter/alerts", label: "Alerts", icon: Siren, feed: "live" }] }],
+  },
+];
+
+/** A consigner's portal: its goods on the road, and how the transporters carrying them perform. */
+export const CONSIGNER_SECTIONS: Section[] = [
+  {
+    href: "/consigner",
+    label: "Overview",
+    icon: LayoutGrid,
+    description: "Your shipments on the road today.",
+    groups: [{ title: "Today", items: [{ href: "/consigner", label: "Overview", icon: LayoutGrid, feed: "live" }] }],
+  },
+  {
+    href: "/consigner/shipments",
+    label: "Shipments",
+    icon: Route,
+    description: "Every shipment from your plants, gate-out to consignee.",
+    groups: [{ title: "Shipments", items: [{ href: "/consigner/shipments", label: "My shipments", icon: Route, feed: "live" }] }],
+  },
+  {
+    href: "/consigner/performance",
+    label: "Performance",
+    icon: ChartLine,
+    description: "Transporters, lanes, consignees and plant detention.",
+    groups: [{ title: "Performance", items: [{ href: "/consigner/performance", label: "Scorecards", icon: ChartLine, feed: "live" }] }],
+  },
+  {
+    href: "/consigner/alerts",
+    label: "Alerts",
+    icon: Siren,
+    description: "What happened to your goods on the road.",
+    groups: [{ title: "Alerts", items: [{ href: "/consigner/alerts", label: "Alerts", icon: Siren, feed: "live" }] }],
+  },
+];
+
+/** The top-bar sections a role sees: the GPS provider the whole console, the others their portal. */
+export function sectionsFor(role: Role): Section[] {
+  return role === "TRANSPORTER" ? TRANSPORTER_SECTIONS : role === "CONSIGNER" ? CONSIGNER_SECTIONS : SECTIONS;
+}
+
+/** The section a page belongs to: the longest section path it starts with ("/transporter/fleet" before "/transporter"). */
+export function sectionFor(pathname: string, sections: Section[] = SECTIONS): Section {
+  let best: Section | undefined;
+  for (const s of sections) {
+    if ((pathname === s.href || pathname.startsWith(`${s.href}/`)) && (!best || s.href.length > best.href.length)) best = s;
+  }
+  return best ?? sections[0];
 }
 
 /** Whether a menu item (or one of its sub-pages) is the page being shown. */
@@ -397,8 +515,8 @@ export function itemContains(item: NavItem, pathname: string): boolean {
 export type Trail = { section: Section; group?: NavGroup; item?: NavItem; leaf?: NavLeaf };
 
 /** Section, menu item and sub-page of a path: the breadcrumb. */
-export function trailFor(pathname: string): Trail {
-  const section = sectionFor(pathname);
+export function trailFor(pathname: string, sections: Section[] = SECTIONS): Trail {
+  const section = sectionFor(pathname, sections);
   for (const group of section.groups) {
     for (const item of group.items) {
       const leaf = item.children?.find((c) => c.href === pathname);
@@ -412,8 +530,8 @@ export function trailFor(pathname: string): Trail {
 export type PageEntry = { href: string; label: string; section: string; parent?: string; icon: IconComponent; feed?: Feed };
 
 /** Every page once, for search. A sub-page carries the name of the item it belongs to. */
-export function allPages(): PageEntry[] {
-  return SECTIONS.flatMap((s) =>
+export function allPages(sections: Section[] = SECTIONS): PageEntry[] {
+  return sections.flatMap((s) =>
     s.groups.flatMap((g) =>
       g.items.flatMap((item) =>
         item.children

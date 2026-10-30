@@ -1,30 +1,40 @@
 package com.srm.gps.application.streaming;
 
 import com.srm.gps.application.events.VehicleEventRecorder;
+import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.RedisKeyNames;
 import com.srm.gps.configuration.message.EventSeverity;
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.VehicleEvent;
 import com.srm.gps.configuration.message.VehicleEventType;
-import com.srm.gps.connectivity.kafka.StreamConsumerHandlers.SpeedViolationHandler;
 import com.srm.gps.connectivity.redis.RedisStateStore;
 import com.srm.gps.processing.speed.SpeedFinding;
 import com.srm.gps.processing.speed.SpeedReading;
 import com.srm.gps.processing.speed.SpeedRule;
 import com.srm.gps.processing.speed.SpeedViolationProcessor;
 import com.srm.gps.processing.speed.SpeedViolationState;
+import com.srm.gps.module.GpsModule;
+import com.srm.gps.module.ModuleContext;
+import com.srm.gps.module.ModuleDescriptor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
- * Consumer group gps-speed-violation-service (Kafka flow) or called directly (direct flow).
+ * Module (gps-module-api), consumer group gps-speed-violation-service (Kafka flow) or called directly (direct flow).
  *
  * Per reading: rule for the vehicle (Redis, vehicle -> company -> default), state (Redis gps:state:speed:{imei}),
  * the pure {@link SpeedViolationProcessor}, then events, then the new state. Events are written before the state:
  * if anything fails the reading is retried, finds the same events, and the upsert by event key keeps them once.
  */
 @Service
-public class SpeedViolationService implements SpeedViolationHandler {
+public class SpeedViolationService implements GpsModule {
+
+    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("speed-violation", "Speed violation",
+            "Sustained over-speed against each entity's rule, speedometer cross-checked against GPS.",
+            KafkaConsumerGroupNames.SPEED_VIOLATION, PipelineStage.SPEED_VIOLATION, 30,
+            List.of("OVERSPEED", "SPEED_SENSOR_MISMATCH"), List.of("gps:state:speed:*"));
 
     private final RedisStateStore redis;
     private final SpeedRuleStore rules;
@@ -39,6 +49,15 @@ public class SpeedViolationService implements SpeedViolationHandler {
     }
 
     @Override
+    public ModuleDescriptor descriptor() {
+        return DESCRIPTOR;
+    }
+
+    @Override
+    public void onPosition(ProcessedGpsPosition position, ModuleContext context) {
+        handle(position);
+    }
+
     public void handle(ProcessedGpsPosition position) {
         VehicleContext.Vehicle vehicle = vehicles.of(position);
         SpeedRule rule = rules.ruleFor(vehicle.registrationNo(), vehicle.tenantCode());

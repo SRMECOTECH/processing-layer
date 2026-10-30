@@ -63,6 +63,16 @@ public class GpsDeviceSimulatorService {
     private volatile int roundsPerDrive;
     private volatile int driveNumber;
     private volatile String lastMessage = "Not started yet";
+    /** The trips being driven with faithful timing, for the demo shipments: empty in compressed timing. */
+    private volatile List<ReplayedTrip> replayedTrips = List.of();
+
+    /**
+     * One smart_truck trip as the simulator replays it: its first ping is sent at {@code replayedFrom} instead of
+     * {@code originalFrom}, and every later ping keeps its real gap - so the trip's own times shifted by the same amount
+     * are the times of the replay.
+     */
+    public record ReplayedTrip(long tripNumber, String imei, String vehicleRegistration, Instant originalFrom, Instant replayedFrom) {
+    }
 
     public GpsDeviceSimulatorService(SmartTruckGpsReader smartTruckGpsReader,
                                      RawGpsFrameSender rawGpsFrameSender,
@@ -178,6 +188,8 @@ public class GpsDeviceSimulatorService {
                     share(imei, "odometer") < settings.devicesWithOdometerOrDefault(),
                     share(imei, "idler") < settings.idlingDevicesOrDefault()));
         }
+        replayedTrips = trips.stream().map(trip -> new ReplayedTrip(trip.getFirst().tripNumber(), trip.getFirst().deviceImei(),
+                trip.getFirst().vehicleRegistration(), trip.getFirst().recordedAt(), replayStartOf(vehicles, trip.getFirst().deviceImei()))).toList();
         LOG.info("Simulator (faithful timing): {} vehicles, replay starts {} min in the past at {}x until it catches up",
                 vehicles.size(), settings.catchUpMinutesOrDefault(), speedFactor);
 
@@ -213,6 +225,15 @@ public class GpsDeviceSimulatorService {
                     + " min behind, " + speedFactor + "x)";
             Thread.sleep(TICK_MILLIS);
         }
+    }
+
+    /** The trips the running fleet replays (faithful timing), for loading them as shipments. */
+    public List<ReplayedTrip> replayedTrips() {
+        return running.get() ? replayedTrips : List.of();
+    }
+
+    private static Instant replayStartOf(List<SimulatedVehicle> vehicles, String imei) {
+        return vehicles.stream().filter(v -> v.imei().equals(imei)).findFirst().map(SimulatedVehicle::firstDriveStart).orElseThrow();
     }
 
     private Instant newestStoredReading() {

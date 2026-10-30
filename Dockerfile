@@ -17,6 +17,7 @@ COPY mvnw pom.xml ./
 COPY gps-configuration gps-configuration
 COPY gps-connectivity gps-connectivity
 COPY gps-processing gps-processing
+COPY gps-module-api gps-module-api
 COPY gps-streams gps-streams
 COPY gps-application gps-application
 COPY gps-route-service gps-route-service

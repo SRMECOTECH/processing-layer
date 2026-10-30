@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { SlideMarker } from "@/components/slide-marker";
-import { SECTIONS, sectionFor } from "@/lib/nav";
+import { sectionFor } from "@/lib/nav";
+import { useSections } from "@/lib/viewer";
 import { useNotifications } from "@/lib/notifications";
 
 /**
@@ -14,9 +15,15 @@ import { useNotifications } from "@/lib/notifications";
  */
 export function SectionTabs() {
   const pathname = usePathname();
-  const active = sectionFor(pathname).href;
+  const sections = useSections();
+  const active = sectionFor(pathname, sections).href;
   const { openAlerts, unread } = useNotifications();
-  const count: Record<string, number> = { "/alerts": openAlerts, "/notifications": unread };
+  const count: Record<string, number> = {
+    "/alerts": openAlerts,
+    "/notifications": unread,
+    "/transporter/alerts": openAlerts,
+    "/consigner/alerts": openAlerts,
+  };
   const current = useRef<HTMLAnchorElement>(null);
 
   // On a narrow screen the capsule scrolls sideways: keep the current section in view.
@@ -26,7 +33,7 @@ export function SectionTabs() {
 
   return (
     <nav className="sections" aria-label="Sections">
-      {SECTIONS.map((section) => {
+      {sections.map((section) => {
         const isCurrent = section.href === active;
         const Icon = section.icon;
         const badge = count[section.href] ?? 0;

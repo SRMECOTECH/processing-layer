@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Counts every message every producer and consumer handled: in total, per second, per partition and per IMEI.
@@ -18,6 +19,8 @@ import java.util.Map;
 public class PipelineMetrics {
 
     private final Map<PipelineStage, StageCounters> countersByStage = new EnumMap<>(PipelineStage.class);
+    /** Processing modules plugged in from outside have no PipelineStage: their load is counted under their id. */
+    private final Map<String, StageCounters> countersByModule = new ConcurrentHashMap<>();
 
     public PipelineMetrics() {
         for (PipelineStage stage : PipelineStage.values()) {
@@ -41,10 +44,24 @@ public class PipelineMetrics {
         return countersByStage.get(stage).snapshot(stage, Instant.now());
     }
 
+    public void recordModuleMessage(String moduleId, String imei, int partition) {
+        countersByModule.computeIfAbsent(moduleId, id -> new StageCounters()).recordMessage(imei, partition, Instant.now());
+    }
+
+    public void recordModuleFailure(String moduleId) {
+        countersByModule.computeIfAbsent(moduleId, id -> new StageCounters()).recordFailure();
+    }
+
+    /** The load of a module counted under its id; {@link StageSnapshot#stage()} is null. */
+    public StageSnapshot moduleSnapshot(String moduleId) {
+        return countersByModule.computeIfAbsent(moduleId, id -> new StageCounters()).snapshot(null, Instant.now());
+    }
+
     /** Starts every counter from 0 again (demo reset). */
     public void reset() {
         for (PipelineStage stage : PipelineStage.values()) {
             countersByStage.put(stage, new StageCounters());
         }
+        countersByModule.clear();
     }
 }

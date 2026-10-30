@@ -23,7 +23,12 @@ public final class PipelineLogContext implements AutoCloseable {
     }
 
     public static PipelineLogContext forRecord(PipelineStage stage, ConsumerRecord<String, String> record) {
-        MDC.put("stage", stage.shortName());
+        return forRecord(stage.shortName(), record);
+    }
+
+    /** For a processing module without a PipelineStage: {@code stageName} is its id. */
+    public static PipelineLogContext forRecord(String stageName, ConsumerRecord<String, String> record) {
+        MDC.put("stage", stageName);
         MDC.put("imei", record.key() != null ? record.key() : "-");
         MDC.put("partition", String.valueOf(record.partition()));
         MDC.put("offset", String.valueOf(record.offset()));

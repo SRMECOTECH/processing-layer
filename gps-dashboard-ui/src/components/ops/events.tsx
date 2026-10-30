@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Empty, Tag, type Tone } from "./kit";
 import { formatDateTime, formatDuration, formatTime, vehicleName } from "@/lib/format";
 import type { VehicleEventView } from "@/lib/types";
+import { shipmentHref, useViewer } from "@/lib/viewer";
 
 export const EVENT_LABEL: Record<VehicleEventView["type"], string> = {
   OVERSPEED: "Over-speed",
@@ -15,6 +16,9 @@ export const EVENT_LABEL: Record<VehicleEventView["type"], string> = {
   IGNITION_OFF: "Ignition off",
   HARSH_ACCELERATION: "Harsh acceleration",
   HARSH_BRAKING: "Harsh braking",
+  SHIPMENT_DEPARTED: "Shipment departed",
+  SHIPMENT_ARRIVED: "Shipment arrived",
+  SHIPMENT_DELAYED: "Shipment delayed",
 };
 
 export function severityTone(severity: VehicleEventView["severity"]): Tone {
@@ -61,7 +65,31 @@ export function eventSummary(e: VehicleEventView): string {
     case "HARSH_ACCELERATION":
     case "HARSH_BRAKING":
       return `${d.accelerationMps2} m/s² (${d.fromSpeedKmph} to ${d.toSpeedKmph} km/h)`;
+    case "SHIPMENT_DEPARTED":
+      return `trip ${d.tripNo}: left ${d.origin ?? "the origin"} for ${d.destination ?? "?"}`;
+    case "SHIPMENT_ARRIVED":
+      return `trip ${d.tripNo}: reached ${d.destination ?? "the destination"}${d.consignee ? ` (${d.consignee})` : ""}`;
+    case "SHIPMENT_DELAYED":
+      return `trip ${d.tripNo} to ${d.destination ?? "?"}: past its ETA${e.status === "CLOSED" ? ", arrived late" : ""}`;
   }
+}
+
+/**
+ * The vehicle of an event, linked where the viewer may go: the GPS provider to the vehicle inspector, everyone to the
+ * shipment the event belongs to; a transporter's or consigner's other events are not links.
+ */
+function VehicleLink({ e }: { e: VehicleEventView }) {
+  const { role } = useViewer();
+  const name = vehicleName(e.vehicleRegistrationNo, e.imei);
+  const shipmentId = e.details.shipmentId;
+  const href = typeof shipmentId === "number" ? shipmentHref(role, shipmentId) : role === "DEVELOPER" ? `/live/inspector?imei=${e.imei}` : null;
+  return href ? (
+    <Link className="link mono" href={href}>
+      {name}
+    </Link>
+  ) : (
+    <span className="mono">{name}</span>
+  );
 }
 
 export function EventTable({ events, empty = "No events yet.", showType = true }: { events: VehicleEventView[] | undefined; empty?: string; showType?: boolean }) {
@@ -88,9 +116,7 @@ export function EventTable({ events, empty = "No events yet.", showType = true }
               <tr key={e.id} className={e.severity === "CRITICAL" || e.severity === "HIGH" ? "flagged" : undefined}>
                 {showType && <td>{EVENT_LABEL[e.type] ?? e.type}</td>}
                 <td>
-                  <Link className="link mono" href={`/live/inspector?imei=${e.imei}`}>
-                    {vehicleName(e.vehicleRegistrationNo, e.imei)}
-                  </Link>
+                  <VehicleLink e={e} />
                 </td>
                 <td className="muted">{formatDateTime(e.startedAt)}</td>
                 <td className="right mono">{duration === null ? "–" : formatDuration(duration)}</td>
@@ -122,9 +148,7 @@ export function EventFeed({ events, empty = "No events yet." }: { events: Vehicl
             <span className="feed-main">
               <span className="feed-title">
                 {EVENT_LABEL[e.type] ?? e.type}
-                <Link className="link mono" href={`/live/inspector?imei=${e.imei}`}>
-                  {vehicleName(e.vehicleRegistrationNo, e.imei)}
-                </Link>
+                <VehicleLink e={e} />
               </span>
               <span className="feed-sub">{eventSummary(e)}</span>
             </span>

@@ -51,6 +51,11 @@ public class DeviceVehicleDirectory {
         return fromDatabase;
     }
 
+    /** Forgets the cached period of a device: called when its mapping changes, so the next reading asks again. */
+    public void evict(String imei) {
+        cachedAssignmentByImei.remove(imei);
+    }
+
     private static VehicleOfDevice toVehicleOfDevice(DeviceAssignment assignment) {
         Vehicle vehicle = assignment.getVehicle();
         Tenant owner = vehicle.getOwnerTenant();
