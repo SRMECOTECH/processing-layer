@@ -1,4 +1,5 @@
-// Sign-in session for the dashboard, with no auth package: the cookie holds the user name and an expiry time,
+// Sign-in session for the dashboard, with no auth package: the cookie holds the user, role, company, the GPS
+// service's token and an expiry time,
 // signed with HMAC-SHA256 (Web Crypto). The server keeps no session store, so a restart keeps people signed in.
 // Used by src/proxy.ts (every request), the API forwarder and the sign-in actions (src/lib/auth-actions.ts).
 
@@ -7,9 +8,45 @@ export const SESSION_COOKIE = "pulsestream_session";
 export const SESSION_HOURS = 12;
 export const REMEMBER_DAYS = 30;
 
-export type Session = { user: string; expires: number };
+/** The three kinds of login: the GPS provider (us), a truck company, a company sending goods. */
+export type Role = "DEVELOPER" | "TRANSPORTER" | "CONSIGNER";
+export const ROLES: Role[] = ["DEVELOPER", "TRANSPORTER", "CONSIGNER"];
 
-/** The one account that may sign in: DASHBOARD_USERNAME / DASHBOARD_PASSWORD, or "abc" / "abc" until they are set. */
+/**
+ * @param token    the GPS service's sign-in token (sent with every /api/portal call); absent for the break-glass
+ *                 developer sign-in used while the service is down
+ * @param tenant   the user's company code (transporter or consigner); absent for the GPS provider
+ */
+export type Session = {
+  user: string;
+  role: Role;
+  name?: string;
+  tenant?: string;
+  tenantName?: string;
+  token?: string;
+  expires: number;
+};
+
+/** Where each role lands after signing in, and the only pages a transporter or consigner may open. */
+export const HOME: Record<Role, string> = { DEVELOPER: "/live", TRANSPORTER: "/transporter", CONSIGNER: "/consigner" };
+
+/** Whether a role may open a page: the GPS provider every page, the others only their own portal. */
+export function mayOpen(role: Role, pathname: string): boolean {
+  if (role === "DEVELOPER") return true;
+  const home = HOME[role];
+  return pathname === home || pathname.startsWith(`${home}/`);
+}
+
+/** Whether a role may call a service path (/api/...): the others only the portal API, never its admin part. */
+export function mayCall(role: Role, apiPath: string): boolean {
+  if (role === "DEVELOPER") return true;
+  return apiPath.startsWith("/api/portal/") && !apiPath.startsWith("/api/portal/admin/");
+}
+
+/**
+ * The break-glass developer account, used only when the GPS service cannot be asked (its users live there):
+ * DASHBOARD_USERNAME / DASHBOARD_PASSWORD, or "abc" / "abc" until they are set.
+ */
 function account() {
   return {
     username: process.env.DASHBOARD_USERNAME || "abc",
@@ -37,7 +74,8 @@ function signingKey(): Promise<CryptoKey> {
 async function deriveKey(secret: string, stretch: boolean): Promise<CryptoKey> {
   const usage: KeyUsage[] = ["sign", "verify"];
   const hmac = { name: "HMAC", hash: "SHA-256", length: 256 };
-  if (!stretch) return crypto.subtle.importKey("raw", encoder.encode(secret), hmac, false, usage);
+  // AUTH_SECRET as given: the key is as long as the secret (a fixed length would refuse any other secret)
+  if (!stretch) return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, usage);
   const base = await crypto.subtle.importKey("raw", encoder.encode(secret), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", hash: "SHA-256", salt: encoder.encode("pulsestream-dashboard-session"), iterations: 210_000 },
@@ -48,9 +86,9 @@ async function deriveKey(secret: string, stretch: boolean): Promise<CryptoKey> {
   );
 }
 
-/** A signed cookie value for `user`, valid for `seconds`. */
-export async function createSession(user: string, seconds: number): Promise<string> {
-  const session: Session = { user, expires: Math.floor(Date.now() / 1000) + seconds };
+/** A signed cookie value for the session, valid for `seconds`. */
+export async function createSession(details: Omit<Session, "expires">, seconds: number): Promise<string> {
+  const session: Session = { ...details, expires: Math.floor(Date.now() / 1000) + seconds };
   const payload = toBase64Url(encoder.encode(JSON.stringify(session)));
   const signature = await crypto.subtle.sign("HMAC", await signingKey(), encoder.encode(payload));
   return `${payload}.${toBase64Url(new Uint8Array(signature))}`;
@@ -66,6 +104,8 @@ export async function readSession(token: string | undefined): Promise<Session | 
     if (!valid) return null;
     const session = JSON.parse(new TextDecoder().decode(fromBase64Url(payload))) as Session;
     if (typeof session.user !== "string" || typeof session.expires !== "number") return null;
+    // a cookie from before the roles was a developer's
+    if (!ROLES.includes(session.role)) session.role = "DEVELOPER";
     return session.expires > Date.now() / 1000 ? session : null;
   } catch {
     return null;

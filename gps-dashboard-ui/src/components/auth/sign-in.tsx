@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BellRing,
+  Building2,
   Check,
   Eye,
   EyeOff,
@@ -11,9 +12,11 @@ import {
   LockKeyhole,
   MapPin,
   Moon,
+  Radio,
   ShieldCheck,
   Sun,
   TriangleAlert,
+  Truck,
   User,
   Waves,
   Workflow,
@@ -22,7 +25,15 @@ import { Flower } from "@/components/studio/art";
 import { RevealText, after, cx } from "@/components/studio/kit";
 import { useTheme } from "@/components/studio/use-theme";
 import { signIn, type SignInState } from "@/lib/auth-actions";
+import type { Role } from "@/lib/session";
 import s from "./sign-in.module.css";
+
+/** The three kinds of login: who you are decides what you see. */
+const ROLE_CHOICES: { role: Role; label: string; note: string; icon: typeof Truck }[] = [
+  { role: "DEVELOPER", label: "GPS provider", note: "Devices, mapping, engine", icon: Radio },
+  { role: "TRANSPORTER", label: "Transporter", note: "Fleet and trips carried", icon: Truck },
+  { role: "CONSIGNER", label: "Consigner", note: "Shipments to consignees", icon: Building2 },
+];
 
 const FEATURES = [
   { icon: MapPin, label: "Live fleet map", note: "Every vehicle, as it moves" },
@@ -48,6 +59,7 @@ export function SignIn({ next }: { next: string }) {
   const [state, action, pending] = useActionState<SignInState, FormData>(signIn, null);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  const [role, setRole] = useState<Role>(state?.role ?? "DEVELOPER");
   const [theme, toggleTheme] = useTheme();
   const card = useRef<HTMLDivElement>(null);
   const password = useRef<HTMLInputElement>(null);
@@ -77,8 +89,8 @@ export function SignIn({ next }: { next: string }) {
               <RevealText text="Every vehicle, every event, live." i={1} />
             </h2>
             <p className={s.heroLead} style={after(0.35)}>
-              The operations console for your GPS streaming platform: the live fleet, the stream processors, alerts and
-              storage in one calm place.
+              One sign-in for everyone on the road: the GPS provider runs the devices and the platform, transporters
+              follow their trucks and the trips they carry, consigners follow their goods to the consignee.
             </p>
           </div>
 
@@ -117,8 +129,29 @@ export function SignIn({ next }: { next: string }) {
             <form action={action} className={s.form}>
               <input type="hidden" name="next" value={next} />
 
+              <fieldset className={s.roles}>
+                <legend className={s.label}>Sign in as</legend>
+                <div className={s.roleRow}>
+                  {ROLE_CHOICES.map((choice) => (
+                    <label key={choice.role} className={cx(s.role, role === choice.role && s.roleOn)}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value={choice.role}
+                        checked={role === choice.role}
+                        onChange={() => setRole(choice.role)}
+                        className={s.roleInput}
+                      />
+                      <choice.icon size={17} strokeWidth={1.8} />
+                      <span className={s.roleLabel}>{choice.label}</span>
+                      <span className={s.roleNote}>{choice.note}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
               <label className={s.field}>
-                <span className={s.label}>Username</span>
+                <span className={s.label}>User id</span>
                 <span className={s.control}>
                   <User size={16} strokeWidth={1.8} />
                   <input
@@ -128,7 +161,7 @@ export function SignIn({ next }: { next: string }) {
                     spellCheck={false}
                     autoFocus
                     required
-                    placeholder="Your username"
+                    placeholder="Your user id"
                     defaultValue={state?.username}
                     className={s.input}
                   />

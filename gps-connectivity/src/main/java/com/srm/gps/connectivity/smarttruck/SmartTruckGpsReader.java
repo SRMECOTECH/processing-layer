@@ -70,6 +70,18 @@ public class SmartTruckGpsReader {
         return jdbcTemplate.queryForList(LATEST_TRIP_OF_DISTINCT_DEVICES, Long.class, minimumPings, deviceCount);
     }
 
+    /**
+     * The TMS rows (tta_trips) of these trips, every column, keyed by column name: the shipments behind the trips the
+     * simulator replays. Times are the database's own (India time, no zone).
+     */
+    public List<java.util.Map<String, Object>> readTripRows(List<Long> tripNumbers) {
+        if (tripNumbers.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(tripNumbers.size(), "?"));
+        return jdbcTemplate.queryForList("SELECT * FROM tta_trips WHERE i_trip_no IN (" + placeholders + ")", tripNumbers.toArray());
+    }
+
     /** The first {@code maximumPings} pings of one trip, oldest first. */
     public List<SmartTruckGpsPing> readPingsOfTrip(long tripNumber, int maximumPings) {
         return jdbcTemplate.query(PINGS_OF_ONE_TRIP, this::toGpsPing, tripNumber, maximumPings);

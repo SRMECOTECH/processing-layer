@@ -9,6 +9,7 @@ import { itemContains, sectionFor, type NavGroup, type NavItem } from "@/lib/nav
 import { useOverview } from "@/lib/overview-context";
 import { isKafkaFlow } from "@/lib/pipeline";
 import { usePreferences } from "@/lib/preferences";
+import { useSections, useViewer } from "@/lib/viewer";
 
 /**
  * The white menu card of the current section: groups, items and, under an item, its sub-pages. A black pill
@@ -17,7 +18,8 @@ import { usePreferences } from "@/lib/preferences";
  */
 export function Sidebar() {
   const pathname = usePathname();
-  const section = sectionFor(pathname);
+  const section = sectionFor(pathname, useSections());
+  const viewer = useViewer();
   const { sidebarOpen, toggleSidebar, drawerOpen, setDrawerOpen } = usePreferences();
   const [filter, setFilter] = useState("");
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -81,7 +83,7 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <SystemStatus />
+        {viewer.role === "DEVELOPER" ? <SystemStatus /> : <CompanyCard name={viewer.tenantName} role={viewer.role} />}
 
         <button type="button" className="side-collapse" onClick={toggleSidebar} aria-label={sidebarOpen ? "Collapse the menu" : "Expand the menu"}>
           {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
@@ -152,6 +154,19 @@ function filterGroups(groups: NavGroup[], filter: string): NavGroup[] {
         .filter((item): item is NavItem => item !== null),
     }))
     .filter((g) => g.items.length > 0);
+}
+
+/** For a transporter or consigner, the foot of the menu says whose portal this is. */
+function CompanyCard({ name, role }: { name?: string; role: string }) {
+  return (
+    <div className="side-status" aria-label="Your company">
+      <div className="side-title">{role === "TRANSPORTER" ? "Transporter" : "Consigner"}</div>
+      <div className="side-status-row">
+        <span className="status-dot good" />
+        <span className="side-label">{name ?? "Your company"}</span>
+      </div>
+    </div>
+  );
 }
 
 /** The state of every store at a glance, at the foot of the menu. */

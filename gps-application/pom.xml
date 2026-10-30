@@ -24,7 +24,15 @@
         </dependency>
         <dependency>
             <groupId>com.srm.gps</groupId>
+            <artifactId>gps-module-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
             <artifactId>gps-streams</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
         </dependency>
 
         <dependency>

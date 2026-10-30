@@ -122,6 +122,28 @@ gps:
     jitter-max-speed-kmph: 5
     max-implied-speed-kmph: 200
     min-jump-meters: 500
+  # Processing modules after Kafka (gps-module-api): each is a GpsModule bean with its own consumer group on
+  # gps.processed-positions. One line switches a module off (it is on unless set to false); GET /api/modules lists
+  # them, POST /api/modules/{id}/replay?from=... hands one of them the readings since that moment again.
+  modules:
+    ignition:
+      enabled: true
+    vehicle-state:
+      enabled: true
+    speed-violation:
+      enabled: true
+    stoppage:
+      enabled: true
+    shipment-tracking:
+      enabled: true
+  # Sign-in for the three roles (GPS provider = DEVELOPER, TRANSPORTER, CONSIGNER). Demo users "abc" with this
+  # password are created when a role has no user yet; switch it off on a real installation.
+  auth:
+    demo-accounts: ${GPS_DEMO_ACCOUNTS:true}
+    demo-password: ${GPS_DEMO_PASSWORD:abc}
+  # Transport management: times in shipment files without a zone are in this zone (the smart_truck TMS writes IST).
+  tms:
+    time-zone: Asia/Kolkata
   # The four stream consumers after Kafka (speed violation, vehicle state, stoppage, ignition).
   # Speed rules are NOT here: they live in Redis (gps:config:speed-rule:*) and are edited from the UI or
   # PUT /api/speed/rules/{scope}; the default rule is created on first start.

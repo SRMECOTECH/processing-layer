@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.srm.gps</groupId>
+        <artifactId>gps-streaming-platform</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>gps-module-api</artifactId>
+    <name>gps-module-api</name>
+    <description>The plug-in contract for processing modules after Kafka: GpsModule, its descriptor and the context the platform hands it. Plain Java, no framework.</description>
+
+    <!--
+        A module (speed violation, stoppage, geofencing, waypoints, shipment tracking ...) depends on this jar only.
+        The platform gives every enabled module its own consumer group on gps.processed-positions, ordering per
+        vehicle, retry-forever / dead letters, load counters, replay from a moment in the past and a row in the
+        module registry. The module itself contains no Kafka, Redis or database code.
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.srm.gps</groupId>
+            <artifactId>gps-configuration</artifactId>
+        </dependency>
+    </dependencies>
+</project>

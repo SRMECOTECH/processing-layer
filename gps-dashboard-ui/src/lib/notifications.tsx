@@ -6,6 +6,7 @@ import { vehicleName } from "./format";
 import { useOverview } from "./overview-context";
 import type { VehicleEventView } from "./types";
 import { usePoll } from "./use-poll";
+import { shipmentHref, useViewer } from "./viewer";
 
 export type Notice = {
   id: string;
@@ -38,6 +39,7 @@ const EVENT_TITLE: Record<string, string> = {
   IDLING: "Idling",
   HARSH_ACCELERATION: "Harsh acceleration",
   HARSH_BRAKING: "Harsh braking",
+  SHIPMENT_DELAYED: "Shipment delayed",
 };
 
 /**
@@ -46,7 +48,10 @@ const EVENT_TITLE: Record<string, string> = {
  */
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { data: overview } = useOverview();
-  const events = usePoll<VehicleEventView[]>("/api/events?limit=60", 10000);
+  const viewer = useViewer();
+  const portal = viewer.role !== "DEVELOPER";
+  // a transporter or consigner hears only about its own trucks and shipments
+  const events = usePoll<VehicleEventView[]>(portal ? "/api/portal/alerts?limit=60" : "/api/events?limit=60", 10000);
   const [read, setRead] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -84,11 +89,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         tone: e.severity === "CRITICAL" ? "bad" : "warn",
         title: `${EVENT_TITLE[e.type] ?? e.type} · ${vehicleName(e.vehicleRegistrationNo, e.imei)}`,
         text: e.status === "OPEN" ? "Ongoing" : "Ended",
-        href: `/live/inspector?imei=${e.imei}`,
+        href: typeof e.details.shipmentId === "number"
+          ? shipmentHref(viewer.role, e.details.shipmentId)
+          : portal
+            ? `/${viewer.role === "TRANSPORTER" ? "transporter" : "consigner"}/alerts`
+            : `/live/inspector?imei=${e.imei}`,
         at: e.startedAt,
       }));
     return [...platform, ...vehicle];
-  }, [overview, events.data]);
+  }, [overview, events.data, viewer.role, portal]);
 
   const openAlerts = (events.data ?? []).filter((e) => e.status === "OPEN" && (e.severity === "HIGH" || e.severity === "CRITICAL")).length;
   const unread = notices.filter((n) => !read.has(n.id)).length;

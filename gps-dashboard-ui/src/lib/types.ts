@@ -325,7 +325,10 @@ export type VehicleEventView = {
     | "IGNITION_ON"
     | "IGNITION_OFF"
     | "HARSH_ACCELERATION"
-    | "HARSH_BRAKING";
+    | "HARSH_BRAKING"
+    | "SHIPMENT_DEPARTED"
+    | "SHIPMENT_ARRIVED"
+    | "SHIPMENT_DELAYED";
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "OPEN" | "CLOSED";
   startedAt: string;
