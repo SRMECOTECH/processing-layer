@@ -21,5 +21,13 @@ public enum VehicleEventType {
     /** A shipment's vehicle entered the destination geofence. */
     SHIPMENT_ARRIVED,
     /** A shipment still on the road after its ETA (episode: closed when it arrives). */
-    SHIPMENT_DELAYED
+    SHIPMENT_DELAYED,
+    /** Inside a geofence long enough to be a visit (stamped at the first reading inside). */
+    GEOFENCE_ENTER,
+    /** Out of a geofence after a visit (stamped at the last reading inside), with the dwell. */
+    GEOFENCE_EXIT,
+    /** Through a geofence without stopping long enough to be a visit, or over it between two readings. */
+    GEOFENCE_PASS,
+    /** Inside a geofence longer than its dwell limit (episode: closed when the vehicle leaves). */
+    GEOFENCE_DWELL
 }

@@ -86,8 +86,9 @@ arrive late and out of order (a device out of coverage stores readings and sends
 |---|---|---|---|---|
 | `ignition` | `gps-ignition-service` | 10 | IGNITION_ON / OFF, IDLING | `gps:state:ignition:*` |
 | `vehicle-state` | `gps-vehicle-state-service` | 20 | HARSH_ACCELERATION / BRAKING | `gps:state:vehicle:*`, `gps:history:*` |
-| `speed-violation` | `gps-speed-violation-service` | 30 | OVERSPEED, SPEED_SENSOR_MISMATCH | `gps:state:speed:*` |
+| `speed-violation` | `gps-speed-violation-service` | 30 | OVERSPEED, SPEED_SENSOR_MISMATCH (graded by the alert policy, geofence speed limits) | `gps:state:speed:*` |
 | `stoppage` | `gps-stoppage-service` | 40 | STOPPAGE, PARKED | `gps:state:stoppage:*` |
+| `geofence` | `gps-geofence-service` | 45 | GEOFENCE_ENTER / EXIT / PASS / DWELL ([GEOFENCING_GUIDE.md](GEOFENCING_GUIDE.md)) | `gps:state:geofence:*` (+ PostgreSQL `geofence_visit`) |
 | `shipment-tracking` | `gps-shipment-tracking-service` | 50 | SHIPMENT_DEPARTED / ARRIVED / DELAYED | none (PostgreSQL `shipment`) |
 
 The first four kept their consumer group names when they became modules, so they continue from their committed

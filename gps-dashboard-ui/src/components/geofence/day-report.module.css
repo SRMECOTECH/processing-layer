@@ -1,0 +1,209 @@
+/* The day-wise geofence report: insights, where the time went, crowding by hour, each truck's 24 hours. */
+
+.insights {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.insight {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--tile);
+  line-height: 1.45;
+}
+
+.insight.high {
+  background: var(--bad-soft);
+}
+
+.insight.medium {
+  background: var(--warn-soft);
+}
+
+.share {
+  display: block;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.shareFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+/* ---- crowding: one row per fence, 24 hour cells */
+
+.heat {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) repeat(24, minmax(14px, 1fr));
+  gap: 3px;
+  align-items: center;
+  overflow-x: auto;
+  font-size: 12px;
+}
+
+.heatName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+.heatCell {
+  height: 22px;
+  border-radius: 5px;
+  background: var(--accent);
+}
+
+.heatHour {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 10px;
+}
+
+/* ---- each truck's day */
+
+.trucks {
+  display: flex;
+  flex-direction: column;
+}
+
+.truck {
+  display: grid;
+  grid-template-columns: minmax(160px, 230px) 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.truck:first-child {
+  border-top: none;
+}
+
+.truckName {
+  font-weight: 600;
+}
+
+.truckFacts {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+.track {
+  position: relative;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--track);
+  margin-top: 4px;
+}
+
+.segment {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 3px;
+  border-radius: 5px;
+  background: var(--role, var(--good));
+  color: var(--ink-text);
+  font-size: 11px;
+  line-height: 22px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* one colour per fence role, for the bars and the legend */
+.ORIGIN {
+  --role: var(--accent);
+}
+
+.DESTINATION {
+  --role: var(--good);
+}
+
+.YARD {
+  --role: var(--warn);
+}
+
+.CHECKPOINT,
+.ZONE {
+  --role: var(--rail-icon);
+}
+
+.segment.over {
+  box-shadow: inset 0 0 0 2px var(--bad);
+}
+
+.segment.open {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.ticks {
+  position: relative;
+  height: 14px;
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.tick:first-child {
+  transform: none;
+}
+
+.tick:last-child {
+  transform: translateX(-100%);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  background: var(--role);
+}
+
+.more {
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .truck {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+@media print {
+  .truck {
+    break-inside: avoid;
+  }
+}

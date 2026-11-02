@@ -196,11 +196,11 @@ export const SECTIONS: Section[] = [
             href: "/processing/geofence",
             label: "Geofencing",
             icon: Grid3x3,
-            feed: "planned",
+            feed: "live",
             children: [
-              { href: "/processing/geofence", label: "Zone hierarchy", feed: "planned" },
-              { href: "/processing/geofence/distance", label: "Nested distance", feed: "planned" },
-              { href: "/processing/geofence/events", label: "Entry & exit", feed: "planned" },
+              { href: "/processing/geofence", label: "Live geofences", feed: "live" },
+              { href: "/processing/geofence/events", label: "Entry & exit", feed: "live" },
+              { href: "/processing/geofence/distance", label: "Index & accuracy", feed: "live" },
             ],
           },
           {
@@ -252,7 +252,7 @@ export const SECTIONS: Section[] = [
             children: [
               { href: "/alerts/overspeed", label: "Dual verification", feed: "live" },
               { href: "/alerts/overspeed/audit", label: "Device log audit", feed: "live" },
-              { href: "/alerts/overspeed/policy", label: "Alert policy", feed: "planned" },
+              { href: "/alerts/overspeed/policy", label: "Alert policy", feed: "live" },
             ],
           },
           {
@@ -292,6 +292,7 @@ export const SECTIONS: Section[] = [
           { href: "/reports", label: "Day report", icon: CalendarClock, feed: "live" },
           { href: "/reports/month", label: "Month report", icon: CalendarDays, feed: "live" },
           { href: "/reports/vehicle", label: "Vehicle day sheet", icon: Truck, feed: "live" },
+          { href: "/reports/geofence", label: "Geofence day report", icon: MapPinned, feed: "live" },
         ],
       },
       {
@@ -435,7 +436,15 @@ export const TRANSPORTER_SECTIONS: Section[] = [
     label: "Fleet",
     icon: Truck,
     description: "Every truck you own or carry shipments with, live.",
-    groups: [{ title: "Fleet", items: [{ href: "/transporter/fleet", label: "Fleet board", icon: Truck, feed: "live" }] }],
+    groups: [
+      {
+        title: "Fleet",
+        items: [
+          { href: "/transporter/fleet", label: "Fleet board", icon: Truck, feed: "live" },
+          { href: "/transporter/geofences", label: "Geofence day report", icon: MapPinned, feed: "live" },
+        ],
+      },
+    ],
   },
   {
     href: "/transporter/shipments",
@@ -482,7 +491,15 @@ export const CONSIGNER_SECTIONS: Section[] = [
     label: "Performance",
     icon: ChartLine,
     description: "Transporters, lanes, consignees and plant detention.",
-    groups: [{ title: "Performance", items: [{ href: "/consigner/performance", label: "Scorecards", icon: ChartLine, feed: "live" }] }],
+    groups: [
+      {
+        title: "Performance",
+        items: [
+          { href: "/consigner/performance", label: "Scorecards", icon: ChartLine, feed: "live" },
+          { href: "/consigner/geofences", label: "Geofence day report", icon: MapPinned, feed: "live" },
+        ],
+      },
+    ],
   },
   {
     href: "/consigner/alerts",

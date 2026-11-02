@@ -82,6 +82,19 @@ public class SmartTruckGpsReader {
         return jdbcTemplate.queryForList("SELECT * FROM tta_trips WHERE i_trip_no IN (" + placeholders + ")", tripNumbers.toArray());
     }
 
+    /**
+     * smart_truck's geofence master (table geofences), every fence active or not: i_fence_id, s_key (the normalised
+     * node name the trips use), s_name, s_role (origin / destination / yard), d_lat, d_long, i_radius_m, i_trips_seen,
+     * i_spread_m, b_manual, b_active, s_source (plant, anchor, anchor_unverified, gazetteer).
+     */
+    public List<java.util.Map<String, Object>> readGeofences() {
+        return jdbcTemplate.queryForList("""
+                SELECT i_fence_id, s_key, s_name, s_role, d_lat, d_long, i_radius_m, i_trips_seen, i_spread_m, b_manual,
+                       b_active, s_source
+                FROM geofences ORDER BY i_fence_id
+                """);
+    }
+
     /** The first {@code maximumPings} pings of one trip, oldest first. */
     public List<SmartTruckGpsPing> readPingsOfTrip(long tripNumber, int maximumPings) {
         return jdbcTemplate.query(PINGS_OF_ONE_TRIP, this::toGpsPing, tripNumber, maximumPings);

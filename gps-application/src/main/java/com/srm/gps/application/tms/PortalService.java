@@ -427,6 +427,27 @@ public class PortalService {
                 """.formatted(where), scope.parameters().addValue("limit", limit), (rs, n) -> event(rs));
     }
 
+    /**
+     * The vehicles whose geofence visits on {@code day} a user may see, or null for every vehicle (the GPS provider
+     * unfiltered): a transporter its own trucks and the trucks carrying its shipments that week; a consigner the trucks
+     * carrying its goods that week.
+     */
+    public java.util.Collection<String> geofenceVehicles(Scope scope, java.time.LocalDate day) {
+        if (scope.role() == Role.DEVELOPER && scope.transporterFilter() == null && scope.consignerFilter() == null) {
+            return null;
+        }
+        Instant dayStart = day.atStartOfDay(zone).toInstant();
+        MapSqlParameterSource p = scope.parameters()
+                .addValue("from", java.sql.Timestamp.from(dayStart.minus(java.time.Duration.ofDays(7))))
+                .addValue("to", java.sql.Timestamp.from(dayStart.plus(java.time.Duration.ofDays(1))));
+        String shipments = "SELECT s.vehicle_registration_no FROM shipment s WHERE " + scope.where()
+                + " AND s.dispatched_at >= :from AND s.dispatched_at < :to";
+        String sql = scope.role() == Role.TRANSPORTER
+                ? "SELECT v.registration_no FROM vehicle v WHERE v.owner_tenant_id = :scopeTenant UNION " + shipments
+                : shipments;
+        return new java.util.LinkedHashSet<>(jdbc.queryForList(sql, p, String.class));
+    }
+
     private static final String EVENT_SELECT = """
             SELECT e.id, e.imei, e.vehicle_registration_no, e.tenant_code, e.event_type, e.severity, e.status, e.started_at,
                    e.ended_at, e.latitude, e.longitude, e.detected_by, e.details::text AS details

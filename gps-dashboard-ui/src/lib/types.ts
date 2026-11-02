@@ -328,7 +328,11 @@ export type VehicleEventView = {
     | "HARSH_BRAKING"
     | "SHIPMENT_DEPARTED"
     | "SHIPMENT_ARRIVED"
-    | "SHIPMENT_DELAYED";
+    | "SHIPMENT_DELAYED"
+    | "GEOFENCE_ENTER"
+    | "GEOFENCE_EXIT"
+    | "GEOFENCE_PASS"
+    | "GEOFENCE_DWELL";
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "OPEN" | "CLOSED";
   startedAt: string;

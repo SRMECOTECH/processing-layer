@@ -28,6 +28,8 @@ public final class RedisKeyNames {
 
     public static final String LIVE_POSITIONS_GEO = "gps:live:positions";
     public static final String SPEED_RULE_SCOPES = "gps:config:speed-rules";
+    /** The over-speed alert policy (bands, night rule, sensor-suspect handling): one hash, edited from the console. */
+    public static final String SPEED_POLICY = "gps:config:speed-policy";
     public static final String DEFAULT_SPEED_RULE_SCOPE = "default";
 
     /**

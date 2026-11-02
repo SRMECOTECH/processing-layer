@@ -136,6 +136,24 @@ gps:
       enabled: true
     shipment-tracking:
       enabled: true
+    # Live geofencing against the place table (consumer group gps-geofence-service). The confirmation and escape rules
+    # are smart_truck's (detection.py), so live visits agree with its tta_trip_geofence_events:
+    #   confirm-minutes           a new side of a border is believed after this long on it (GPS scatter at a gate)
+    #   escape-factor             ... or at once for an exit, beyond this many radii from the centre
+    #   pass-min-travel-meters    a short stay that never held is a pass-through if the truck moved this far meanwhile
+    #   crossing-max-gap-minutes  fences jumped between two readings are inferred only up to this gap
+    #   dwell-alert-minutes(-role) GEOFENCE_DWELL after this long inside (a fence's own dwell_alert_min wins); 0 = off
+    geofence:
+      enabled: true
+      confirm-minutes: 15
+      escape-factor: 2.0
+      pass-min-travel-meters: 300
+      crossing-max-gap-minutes: 30
+      crossing-min-move-meters: 200
+      dwell-alert-minutes: 360
+      dwell-alert-minutes-origin: 720
+      dwell-alert-minutes-destination: 360
+      dwell-alert-minutes-yard: 240
   # Sign-in for the three roles (GPS provider = DEVELOPER, TRANSPORTER, CONSIGNER). Demo users "abc" with this
   # password are created when a role has no user yet; switch it off on a real installation.
   auth:

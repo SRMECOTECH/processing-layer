@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
 @Component
 public class PlaceStore {
 
-    public enum Role { ORIGIN, DESTINATION }
+    /** A shipment starts in an ORIGIN and ends in a DESTINATION; the other roles are geofences for the geofence module. */
+    public enum Role { ORIGIN, DESTINATION, YARD, CHECKPOINT, ZONE }
 
     public record Place(long id, String code, String name, Role role, double latitude, double longitude, int radiusMeters,
                         String source, boolean active) {
@@ -85,6 +86,11 @@ public class PlaceStore {
                 .addValue("lat", latitude).addValue("lon", longitude).addValue("radius", radiusMeters));
         byId = null;
         return resolve(name, role).orElseThrow();
+    }
+
+    /** Forget the copy in memory: the places were changed elsewhere (the geofence API). */
+    public void invalidate() {
+        byId = null;
     }
 
     public void deactivate(long id) {

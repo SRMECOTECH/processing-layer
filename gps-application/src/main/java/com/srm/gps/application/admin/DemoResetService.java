@@ -18,6 +18,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaAdmin;
@@ -47,7 +48,8 @@ import java.util.function.BooleanSupplier;
  *      month's reports keep their numbers; without it they are emptied too;
  *   5. delete the platform's telemetry keys in Redis (RedisKeyNames.TELEMETRY_PATTERNS): configuration (gps:config:*,
  *      the speed rules) stays, and so do other programs' keys in a shared Redis (the HP ingestion API's gps:points);
- *   6. forget the in-memory previous readings and start the load counters from 0;
+ *   6. forget the in-memory previous readings (and tell the modules, {@link TelemetryCleared}) and start the load
+ *      counters from 0;
  *   7. reset the Kafka Streams apps (local state, consumer groups, changelog topics) and start them again;
  *   8. resume the consumers, and restart the fleet if asked.
  * Not for production: it is switched off with gps.admin.reset-enabled=false.
@@ -59,7 +61,7 @@ public class DemoResetService {
     private static final List<String> TOPICS = List.of(KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS,
             KafkaTopicNames.REJECTED_FRAMES, KafkaTopicNames.VEHICLE_EVENTS, KafkaTopicNames.VEHICLE_ACTIVITY,
             KafkaTopicNames.DEAD_LETTERS, KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
-    private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "gps_trip_late_reading", "gps_trip",
+    private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "geofence_visit", "gps_trip_late_reading", "gps_trip",
             "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
     /** Days back whose report numbers are frozen before the tables are emptied (keepReports). */
     private static final int REPORT_DAYS_KEPT = 400;
@@ -75,13 +77,16 @@ public class DemoResetService {
     private final PipelineMetrics metrics;
     private final ObjectProvider<GpsStreamsRuntime> kafkaStreams;
     private final DaySummarizer daySummaries;
+    private final ApplicationEventPublisher events;
 
     public DemoResetService(GpsDeviceSimulatorService simulator, GpsDeviceSimulatorSettings simulatorSettings,
                             ObjectProvider<KafkaListenerEndpointRegistry> listenerRegistry,
                             ObjectProvider<KafkaBacklogSkipper> backlogSkipper, ObjectProvider<KafkaAdmin> kafkaAdmin,
                             JdbcTemplate jdbc, RedisStateStore redis, DatabaseBackedPreviousReadingStore previousReadings,
-                            PipelineMetrics metrics, ObjectProvider<GpsStreamsRuntime> kafkaStreams, DaySummarizer daySummaries) {
+                            PipelineMetrics metrics, ObjectProvider<GpsStreamsRuntime> kafkaStreams, DaySummarizer daySummaries,
+                            ApplicationEventPublisher events) {
         this.daySummaries = daySummaries;
+        this.events = events;
         this.simulator = simulator;
         this.simulatorSettings = simulatorSettings;
         this.listenerRegistry = listenerRegistry;
@@ -149,6 +154,7 @@ public class DemoResetService {
             notes.add("Redis not emptied: " + problem.getMessage());
         }
         previousReadings.forgetAll();
+        events.publishEvent(new TelemetryCleared(Instant.now()));
         metrics.reset();
 
         List<String> streamsAppsReset = new ArrayList<>();

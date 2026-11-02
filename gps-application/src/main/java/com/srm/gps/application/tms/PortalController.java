@@ -1,8 +1,12 @@
 package com.srm.gps.application.tms;
 
 import com.srm.gps.application.auth.PortalUser;
+import com.srm.gps.application.geofence.GeofenceController;
+import com.srm.gps.application.geofence.GeofenceReportService;
+import com.srm.gps.application.geofence.GeofenceVisitStore;
 import com.srm.gps.application.tms.ShipmentColumns.Field;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +41,7 @@ import java.util.stream.Collectors;
  *   GET  /api/portal/shipments/template           an empty CSV in the tta_trips columns
  *   GET  /api/portal/fleet                        the transporter's trucks, live
  *   GET  /api/portal/alerts                       events the user may see
+ *   GET  /api/portal/geofence-report?date=        the day-wise geofence report of the user's trucks (.csv: the visits)
  */
 @RestController
 @RequestMapping("/api/portal")
@@ -47,12 +53,41 @@ public class PortalController {
     private final ShipmentImportService importer;
     private final ShipmentStore shipments;
     private final TenantDirectory tenants;
+    private final GeofenceReportService geofenceReports;
 
-    public PortalController(PortalService portal, ShipmentImportService importer, ShipmentStore shipments, TenantDirectory tenants) {
+    public PortalController(PortalService portal, ShipmentImportService importer, ShipmentStore shipments, TenantDirectory tenants,
+                            GeofenceReportService geofenceReports) {
         this.portal = portal;
         this.importer = importer;
         this.shipments = shipments;
         this.tenants = tenants;
+        this.geofenceReports = geofenceReports;
+    }
+
+    /** The day-wise geofence report, cut to the user's trucks (see PortalService#geofenceVehicles). */
+    @GetMapping("/geofence-report")
+    public Map<String, Object> geofenceReport(HttpServletRequest request,
+                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                              @RequestParam(required = false) String vehicle, @RequestParam(required = false) Long fenceId,
+                                              @RequestParam(required = false) String transporter, @RequestParam(required = false) String consigner) {
+        LocalDate day = date == null ? geofenceReports.today() : date;
+        return geofenceReports.day(day, geofenceFilter(request, day, vehicle, fenceId, transporter, consigner));
+    }
+
+    @GetMapping(value = "/geofence-report.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> geofenceReportCsv(HttpServletRequest request,
+                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                                    @RequestParam(required = false) String vehicle, @RequestParam(required = false) Long fenceId,
+                                                    @RequestParam(required = false) String transporter, @RequestParam(required = false) String consigner) {
+        LocalDate day = date == null ? geofenceReports.today() : date;
+        return GeofenceController.csv(day, geofenceReports.dayVisits(day, geofenceFilter(request, day, vehicle, fenceId, transporter, consigner)),
+                geofenceReports.zone());
+    }
+
+    private GeofenceVisitStore.Filter geofenceFilter(HttpServletRequest request, LocalDate day, String vehicle, Long fenceId,
+                                                     String transporter, String consigner) {
+        ShipmentStore.Scope scope = portal.scope(PortalUser.of(request), transporter, consigner);
+        return new GeofenceVisitStore.Filter(null, vehicle, fenceId, null, portal.geofenceVehicles(scope, day));
     }
 
     @GetMapping("/overview")

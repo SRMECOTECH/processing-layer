@@ -40,6 +40,7 @@ const EVENT_TITLE: Record<string, string> = {
   HARSH_ACCELERATION: "Harsh acceleration",
   HARSH_BRAKING: "Harsh braking",
   SHIPMENT_DELAYED: "Shipment delayed",
+  GEOFENCE_DWELL: "Too long inside a geofence",
 };
 
 /**

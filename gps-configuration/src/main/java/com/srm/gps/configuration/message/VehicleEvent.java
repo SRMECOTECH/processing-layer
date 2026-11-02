@@ -42,8 +42,15 @@ public record VehicleEvent(
 
     public enum Status { OPEN, CLOSED }
 
-    /** Same episode, same key: IMEI + type + start. */
+    /**
+     * Details key that tells apart episodes of one type starting at the same moment on one vehicle: a truck entering
+     * a plant and the city around it with the same reading has one GEOFENCE_ENTER per fence (scope = fence id).
+     */
+    public static final String EPISODE_SCOPE = "episodeScope";
+
+    /** Same episode, same key: IMEI + type + start (+ the episode scope, when the details carry one). */
     public String eventKey() {
-        return imei + "|" + type + "|" + startedAt.toEpochMilli();
+        Object scope = details == null ? null : details.get(EPISODE_SCOPE);
+        return imei + "|" + type + "|" + startedAt.toEpochMilli() + (scope == null ? "" : "|" + scope);
     }
 }

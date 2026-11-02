@@ -19,6 +19,10 @@ export const EVENT_LABEL: Record<VehicleEventView["type"], string> = {
   SHIPMENT_DEPARTED: "Shipment departed",
   SHIPMENT_ARRIVED: "Shipment arrived",
   SHIPMENT_DELAYED: "Shipment delayed",
+  GEOFENCE_ENTER: "Entered fence",
+  GEOFENCE_EXIT: "Left fence",
+  GEOFENCE_PASS: "Passed fence",
+  GEOFENCE_DWELL: "Too long in fence",
 };
 
 export function severityTone(severity: VehicleEventView["severity"]): Tone {
@@ -71,6 +75,14 @@ export function eventSummary(e: VehicleEventView): string {
       return `trip ${d.tripNo}: reached ${d.destination ?? "the destination"}${d.consignee ? ` (${d.consignee})` : ""}`;
     case "SHIPMENT_DELAYED":
       return `trip ${d.tripNo} to ${d.destination ?? "?"}: past its ETA${e.status === "CLOSED" ? ", arrived late" : ""}`;
+    case "GEOFENCE_ENTER":
+      return `${d.fenceName ?? d.fenceCode}${Number(d.entryGapMinutes) > 60 ? ` (±${d.entryGapMinutes} min GPS gap)` : ""}`;
+    case "GEOFENCE_EXIT":
+      return `${d.fenceName ?? d.fenceCode} after ${formatDuration(Number(d.dwellMinutes ?? 0) * 60)}`;
+    case "GEOFENCE_PASS":
+      return `${d.fenceName ?? d.fenceCode}${d.inferred ? ", between two readings" : ""}`;
+    case "GEOFENCE_DWELL":
+      return `${d.fenceName ?? d.fenceCode}: over its ${d.limitMinutes ?? "?"} min limit${e.status === "CLOSED" ? `, left after ${formatDuration(Number(d.dwellMinutes ?? 0) * 60)}` : ""}`;
   }
 }
 
