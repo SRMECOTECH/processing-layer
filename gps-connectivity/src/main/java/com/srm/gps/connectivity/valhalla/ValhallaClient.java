@@ -31,6 +31,17 @@ public class ValhallaClient {
     public record Route(double lengthKm, double timeSeconds, List<String> legShapes, long millis) {
     }
 
+    /** One instruction of a leg: the shape points begin..end take this long (Valhalla's truck speed for those roads). */
+    public record Maneuver(int beginShapeIndex, int endShapeIndex, double timeSeconds, double lengthKm) {
+    }
+
+    public record Leg(String shape, double lengthKm, double timeSeconds, List<Maneuver> maneuvers) {
+    }
+
+    /** A route with everything a route plan needs: each leg's shape and maneuver timings. */
+    public record Plan(double lengthKm, double timeSeconds, List<Leg> legs, long millis) {
+    }
+
     private final JsonHttp http;
 
     public ValhallaClient(JsonHttp http) {
@@ -73,5 +84,66 @@ public class ValhallaClient {
             throw new IOException("Valhalla answered without a route summary");
         }
         return new Route(length.doubleValue(), time.doubleValue(), shapes, answer.millis());
+    }
+
+    /**
+     * A route plan (bidirectional A* on Valhalla's tiled road graph) through the locations in order.
+     *
+     * @param startHeading the vehicle's heading at the first location (degrees from north), so the plan does not begin
+     *                     with a U-turn; null when unknown
+     */
+    public Plan plan(String baseUrl, List<Location> locations, String costing, Double startHeading) throws IOException, InterruptedException {
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (int i = 0; i < locations.size(); i++) {
+            Location location = locations.get(i);
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("lat", location.latitude());
+            point.put("lon", location.longitude());
+            if (i == 0 && startHeading != null && !startHeading.isNaN()) {
+                point.put("heading", Math.round(startHeading));
+                point.put("heading_tolerance", 60);
+            }
+            points.add(point);
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("locations", points);
+        request.put("costing", costing);
+        request.put("units", "kilometers");
+        // maneuvers (with their shape indices and times) but no narrative text; narrative:false would drop the maneuvers
+        request.put("directions_type", "maneuvers");
+        JsonHttp.Answer answer = http.post(JsonHttp.baseUrl(baseUrl) + "/route", request);
+
+        Map<?, ?> trip = answer.body().get("trip") instanceof Map<?, ?> map ? map : Map.of();
+        Map<?, ?> summary = trip.get("summary") instanceof Map<?, ?> map ? map : Map.of();
+        if (!(summary.get("length") instanceof Number length) || !(summary.get("time") instanceof Number time)) {
+            throw new IOException("Valhalla answered without a route summary");
+        }
+        List<Leg> legs = new ArrayList<>();
+        if (trip.get("legs") instanceof List<?> list) {
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> leg) || !(leg.get("shape") instanceof String shape)) {
+                    continue;
+                }
+                Map<?, ?> legSummary = leg.get("summary") instanceof Map<?, ?> map ? map : Map.of();
+                List<Maneuver> maneuvers = new ArrayList<>();
+                if (leg.get("maneuvers") instanceof List<?> steps) {
+                    for (Object step : steps) {
+                        if (step instanceof Map<?, ?> m && m.get("begin_shape_index") instanceof Number begin
+                                && m.get("end_shape_index") instanceof Number end) {
+                            maneuvers.add(new Maneuver(begin.intValue(), end.intValue(), number(m.get("time")), number(m.get("length"))));
+                        }
+                    }
+                }
+                legs.add(new Leg(shape, number(legSummary.get("length")), number(legSummary.get("time")), maneuvers));
+            }
+        }
+        if (legs.isEmpty()) {
+            throw new IOException("Valhalla answered without route legs");
+        }
+        return new Plan(length.doubleValue(), time.doubleValue(), legs, answer.millis());
+    }
+
+    private static double number(Object value) {
+        return value instanceof Number n ? n.doubleValue() : 0;
     }
 }

@@ -90,6 +90,8 @@ arrive late and out of order (a device out of coverage stores readings and sends
 | `stoppage` | `gps-stoppage-service` | 40 | STOPPAGE, PARKED | `gps:state:stoppage:*` |
 | `geofence` | `gps-geofence-service` | 45 | GEOFENCE_ENTER / EXIT / PASS / DWELL ([GEOFENCING_GUIDE.md](GEOFENCING_GUIDE.md)) | `gps:state:geofence:*` (+ PostgreSQL `geofence_visit`) |
 | `shipment-tracking` | `gps-shipment-tracking-service` | 50 | SHIPMENT_DEPARTED / ARRIVED / DELAYED | none (PostgreSQL `shipment`) |
+| `waypoints` | `gps-waypoint-service` | 52 | WAYPOINT_ARRIVED / DEPARTED / MISSED | `gps:state:waypoints:*` (+ PostgreSQL `route_stop`) |
+| `route-deviation` | `gps-route-deviation-service` | 55 | ROUTE_DEVIATION, ROUTE_ALTERNATE, WRONG_DIRECTION, ETA_CHANGED, DESTINATION_REACHED ([ROUTE_DEVIATION_ETA_DESIGN.md](ROUTE_DEVIATION_ETA_DESIGN.md)) | `gps:state:route-deviation:*` (+ PostgreSQL `route_plan`) |
 
 The first four kept their consumer group names when they became modules, so they continue from their committed
 offsets: no replay and no gap. Kafka Streams analytics is not a `GpsModule` (it is a Kafka Streams app with its own

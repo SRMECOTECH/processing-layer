@@ -332,7 +332,15 @@ export type VehicleEventView = {
     | "GEOFENCE_ENTER"
     | "GEOFENCE_EXIT"
     | "GEOFENCE_PASS"
-    | "GEOFENCE_DWELL";
+    | "GEOFENCE_DWELL"
+    | "ROUTE_DEVIATION"
+    | "ROUTE_ALTERNATE"
+    | "WRONG_DIRECTION"
+    | "ETA_CHANGED"
+    | "DESTINATION_REACHED"
+    | "WAYPOINT_ARRIVED"
+    | "WAYPOINT_DEPARTED"
+    | "WAYPOINT_MISSED";
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "OPEN" | "CLOSED";
   startedAt: string;

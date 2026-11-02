@@ -61,8 +61,8 @@ public class DemoResetService {
     private static final List<String> TOPICS = List.of(KafkaTopicNames.RAW_DEVICE_FRAMES, KafkaTopicNames.PROCESSED_POSITIONS,
             KafkaTopicNames.REJECTED_FRAMES, KafkaTopicNames.VEHICLE_EVENTS, KafkaTopicNames.VEHICLE_ACTIVITY,
             KafkaTopicNames.DEAD_LETTERS, KafkaTopicNames.SHADOW_PROCESSED_POSITIONS, KafkaTopicNames.SHADOW_REJECTED_FRAMES);
-    private static final List<String> TELEMETRY_TABLES = List.of("vehicle_event", "geofence_visit", "gps_trip_late_reading", "gps_trip",
-            "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
+    private static final List<String> TELEMETRY_TABLES = List.of("route_stop", "route_plan", "vehicle_event", "geofence_visit",
+            "gps_trip_late_reading", "gps_trip", "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame");
     /** Days back whose report numbers are frozen before the tables are emptied (keepReports). */
     private static final int REPORT_DAYS_KEPT = 400;
 

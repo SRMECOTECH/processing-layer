@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { eventSummary as routeEventSummary, type RouteEvent } from "@/lib/routes";
 import { Empty, Tag, type Tone } from "./kit";
 import { formatDateTime, formatDuration, formatTime, vehicleName } from "@/lib/format";
 import type { VehicleEventView } from "@/lib/types";
@@ -23,6 +24,14 @@ export const EVENT_LABEL: Record<VehicleEventView["type"], string> = {
   GEOFENCE_EXIT: "Left fence",
   GEOFENCE_PASS: "Passed fence",
   GEOFENCE_DWELL: "Too long in fence",
+  ROUTE_DEVIATION: "Off route",
+  ROUTE_ALTERNATE: "Alternate road",
+  WRONG_DIRECTION: "Wrong direction",
+  ETA_CHANGED: "ETA changed",
+  DESTINATION_REACHED: "Destination reached",
+  WAYPOINT_ARRIVED: "At stop",
+  WAYPOINT_DEPARTED: "Left stop",
+  WAYPOINT_MISSED: "Stop missed",
 };
 
 export function severityTone(severity: VehicleEventView["severity"]): Tone {
@@ -83,6 +92,15 @@ export function eventSummary(e: VehicleEventView): string {
       return `${d.fenceName ?? d.fenceCode}${d.inferred ? ", between two readings" : ""}`;
     case "GEOFENCE_DWELL":
       return `${d.fenceName ?? d.fenceCode}: over its ${d.limitMinutes ?? "?"} min limit${e.status === "CLOSED" ? `, left after ${formatDuration(Number(d.dwellMinutes ?? 0) * 60)}` : ""}`;
+    case "ROUTE_DEVIATION":
+    case "ROUTE_ALTERNATE":
+    case "WRONG_DIRECTION":
+    case "ETA_CHANGED":
+    case "DESTINATION_REACHED":
+    case "WAYPOINT_ARRIVED":
+    case "WAYPOINT_DEPARTED":
+    case "WAYPOINT_MISSED":
+      return `${d.origin ?? "?"} → ${d.destination ?? "?"}: ${routeEventSummary({ ...e, latitude: 0, longitude: 0, details: d } as RouteEvent)}`;
   }
 }
 

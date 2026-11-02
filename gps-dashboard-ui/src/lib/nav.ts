@@ -207,10 +207,10 @@ export const SECTIONS: Section[] = [
             href: "/processing/waypoints",
             label: "Waypoints",
             icon: Waypoints,
-            feed: "planned",
+            feed: "live",
             children: [
-              { href: "/processing/waypoints", label: "Routes & waypoints", feed: "planned" },
-              { href: "/processing/waypoints/arrivals", label: "Arrivals & ETA", feed: "planned" },
+              { href: "/processing/waypoints", label: "Routes & waypoints", feed: "live" },
+              { href: "/processing/waypoints/arrivals", label: "Arrivals & ETA", feed: "live" },
             ],
           },
           {
@@ -268,12 +268,13 @@ export const SECTIONS: Section[] = [
           },
           {
             href: "/alerts/route-deviation",
-            label: "Route deviation",
+            label: "Route deviation & ETA",
             icon: TriangleAlert,
-            feed: "planned",
+            feed: "live",
             children: [
-              { href: "/alerts/route-deviation", label: "Corridors", feed: "planned" },
-              { href: "/alerts/route-deviation/log", label: "Deviation log", feed: "planned" },
+              { href: "/alerts/route-deviation", label: "Live trips & ETA", feed: "live" },
+              { href: "/alerts/route-deviation/plan", label: "Plan a route", feed: "live" },
+              { href: "/alerts/route-deviation/log", label: "Deviation log", feed: "live" },
             ],
           },
         ],
@@ -441,6 +442,7 @@ export const TRANSPORTER_SECTIONS: Section[] = [
         title: "Fleet",
         items: [
           { href: "/transporter/fleet", label: "Fleet board", icon: Truck, feed: "live" },
+          { href: "/transporter/eta", label: "Live ETA & route", icon: Route, feed: "live" },
           { href: "/transporter/geofences", label: "Geofence day report", icon: MapPinned, feed: "live" },
         ],
       },
@@ -496,6 +498,7 @@ export const CONSIGNER_SECTIONS: Section[] = [
         title: "Performance",
         items: [
           { href: "/consigner/performance", label: "Scorecards", icon: ChartLine, feed: "live" },
+          { href: "/consigner/eta", label: "Live ETA & route", icon: Route, feed: "live" },
           { href: "/consigner/geofences", label: "Geofence day report", icon: MapPinned, feed: "live" },
         ],
       },

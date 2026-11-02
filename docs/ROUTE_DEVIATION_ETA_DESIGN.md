@@ -1,9 +1,48 @@
-# Route deviation, wrong direction and live ETA on Valhalla — design for implementation
+# Route deviation, wrong direction and live ETA on Valhalla
 
-Status: **design, not built** (2026-11-02). It replaces the GraphHopper parts of
-[ROUTE_INTELLIGENCE_PLAN.md](ROUTE_INTELLIGENCE_PLAN.md): Valhalla is already built for all of India (the HP home
-server), and the GraphHopper import never finished. Everything per reading is local geometry in a module, like
-geofencing; Valhalla is called once per trip and then only when a truck looks off its route.
+Status: **built** (2026-11-03): modules `route-deviation` and `waypoints`, Flyway V11 (`route_plan`, `route_stop`),
+`/api/routes/**`, Alerts → Route deviation & ETA, Processing → Waypoints, and Live ETA & route in both portals.
+Valhalla on the HP plans; GraphHopper on this laptop (compose profile `routing`) is the fallback engine.
+Sections 1-7 below are the design; section 0 says what was built and where it differs.
+
+## 0. What was built
+
+| Piece | Where |
+|---|---|
+| Pure engine: plan + segment grid + projection, the tracker (state machine, wrong direction, pace, ETA), waypoints | `gps-processing/.../route/` (`RoutePlan`, `RouteTracker`, `RouteTrackState`, `WaypointTracker`, `Polyline6`, `RouteSettings`), 27 unit tests |
+| Engines: Valhalla `/route` with maneuver timings (`directions_type: maneuvers`), GraphHopper `/route` with instruction intervals | `gps-connectivity` `ValhallaClient.plan`, `GraphHopperClient`; `gps-application/route/RoutingEngines` |
+| Plans: every open shipment with an origin and a destination geofence (every 30 s), or by hand; the geofences the line crosses become FENCE stops | `RoutePlanService`, `RoutePlanStore`, V11 |
+| Modules (own consumer groups, Redis state, events before state) | `RouteDeviationModule` (order 55), `WaypointModule` (order 52) |
+| Re-plan checks off the Kafka thread (2 threads, queue 200); the answer waits for the truck's next reading | `RoutePlanService.requestCheck / takeAnswer / adoptAlternate` |
+| Live strips, trip map, deviation log, planner, waypoints, arrivals, portal Live ETA | `RouteLiveService`, `RouteController`, `PortalController /routes/**`, dashboard `components/routes/*` |
+
+Differences from the design below, on purpose for this first version:
+
+- **No map matching yet** (`trace_attributes`): the re-plan check alone decides alternate road or deviation. A
+  service road beside the highway stays inside the 150 m corridor, and "1 km driven off the line" keeps short
+  parallel stretches from being checked at all.
+- **Destination reached is the module's own test** (a reading inside the destination geofence, or 300 m of a
+  destination point), not the geofence module's `GEOFENCE_ENTER`: the team lead takes modules one by one, so this
+  module must work without the geofence module.
+- **No confidence band** on the ETA yet: it needs arrived trips per lane (the lane's pace history is kept already:
+  the median pace of 3+ arrived trips between the same two geofences is a new trip's starting pace).
+- **Wrong direction by heading** also needs 300 m lost along the plan, so a U-turn into a dhaba does not count.
+- Stops are only stays the planner gave (MANUAL); geofences on the way add no stay to the ETA.
+- **Leaving the origin by another road counts.** A truck seen inside its origin that leaves it outside the corridor
+  departs straight into SUSPECT (and is checked like any detour); without this, a truck that never touched the
+  planned line would wait for ever. A truck never seen at the start of a hand-made plan still waits.
+- **A geofence on the way sits where the road enters it**, not at its centre (a 10 km plant fence's centre can be far
+  from the road), and stops are listed and timed in road order.
+- **Only a missed planned stop is an event.** Trucks that start inside a plant past the first geofences of their line
+  raised a WAYPOINT_MISSED for each; a geofence on the way that was not entered is now only marked missed on its stop.
+- **A GPS jump is ignored, three in a row are believed** (the replayed trips restart far away; a real device can be
+  moved to another truck): otherwise the tracker would ignore that truck for ever.
+- **The pace is weighed, and the ETA glides.** Tried in the verify stack on the replayed smart_truck trips: a truck
+  crawling out of the 10 km Tata Steel plant fence measured a live pace of 1.76 in its first 18 km, which moved a
+  430 km ETA by hours and raised ETA_CHANGED every few minutes. Now the pace used is
+  `(starting pace x 60 min + live pace x moving time) / (60 min + moving time)`, the shown ETA glides at most
+  2 min per minute and jumps only when a deviation opens, changes or closes, and ETA_CHANGED needs 30 min or 10 % of
+  the time left, whichever is more (`pace-prior-minutes`, `eta-announce-percent`).
 
 ## 1. What the user asked, answered in one line each
 
@@ -112,7 +151,7 @@ ETA promised at dispatch go into the shipment and the lane's history.
   network itself is the plan's own geometry, so no tile server is needed (tiles can be added where allowed).
 - **Owner view**: deviation minutes and extra km per transporter, per lane, per driver; on-time %, ETA error.
 
-## 7. Build order (tomorrow)
+## 7. Build order (done 2026-11-03, except map matching and the ETA band)
 
 1. `ValhallaClient` in `gps-route-service` (route, trace_attributes) + `route_plan` table (Flyway) + plan on dispatch.
 2. `gps-processing/route/`: `RoutePlanIndex` (segment grid, projection), `RouteTracker` (the state machine above, pure,

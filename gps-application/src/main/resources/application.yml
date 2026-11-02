@@ -154,6 +154,50 @@ gps:
       dwell-alert-minutes-origin: 720
       dwell-alert-minutes-destination: 360
       dwell-alert-minutes-yard: 240
+    # Route deviation, wrong direction and live ETA against each trip's road route (consumer group
+    # gps-route-deviation-service; docs/ROUTE_DEVIATION_ETA_DESIGN.md). Corridor: half-width around the planned line,
+    # wider where the engine plans highway speed. Off the corridor for suspect-readings AND suspect-minutes AND
+    # suspect-off-meters driven (or far-off-meters at once) -> re-plan from where the truck is: within
+    # alternate-time-factor of the planned remaining time (or + alternate-extra-minutes) is ROUTE_ALTERNATE, otherwise
+    # ROUTE_DEVIATION (HIGH over high-added-minutes, CRITICAL over critical-added-minutes). Back inside for
+    # rejoin-readings closes it. Pace = moving time / planned time, learned over pace-horizon-minutes.
+    route-deviation:
+      enabled: true
+      corridor-highway-meters: 150
+      corridor-town-meters: 80
+      suspect-readings: 3
+      suspect-minutes: 5
+      suspect-off-meters: 1000
+      far-off-meters: 2000
+      rejoin-readings: 3
+      alternate-time-factor: 1.10
+      alternate-extra-minutes: 15
+      high-added-minutes: 30
+      critical-added-minutes: 90
+      wrong-way-back-meters: 1000
+      initial-pace: 1.0
+      pace-horizon-minutes: 60
+      rest-after-driving-hours: 4.5
+      rest-minutes: 30
+      pace-prior-minutes: 60
+      eta-announce-minutes: 30
+      eta-announce-percent: 10
+    # The planned stops of each trip (consumer group gps-waypoint-service): arrival after waypoint-min-stay-minutes
+    # inside, missed once the truck is waypoint-miss-meters past the stop along the plan.
+    waypoints:
+      enabled: true
+      waypoint-min-stay-minutes: 2
+      waypoint-miss-meters: 2000
+      waypoint-radius-meters: 300
+  # Road routing for the route plans: Valhalla first (gps.connections.valhalla-url, changed on Developer -> Connections),
+  # GraphHopper on this laptop when Valhalla does not answer (compose profile "routing"; blank = no fallback).
+  # Every open shipment with an origin and a destination geofence is planned within plan-every.
+  routing:
+    costing: truck
+    graphhopper-url: ${GPS_GRAPHHOPPER_URL:}
+    timeout: PT20S
+    plan-shipments: true
+    plan-every: PT30S
   # Sign-in for the three roles (GPS provider = DEVELOPER, TRANSPORTER, CONSIGNER). Demo users "abc" with this
   # password are created when a role has no user yet; switch it off on a real installation.
   auth:

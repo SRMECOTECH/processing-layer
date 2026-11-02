@@ -167,6 +167,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       HOME_SERVER_REDIS_URL: ${HOME_SERVER_REDIS_URL:-redis://192.168.137.1:6379/1}
       VALHALLA_URL: ${VALHALLA_URL:-http://192.168.137.1:8002}
+      # Route plans fall back to GraphHopper on this laptop (profile "routing") when Valhalla does not answer
+      GPS_GRAPHHOPPER_URL: ${GPS_GRAPHHOPPER_URL:-http://graphhopper:8989}
       GPS_INGESTION_API_URL: ${GPS_INGESTION_API_URL:-http://192.168.137.1:8000}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SMARTTRUCK_DATABASE_URL: jdbc:mysql://host.docker.internal:3306/smart_truck

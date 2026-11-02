@@ -4,6 +4,7 @@ import com.srm.gps.application.auth.PortalUser;
 import com.srm.gps.application.geofence.GeofenceController;
 import com.srm.gps.application.geofence.GeofenceReportService;
 import com.srm.gps.application.geofence.GeofenceVisitStore;
+import com.srm.gps.application.route.RouteLiveService;
 import com.srm.gps.application.tms.ShipmentColumns.Field;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
  *   GET  /api/portal/fleet                        the transporter's trucks, live
  *   GET  /api/portal/alerts                       events the user may see
  *   GET  /api/portal/geofence-report?date=        the day-wise geofence report of the user's trucks (.csv: the visits)
+ *   GET  /api/portal/routes/live                  live ETA strips of the user's trucks; /routes/{id} one trip's map
  */
 @RestController
 @RequestMapping("/api/portal")
@@ -54,14 +56,16 @@ public class PortalController {
     private final ShipmentStore shipments;
     private final TenantDirectory tenants;
     private final GeofenceReportService geofenceReports;
+    private final RouteLiveService routes;
 
     public PortalController(PortalService portal, ShipmentImportService importer, ShipmentStore shipments, TenantDirectory tenants,
-                            GeofenceReportService geofenceReports) {
+                            GeofenceReportService geofenceReports, RouteLiveService routes) {
         this.portal = portal;
         this.importer = importer;
         this.shipments = shipments;
         this.tenants = tenants;
         this.geofenceReports = geofenceReports;
+        this.routes = routes;
     }
 
     /** The day-wise geofence report, cut to the user's trucks (see PortalService#geofenceVehicles). */
@@ -72,6 +76,26 @@ public class PortalController {
                                               @RequestParam(required = false) String transporter, @RequestParam(required = false) String consigner) {
         LocalDate day = date == null ? geofenceReports.today() : date;
         return geofenceReports.day(day, geofenceFilter(request, day, vehicle, fenceId, transporter, consigner));
+    }
+
+    /** Live ETA strips of the user's trucks (the same scope as the geofence report). */
+    @GetMapping("/routes/live")
+    public Map<String, Object> routesLive(HttpServletRequest request, @RequestParam(defaultValue = "24") int hours,
+                                          @RequestParam(required = false) String transporter, @RequestParam(required = false) String consigner) {
+        ShipmentStore.Scope scope = portal.scope(PortalUser.of(request), transporter, consigner);
+        return routes.live(portal.geofenceVehicles(scope, geofenceReports.today()), Math.clamp(hours, 1, 24 * 7));
+    }
+
+    /** One trip's map, when the trip's truck is one the user may see. */
+    @GetMapping("/routes/{id}")
+    public Map<String, Object> route(HttpServletRequest request, @PathVariable long id) {
+        ShipmentStore.Scope scope = portal.scope(PortalUser.of(request), null, null);
+        Map<String, Object> trip = routes.detail(id);
+        java.util.Collection<String> allowed = portal.geofenceVehicles(scope, geofenceReports.today());
+        if (allowed != null && !allowed.contains(String.valueOf(trip.get("vehicle")))) {
+            throw new IllegalArgumentException("No such trip");
+        }
+        return trip;
     }
 
     @GetMapping(value = "/geofence-report.csv", produces = "text/csv")

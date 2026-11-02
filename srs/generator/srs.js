@@ -10,9 +10,9 @@ const META = {
   subtitle: "GPS Processing Layer: fleet telemetry streaming platform (gps-streaming-service and PulseStream IoT Console)",
   shortTitle: "SRS: GPS Processing Layer",
   docId: "SRM-GPS-SRS-001",
-  version: "0.9",
+  version: "0.11",
   status: "Draft for review (not yet baselined)",
-  date: "29 October 2026",
+  date: "3 November 2026",
   author: "Sanjoy Chattopadhay, SRMECOTECH",
   classification: "Internal",
   standard: "ISO/IEC/IEEE 29148:2018",
@@ -35,6 +35,7 @@ function build() {
       ["0.1", "19 Oct 2026", "S. Chattopadhay", "Initial requirement notes (README, Hinglish) for the Kafka pipeline, storage and trips."],
       ["0.5", "28 Oct 2026", "S. Chattopadhay", "Kafka Streams, data safety, stream consumers, reports and console captured in project guides."],
       ["0.9", "29 Oct 2026", "S. Chattopadhay", "First formal SRS per ISO/IEC/IEEE 29148:2018: requirement IDs, priorities, verification methods, business rules, regulations, RTM and open issues."],
+      ["0.11", "3 Nov 2026", "S. Chattopadhay", "Transport management (three sign-in roles, shipments, portals), plug-in modules, geofencing, speed alert policy, route plans with route deviation, wrong direction and live ETA, and waypoints moved from Future to Baseline (sections TMS, MOD, GEO, SPD, RTE, WPT); GraphHopper fallback engine."],
     ],
     [
       ["Product owner", "", "", ""],
@@ -72,7 +73,7 @@ function introduction(d) {
     + "and it is written so that a developer can implement the system and an independent tester can verify it without "
     + "having to guess the author's intent.");
   d.p("The document covers two things at once. First, it records the **baseline**: the behaviour of release 0.1.x as implemented in "
-    + "the repository SRMECOTECH/processing-layer (commit c92e25f, 29 October 2026). Second, it states the **proposed** "
+    + "the repository SRMECOTECH/processing-layer (commit c92e25f, 29 October 2026, with transport management, geofencing, the speed alert policy, route deviation, live ETA and waypoints added up to 3 November 2026). Second, it states the **proposed** "
     + "requirements that are needed before the platform carries real customer traffic. Each requirement is labelled "
     + "with its status so that the two are never confused (Section 1.6).");
 
@@ -104,14 +105,18 @@ function introduction(d) {
     "Dead-letter queue and archives of dead letters and rejected frames; the data-safety report.",
     "Day, month and vehicle-day reports, fuel and savings, cost assumptions, and clearing the database while keeping the reports.",
     "Run-time switching of external connections (Redis, Valhalla); the engine dashboard and REST API; demo tools.",
-    "The PulseStream IoT Console with sign-in.",
+    "The PulseStream IoT Console with sign-in for three roles: GPS provider (DEVELOPER), transporter and consigner, each seeing only its own trucks.",
+    "Transport management: shipment files (the smart_truck tta_trips layout, Excel, CSV), device-to-truck mapping, the transporter and consigner portals; every processor is a plug-in module with its own consumer group.",
+    "Geofencing (grid index, circle and polygon tests, the smart_truck confirmation rules), the day-wise geofence report, the speed alert policy and geofence speed limits.",
+    "Route plans on Valhalla (with GraphHopper as fallback): route deviation, alternate roads, wrong direction, live ETA, destination reached, and waypoints.",
   ]);
   d.h3("Out of scope for this release");
   d.bullets([
     "Device protocol parsing (TCP/UDP listeners for vendor protocols). The interface to a future parser is specified (IFR-KAF-001).",
-    "Geofencing, waypoints and ETA, route deviation, ClickHouse storage, and notification delivery (SMS, e-mail, push). The console "
-      + "shows these modules as “Planned” with example data; their requirements are listed as “Future” for traceability only.",
-    "Multiple user accounts, role-based access control and single sign-on (proposed in FR-AUTH-010).",
+    "ClickHouse storage and notification delivery (SMS, e-mail, push). The console shows these as “Planned” with example data; "
+      + "their requirements are listed as “Future” for traceability only.",
+    "Map matching of the real trail (Valhalla trace_attributes) and ETA confidence bands (FR-RTE-015, FR-RTE-016, Future).",
+    "Single sign-on, and roles beyond GPS provider, transporter and consigner (FR-AUTH-010).",
     "Driver management, maintenance scheduling, billing, mobile applications and map-tile hosting.",
     "Writing to the legacy smart_truck database, which is a read-only source.",
   ]);
@@ -301,7 +306,8 @@ function overallDescription(d) {
     ["DEP-002", "PostgreSQL 14 with btree_gist", "System of record"],
     ["DEP-003", "Redis 7.4+ (local or HP home server, database 1)", "Live state, rules, history"],
     ["DEP-004", "smart_truck MySQL 8 (read-only user)", "Simulator source trips"],
-    ["DEP-005", "Valhalla routing engine (HP home server, all-India map)", "Route checks; route deviation (future)"],
+    ["DEP-005", "Valhalla routing engine (HP home server, all-India map, truck costing)", "Route plans and re-plan checks (FR-RTE)"],
+    ["DEP-008", "GraphHopper 11.1 with the India graph (this laptop, compose profile routing)", "Fallback routing engine (FR-RTE-002)"],
     ["DEP-006", "Open-Meteo weather API; TomTom traffic API (optional key)", "Stoppage cause analysis"],
     ["DEP-007", "HP ingestion API (FastAPI), health endpoint only", "Connections page status"],
   ]);
@@ -312,7 +318,7 @@ function functionalRequirements(d) {
   d.h1("Specific Requirements");
   d.p("This section states the functional requirements module by module. Each module gives its purpose, inputs and outputs, "
     + "followed by its requirements, including the behaviour for invalid input, duplicates, late data, missing permissions and "
-    + "unavailable dependencies. Section 3.23 summarises the exceptional cases across modules.");
+    + "unavailable dependencies. Section 3.29 summarises the exceptional cases across modules.");
 
   d.h2("User Authentication and Session Management (AUTH)");
   d.p("Inputs: user name, password, “Keep me signed in”. Outputs: signed session cookie `pulsestream_session`; redirect to the requested page. Component: gps-dashboard-ui (session.ts, auth-actions.ts, proxy.ts).");
@@ -545,6 +551,83 @@ function functionalRequirements(d) {
     ["FR-UI-004", "When the service is unreachable, each page shall show an error state naming the failed call instead of stale or empty data.", M, T, P],
   ], { objective: "OBJ-06", component: "gps-dashboard-ui", tests: "Manual (TC)" });
 
+  d.h2("Transport Management and Portals (TMS)");
+  d.p("Inputs: shipment files from transporters (the smart_truck tta_trips layout, Excel or CSV), device-to-truck mappings agreed between the GPS provider and the transporter, sign-in with a role. Outputs: shipments followed by GPS, the transporter and consigner portals. Components: tms/ShipmentImportService, ShipmentStore, PortalService, PortalController, auth/AuthController, PortalTokens; dashboard /transporter and /consigner.");
+  d.requirements("Transport management requirements", [
+    ["FR-TMS-001", "The sign-in page shall ask for the role (GPS provider, transporter, consigner) as well as the user id and password; tokens shall be signed with the key in auth_key and checked on every /api/portal/** request (HTTP 401 without a valid token).", M, T, B],
+    ["FR-TMS-002", "A transporter or consigner user shall see only the shipments, trucks, alerts, geofence reports and trips of its own company (BR-014).", M, T, B],
+    ["FR-TMS-003", "The system shall import shipment files in the tta_trips column layout, Excel and CSV, show a preview with the column mapping and problems before committing, and record each upload in shipment_import.", M, T, B],
+    ["FR-TMS-004", "Uploading the same trip again shall update its shipment (BR-013); an unchanged row shall be skipped by its row hash.", M, T, B],
+    ["FR-TMS-005", "Origin and destination names in a file shall be resolved to places (geofences) by their normalised code; unknown names shall be listed, not invented.", M, T, B],
+    ["FR-TMS-006", "Module shipment-tracking shall set departure (cleared the origin fence), arrival (entered the destination fence) and delay (past the ETA) from the earliest reading that proves each, and raise SHIPMENT_DEPARTED, SHIPMENT_ARRIVED and SHIPMENT_DELAYED.", M, T, B],
+    ["FR-TMS-007", "The GPS provider shall map a device to a truck for a period (device_assignment); a reading shall belong to the truck mapped at its time (BR-004).", M, T, B],
+    ["FR-TMS-008", "For demonstrations, the GPS provider shall be able to import the shipments behind the trips the fleet simulator replays (POST /api/portal/admin/demo-shipments), through the same importer.", C, T, B],
+  ], { objective: "OBJ-01", component: "tms/*, auth/*, dashboard portals", tests: "PortalSignInTest, ShipmentFileParsingTest" });
+
+  d.h2("Plug-in Processing Modules (MOD)");
+  d.p("Every processor after Kafka is a module of gps-module-api: a GpsModule bean with a descriptor (id, consumer group, order, events, Redis state). Components: gps-module-api, modules/ModuleRunner, ModuleKafkaListeners, ModuleReplayService.");
+  d.requirements("Module requirements", [
+    ["FR-MOD-001", "Each module shall read gps.processed-positions with its own consumer group, keyed by IMEI, so one vehicle's readings reach it in order and a slow module never holds another back.", M, T, B],
+    ["FR-MOD-002", "A module shall be switched off by one line (gps.modules.{id}.enabled = false) without changing any other module.", M, T, B],
+    ["FR-MOD-003", "A module shall keep its per-device state in Redis (gps:state:{id}:{imei}) and write its events before its state, so a retried reading finds the same events (event key upsert).", M, T, B],
+    ["FR-MOD-004", "POST /api/modules/{id}/replay?from= shall stop that module's consumers, clear its state, let it clean its own tables from that moment, move its offsets back and start it again; no other module shall reread.", M, T, B],
+    ["FR-MOD-005", "GET /api/modules shall list every module with its consumer group, load, lag, failures and whether it runs.", M, T, B],
+  ], { objective: "OBJ-07", component: "gps-module-api; modules/*", tests: "Module registry checks in the verify stack" });
+
+  d.h2("Geofencing (GEO)");
+  d.p("Module geofence (consumer group gps-geofence-service). Inputs: processed positions; the place table (circles and polygons). Outputs: geofence_visit, GEOFENCE_* events, the live board, the day-wise geofence report. Components: gps-processing geofence/ (GeofenceIndex, Geofence, GeofenceTracker), geofence/GeofenceModule, GeofenceDirectory, GeofenceReportService.");
+  d.requirements("Geofencing requirements", [
+    ["FR-GEO-001", "Every active geofence shall be filed in every grid cell (0.05 degrees, or the median fence diameter if larger) its bounding box touches; a reading shall be tested only against the fences of its own cell.", M, T, B],
+    ["FR-GEO-002", "The index shall be rebuilt at once after an edit through the API and within 30 s after any other change to place.", M, T, B],
+    ["FR-GEO-003", "Inside a circle shall be decided by distance from the centre (equirectangular, cos of the centre latitude); inside a polygon by ray casting (an odd number of border crossings).", M, T, B],
+    ["FR-GEO-004", "A side of a border shall be believed only after the truck stayed on it 15 minutes, except an exit beyond twice the radius, which counts at once (the smart_truck rules).", M, T, B],
+    ["FR-GEO-005", "Entry shall be stamped at the first reading inside and exit at the last reading inside, with the gap to the reading outside kept as the uncertainty.", M, T, B],
+    ["FR-GEO-006", "In and out within the confirmation time while moving at least 300 m shall be a pass-through; a fence crossed between two readings (gap up to 30 min, move at least 200 m) shall be an inferred pass.", M, T, B],
+    ["FR-GEO-007", "Inside longer than the fence's dwell limit (else its role's: origin 720, destination 360, yard 240, other 360 minutes) shall raise GEOFENCE_DWELL, OPEN until the truck leaves.", M, T, B],
+    ["FR-GEO-008", "The day-wise report shall give, for one day and the user's trucks, the time per fence against that fence's 30-day usual, hourly crowding, each truck's 24-hour timeline and plain-language insights; an open visit shall end at the device's last reading, not the clock.", M, T, B],
+    ["FR-GEO-009", "Measured on all 2,220 smart_truck trips (3.48 million readings), the module should find at least 95 % of smart_truck's own geofence events at under 1 microsecond per reading.", S, T, B],
+  ], { objective: "OBJ-03", component: "gps-processing geofence/; geofence/*", tests: "GeofenceIndexTest, GeofenceTrackerTest, SmartTruckParityCheck" });
+
+  d.h2("Speed Alert Policy and Zone Limits (SPD)");
+  d.p("The over-speed episodes of FR-SPD-001 to 006 are graded by an alert policy kept in Redis (gps:config:speed-policy). Components: gps-processing speed/SpeedPolicy, streaming/SpeedPolicyStore, SpeedRuleController.");
+  d.requirements("Speed alert policy requirements", [
+    ["FR-SPD-007", "An over-speed shall be graded WARNING, BREACH (default 10 km/h over) or SEVERE (default 25 km/h over); an episode the GPS contradicted (SENSOR_SUSPECT) shall be lowered to a device-health ticket when the policy says so.", M, T, B],
+    ["FR-SPD-008", "Inside a geofence with a speed limit, the strictest such limit shall apply when it is lower than the vehicle's rule; the event shall name the zone.", M, T, B],
+    ["FR-SPD-009", "The policy may make limits stricter at night (default 22:00 to 05:00); GET and PUT /api/speed/policy shall read and change it, refusing inconsistent bands with HTTP 400.", S, T, B],
+  ], { objective: "OBJ-03", component: "speed/SpeedPolicy; streaming/SpeedViolationService", tests: "SpeedPolicyTest" });
+
+  d.h2("Route Plans, Route Deviation and Live ETA (RTE)");
+  d.p("Module route-deviation (consumer group gps-route-deviation-service). Inputs: processed positions; route plans; the routing engines. Outputs: route_plan live columns, ROUTE_DEVIATION, ROUTE_ALTERNATE, WRONG_DIRECTION, ETA_CHANGED, DESTINATION_REACHED, the live ETA strips and trip maps. Components: gps-processing route/ (RoutePlan, RouteTracker), route/RoutingEngines, RoutePlanService, RoutePlanDirectory, RouteDeviationModule, RouteLiveService; docs/ROUTE_DEVIATION_ETA_DESIGN.md.");
+  d.requirements("Route deviation and ETA requirements", [
+    ["FR-RTE-001", "Every open shipment with an origin and a destination geofence shall get a road route plan within 60 s (truck costing), with the geofences its line crosses as stops; a plan may also be made by hand from a start, stops and a destination, each a geofence or a latitude, longitude in India.", M, T, B],
+    ["FR-RTE-002", "Plans shall come from Valhalla at the address set on Developer → Connections; when it does not answer, from GraphHopper (gps.routing.graphhopper-url).", M, T, B],
+    ["FR-RTE-003", "A shipment the engines cannot plan shall be tried again after 10 minutes; a manual plan request shall then fail with HTTP 502 naming each engine's problem.", M, T, B],
+    ["FR-RTE-004", "Each reading of a truck with a plan shall be projected onto the plan's line (segment grid of 0.01 degree cells) to give its distance from the line and its progress along it; a reading of a truck without a plan shall cost one map lookup and write nothing.", M, T, B],
+    ["FR-RTE-005", "A reading implying more than 150 km/h from the previous one shall be ignored; nothing shall be judged while the truck is inside its origin or a stop.", M, T, B],
+    ["FR-RTE-006", "Outside the corridor (150 m where the plan is highway speed, 80 m elsewhere) shall only make the truck SUSPECT; back inside for 2 readings shall clear it with no event. A truck seen at its origin that leaves it outside the corridor shall depart as SUSPECT; a truck never seen at the start of its plan shall wait.", M, T, B],
+    ["FR-RTE-007", "After 3 readings AND 5 minutes AND 1 km driven off the line, or at once beyond 2 km, the system shall ask the engine for the route from the truck's position (with its heading) to the destination, without holding the Kafka consumer.", M, T, B],
+    ["FR-RTE-008", "If that route, plus the time already driven off the line, is within 1.10 times (or 15 minutes of) the planned remaining time, the system shall raise ROUTE_ALTERNATE and make it the plan (version + 1); otherwise ROUTE_DEVIATION OPEN with the added time, HIGH above 30 and CRITICAL above 90 minutes. If no engine answers, the deviation shall open unverified (MEDIUM).", M, T, B],
+    ["FR-RTE-009", "Three readings back inside the corridor shall close ROUTE_DEVIATION with minutes off route, kilometres off the plan and extra kilometres.", M, T, B],
+    ["FR-RTE-010", "WRONG_DIRECTION shall open when progress falls 1 km over 3 moving readings, or the heading is more than 135 degrees against the road for 3 readings with at least 300 m lost, or (off the line) the re-plan grows 2 km longer; it shall close after 3 readings going forward.", M, T, B],
+    ["FR-RTE-011", "ETA shall be the reading time plus the planned driving time still ahead × the pace, plus planned stays ahead, plus 30 minutes of rest per 4.5 hours of driving ahead, plus the added time of an open deviation. The pace shall weigh the truck's live pace (moving time ÷ planned time, averaged over 60 minutes, clamped 0.6 to 2.5) against the plan's starting pace (the lane's median of 3+ arrived trips, else 1.0) by moving time since departure, one hour of driving weighing as much as the starting pace.", M, T, B],
+    ["FR-RTE-012", "The shown ETA shall move at most 2 minutes per minute; it shall jump only when a deviation opens, changes or closes. ETA_CHANGED shall be raised when it moved 30 minutes, or 10 % of the time left if that is more, from the last announced value, with the reason (pace, stopped, deviation).", M, T, B],
+    ["FR-RTE-013", "A reading inside the destination geofence (or within 300 m of a destination point) shall raise DESTINATION_REACHED with the promised ETA (the ETA at departure) against the actual arrival, and end the plan.", M, T, B],
+    ["FR-RTE-014", "The console and both portals shall show each trip as a strip (origin, stops, destination, the truck at its progress, coloured by state, ETA against the promise) and on an SVG map with the planned line, the real trail on and off it, the stops and the events; no map library shall be used.", M, T, B],
+    ["FR-RTE-015", "Map matching (Valhalla trace_attributes) should confirm a suspected deviation before the re-plan check.", C, T, F],
+    ["FR-RTE-016", "The ETA should be shown with a confidence band from the lane's past ETA errors.", C, T, F],
+  ], { objective: "OBJ-03", component: "gps-processing route/; route/*; dashboard components/routes", tests: "RouteTrackerTest" });
+
+  d.h2("Waypoints (WPT)");
+  d.p("Module waypoints (consumer group gps-waypoint-service). Inputs: processed positions; the stops of the truck's plan. Outputs: route_stop status, WAYPOINT_ARRIVED, WAYPOINT_DEPARTED, WAYPOINT_MISSED. Components: gps-processing route/WaypointTracker, route/WaypointModule.");
+  d.requirements("Waypoint requirements", [
+    ["FR-WPT-001", "Each stop shall have its place along the plan (chainage), so its order and ETA are known; a stop the current line does not pass shall be marked so.", M, T, B],
+    ["FR-WPT-002", "Two minutes inside a stop shall be an arrival stamped at the first reading inside; the first reading outside shall be the departure, stamped at the last reading inside, with the stay against the planned stay.", M, T, B],
+    ["FR-WPT-003", "In and out within two minutes shall be recorded as a drive-through without an event.", M, T, B],
+    ["FR-WPT-004", "A stop never entered shall be missed once the truck is 2 km past it along the plan, or at the destination; a missed planned stop shall raise WAYPOINT_MISSED (HIGH); a geofence on the way that was not entered shall only be marked missed on the stop.", M, T, B],
+    ["FR-WPT-005", "An arrival while an earlier planned stop is still ahead shall be marked out of order.", M, T, B],
+    ["FR-WPT-006", "Each stop ahead shall show its planned time and live ETA (planned driving to it × the trip's pace + the stays before it); a reached stop its arrival against the plan.", M, T, B],
+  ], { objective: "OBJ-03", component: "gps-processing route/WaypointTracker; route/WaypointModule", tests: "WaypointTrackerTest" });
+
   d.h2("Business Rules");
   d.p("Business rules are policies of the business that the software enforces. They apply in every module.");
   d.requirements("Business rules", [
@@ -560,6 +643,11 @@ function functionalRequirements(d) {
     ["BR-010", "Over-speed events are operational information for the fleet owner; the system shall not present them as legal traffic offences (speed limits differ by road, state and vehicle class).", M, I, B],
     ["BR-011", "Trip distance comes only from in-order readings and is never negative; late readings are counted but never change a trip's distance.", M, T, B],
     ["BR-012", "Configuration (speed rules, cost assumptions, connections) and master data survive Clear database and the demo reset.", M, T, B],
+    ["BR-013", "A shipment is identified by its transporter and trip number: uploading the same trip again updates it, never duplicates it.", M, T, B],
+    ["BR-014", "A transporter or consigner user sees only its own trucks and shipments; the GPS provider sees everything.", M, T, B],
+    ["BR-015", "The legacy smart_truck database and project are read-only references: the platform copies from them and never writes to them.", M, I, B],
+    ["BR-016", "A truck follows at most one active route plan; a new plan closes the previous one.", M, T, B],
+    ["BR-017", "Leaving the planned road is a deviation only when the way taken is clearly slower than the plan; another road about as good is an alternate, not an alarm.", M, T, B],
   ], { objective: "OBJ-02", component: "Database constraints and processing rules", tests: "Schema and unit tests" });
 
   d.h2("Exceptional Conditions Summary");
@@ -584,6 +672,10 @@ function functionalRequirements(d) {
     ["Repeated wrong passwords", "Lock the client address for 60 s.", "FR-AUTH-005"],
     ["Two operators change the same rule", "Last write wins; the change is logged (proposed audit).", "NFR-SEC-009 (Proposed)"],
     ["Capacity limit reached", "Lag grows but nothing is lost while within 31 days; data-safety report warns.", "NFR-CAP-002, FR-SAFE-001"],
+    ["Routing engine down when planning", "GraphHopper is tried after Valhalla; if neither answers, the shipment is tried again 10 minutes later; a manual plan gets HTTP 502.", "FR-RTE-002, FR-RTE-003"],
+    ["Routing engine down during a suspected deviation", "The deviation is opened as unverified (MEDIUM) instead of waiting.", "FR-RTE-008"],
+    ["GPS jump far off the road", "A reading implying more than 150 km/h is ignored by the route tracker.", "FR-RTE-005"],
+    ["Fence edited while trucks are inside", "Index rebuilt within 30 s; a removed fence ends its open visits (FENCE_REMOVED).", "FR-GEO-002, FR-GEO-007"],
   ], { size: 16 });
 }
 
@@ -865,6 +957,10 @@ function dataRequirements(d) {
     ["vehicle_day_summary, report_setting", "Report job; Reports UI", "Reports and cost assumptions"],
     ["dead_letter, rejected_frame", "Archive consumers", "Permanent record of what did not become a position"],
     ["connection_setting", "Connections UI", "Run-time external addresses"],
+    ["app_user, auth_key", "Portal administration; migration", "Who may sign in, as which role; the token signing key"],
+    ["place, shipment, shipment_import", "Geofence editor and import; shipment upload; module shipment-tracking", "Geofence master, trips of trucks, upload history"],
+    ["geofence_visit", "Module geofence", "Visits and drive-throughs of geofences"],
+    ["route_plan, route_stop", "RoutePlanService; modules route-deviation and waypoints", "Planned road routes, their live numbers and stops"],
   ]);
   d.h2("Data Requirements");
   d.requirements("Data requirements", [

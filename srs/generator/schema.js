@@ -10,17 +10,17 @@ const FIG = (name) => path.join(__dirname, "figures", name);
 const META = {
   organisation: "SRMECOTECH",
   title: "Database Schema Specification",
-  subtitle: "PostgreSQL database gps_tracking (Flyway V1 to V8), with the Redis key space, Kafka topics and state stores of the GPS Processing Layer",
+  subtitle: "PostgreSQL database gps_tracking (Flyway V1 to V11), with the Redis key space, Kafka topics and state stores of the GPS Processing Layer",
   shortTitle: "DB Schema: gps_tracking",
   docId: "SRM-GPS-DBS-001",
-  version: "0.9",
+  version: "0.11",
   status: "Draft for review (not yet baselined)",
-  date: "29 October 2026",
+  date: "3 November 2026",
   author: "Sanjoy Chattopadhay, SRMECOTECH",
   classification: "Internal",
   standard: "ISO/IEC/IEEE 29148:2018 (data requirements)",
   confidentialNote: "Companion to SRM-GPS-SRS-001. The schema described here is the one created by the Flyway migrations "
-    + "V1 to V8 in gps-application/src/main/resources/db/migration; if the two ever differ, the migrations are authoritative "
+    + "V1 to V11 in gps-application/src/main/resources/db/migration; if the two ever differ, the migrations are authoritative "
     + "and this document shall be corrected.",
 };
 
@@ -60,6 +60,7 @@ function build() {
     [
       ["0.1", "19 Oct 2026", "S. Chattopadhay", "Tables listed in README section 11 (V1 to V4)."],
       ["0.9", "29 Oct 2026", "S. Chattopadhay", "First formal specification: data dictionary for all 15 tables (V1 to V8), constraints, indexes, relationships, lifecycle, Redis, Kafka and state stores, full DDL."],
+      ["0.11", "3 Nov 2026", "S. Chattopadhay", "V9 (transport management: sign-in, places, shipments), V10 (geofencing: place as the geofence master, geofence_visit) and V11 (route plans and stops): eight new tables, second ER figure, new value sets, queries and idempotency keys."],
     ],
     [
       ["Technical lead / architect", "", "", ""],
@@ -78,7 +79,7 @@ function build() {
     + "satisfies its data requirements DR-001 to DR-010.");
   d.h2("Scope");
   d.bullets([
-    "Fifteen PostgreSQL tables created by Flyway migrations V1 to V8: master data, telemetry, trip detection, events, reporting, archives and configuration.",
+    "Twenty-three PostgreSQL tables created by Flyway migrations V1 to V11: master data, telemetry, trip detection, events, reporting, archives, configuration, sign-in, shipments, geofencing and route plans.",
     "Constraints, indexes, relationships, value sets, write patterns, idempotency keys, retention and recovery.",
     "Redis keys (live state, configuration, counters), Kafka topics and Kafka Streams state stores.",
     "The read-only legacy source smart_truck, as far as this platform reads it.",
@@ -87,8 +88,8 @@ function build() {
   d.table("Referenced documents", [{ header: "Ref.", width: 700 }, { header: "Document", width: 8326 }], [
     ["[S1]", "SRM-GPS-SRS-001, Software Requirements Specification: GPS Processing Layer."],
     ["[S2]", "SRM-GPS-SRS-RUL-001, SRS Rules and Regulations."],
-    ["[S3]", "gps-application/src/main/resources/db/migration/V1 to V8 (authoritative DDL)."],
-    ["[S4]", "README.md sections 11, 12, 14 and 15; docs/DATA_SAFETY_GUIDE.md; docs/REPORTS_GUIDE.md."],
+    ["[S3]", "gps-application/src/main/resources/db/migration/V1 to V11 (authoritative DDL)."],
+    ["[S4]", "README.md sections 11, 12, 14 and 15; docs/DATA_SAFETY_GUIDE.md; docs/REPORTS_GUIDE.md; docs/TMS_GUIDE.md; docs/GEOFENCING_GUIDE.md; docs/ROUTE_DEVIATION_ETA_DESIGN.md."],
     ["[S5]", "PostgreSQL 14 documentation: data types, constraints (EXCLUDE with btree_gist), indexes."],
   ]);
   d.h2("Notation");
@@ -107,7 +108,7 @@ function build() {
     ["Database / schema", "gps_tracking / public"],
     ["Application user", "gps_app (password from local-secrets.properties or .env; never in version control)"],
     ["Extensions", "btree_gist (needed for the exclusion constraint on device_assignment)"],
-    ["Schema management", "Flyway, migrations V1 to V8; Hibernate ddl-auto = validate (it never changes the schema)"],
+    ["Schema management", "Flyway, migrations V1 to V11; Hibernate ddl-auto = validate (it never changes the schema)"],
     ["Time zone", "JDBC session time zone UTC (hibernate.jdbc.time_zone); all timestamps are timestamptz"],
     ["Character set", "UTF-8"],
     ["Connection", "jdbc:postgresql://localhost:5432/gps_tracking (Docker: postgres:5432, host port 5433)"],
@@ -123,10 +124,15 @@ function build() {
     ["Reporting", "vehicle_day_summary, report_setting", "DaySummaryJob; Reports → Cost assumptions"],
     ["Archives", "dead_letter, rejected_frame", "gps-dead-letter-archive; gps-rejected-frame-logger"],
     ["Configuration", "connection_setting", "Developer → Connections"],
+    ["Sign-in (V9)", "app_user, auth_key; tenant.kind", "AuthController, PortalAdminController"],
+    ["Shipments (V9)", "shipment, shipment_import, place", "ShipmentImportService (Excel / CSV / tta_trips), module shipment-tracking"],
+    ["Geofencing (V10)", "place (geofence master), geofence_visit", "Live geofences page, module geofence"],
+    ["Route plans (V11)", "route_plan, route_stop", "RoutePlanService, modules route-deviation and waypoints"],
   ]);
-  d.p(ref("dbs-er") + " (next page) shows all tables and their relationships.");
+  d.p(ref("dbs-er") + " (next page) shows the tables of V1 to V8 and their relationships; " + ref("dbs-er-tms") + " those added by V9 to V11.");
   d.landscape();
   d.figure(FIG("er-diagram.png"), "Entity-relationship overview of gps_tracking", 9.0, "dbs-er");
+  d.figure(FIG("er-tms-routes.png"), "Tables added by V9 to V11: sign-in, shipments, geofencing, route plans", 9.0, "dbs-er-tms");
   d.portrait();
 
   // ---------------------------------------------------------------------------------------------- 3
@@ -534,6 +540,212 @@ function build() {
     ["co2-kg-per-litre", "2.68 (petrol 2.31)", "≥ 0"],
   ]);
 
+  // ---------------------------------------------------------------------------------------------- 4b (V9 to V11)
+  d.h2("Tables added by V9 to V11");
+  d.p("V9 adds transport management (three sign-in roles, places and shipments), V10 makes place the geofence master and "
+    + "adds the visits the geofence module finds, V11 adds the road route plans that the route-deviation and waypoints "
+    + "modules follow. tenant gains two columns in V9: kind (GPS_PROVIDER, TRANSPORTER, CONSIGNER; default TRANSPORTER) and "
+    + "external_code (the company's number in the TMS file; unique per kind when present).");
+
+  tableHeader(d, "app_user", [
+    ["Purpose", "Who may sign in, and as what: DEVELOPER (the GPS provider, sees everything), TRANSPORTER or CONSIGNER (one company each, sees only its data)."],
+    ["Created in", "V9"],
+    ["Written by / read by", "PortalAdminController (users), demo accounts at start when a role has none / AuthController (sign-in)"],
+  ]);
+  columns(d, "app_user columns", [
+    ["id", "uuid", "N", "gen_random_uuid()", "Surrogate key."],
+    ["role", "varchar(20)", "N", "", "DEVELOPER, TRANSPORTER or CONSIGNER."],
+    ["username", "varchar(80)", "N", "", "User id typed at sign-in (unique per role, case-insensitive)."],
+    ["display_name", "varchar(120)", "N", "", "Name shown in the console."],
+    ["tenant_id", "uuid", "Y", "", "FK tenant: the user's company (required except for DEVELOPER)."],
+    ["password_hash", "varchar(200)", "N", "", "PBKDF2-HMAC-SHA256 with salt; never the password."],
+    ["active", "boolean", "N", "true", "False = may not sign in."],
+    ["created_at / last_login_at", "timestamptz", "N / Y", "now() / –", "Created; last successful sign-in."],
+  ]);
+  constraints(d, "app_user constraints", [
+    ["app_user_pkey", "PK", "(id)"],
+    ["app_user_role_values", "CK", "role IN ('DEVELOPER','TRANSPORTER','CONSIGNER')"],
+    ["app_user_company_for_business_roles", "CK", "role = 'DEVELOPER' OR tenant_id IS NOT NULL"],
+    ["app_user_role_username", "UK (index)", "(role, lower(username))"],
+  ]);
+
+  tableHeader(d, "auth_key", [
+    ["Purpose", "The single secret that signs sign-in tokens (HMAC). Made by the migration, so it survives restarts and never sits in a configuration file; replacing it signs everyone out."],
+    ["Created in", "V9"],
+  ]);
+  columns(d, "auth_key columns", [
+    ["id", "smallint", "N", "", "Always 1."],
+    ["secret", "varchar(128)", "N", "random", "Signing key."],
+    ["created_at", "timestamptz", "N", "now()", "When made."],
+  ]);
+  constraints(d, "auth_key constraints", [["auth_key_pkey", "PK", "(id)"], ["auth_key_single_row", "CK", "id = 1"]]);
+
+  tableHeader(d, "place", [
+    ["Purpose", "The geofence master: plants, customers, yards, checkpoints and zones. A shipment file names its origin and destination; the name finds the place by code. Every active place is a geofence of the geofence module and can be a stop of a route plan."],
+    ["Created in", "V9 (circle, ORIGIN / DESTINATION); V10 adds shapes, roles, dwell and speed limits and the 87 smart_truck fences"],
+    ["Written by / read by", "Live geofences page (PUT /api/geofences/{code}), import from smart_truck / GeofenceDirectory (index rebuilt within 30 s of a change), RoutePlanService"],
+  ]);
+  columns(d, "place columns", [
+    ["id", "bigint identity", "N", "generated", "Surrogate key."],
+    ["code / name", "varchar(255)", "N", "", "Normalised name the files use (\"ADITYAPUR\") / display name."],
+    ["role", "varchar(12)", "N", "", "ORIGIN, DESTINATION, YARD, CHECKPOINT, ZONE."],
+    ["shape", "varchar(10)", "N", "'CIRCLE'", "CIRCLE or POLYGON (V10)."],
+    ["polygon", "jsonb", "Y", "", "[[latitude, longitude], …] around the border, at least 3 corners (V10)."],
+    ["latitude / longitude", "double precision", "N", "", "Centre (for a polygon: the average of its corners)."],
+    ["radius_m", "integer", "N", "", "Circle radius, 50 to 50,000 m; for a polygon the covering radius."],
+    ["dwell_alert_min", "integer", "Y", "", "Inside longer raises GEOFENCE_DWELL; null = the role's default, 0 = never (V10)."],
+    ["speed_limit_kmph", "integer", "Y", "", "Limit inside the fence (5 to 150); the strictest applies to over-speed (V10)."],
+    ["source / source_detail", "varchar(20) / varchar(30)", "N / Y", "'MANUAL'", "MANUAL or SMART_TRUCK; how smart_truck derived it (plant, anchor, gazetteer)."],
+    ["external_ref", "varchar(60)", "Y", "", "smart_truck:{id} for copied fences (V10)."],
+    ["trips_seen / spread_m", "integer", "Y", "", "smart_truck evidence: trips seen at the fence, spread of their pings (V10)."],
+    ["active", "boolean", "N", "true", "Inactive places are not geofences."],
+    ["created_at / updated_at", "timestamptz", "N", "now()", "Created; last change (the directory's fingerprint)."],
+  ]);
+  constraints(d, "place constraints", [
+    ["place_pkey", "PK", "(id)"],
+    ["place_once_per_role", "UK", "(code, role)"],
+    ["place_role_values", "CK", "role IN ('ORIGIN','DESTINATION','YARD','CHECKPOINT','ZONE')"],
+    ["place_shape_values", "CK", "shape IN ('CIRCLE','POLYGON')"],
+    ["place_radius_sensible", "CK", "shape = 'POLYGON' OR radius_m BETWEEN 50 AND 50000"],
+    ["place_polygon_present", "CK", "shape = 'CIRCLE' OR polygon is a JSON array of at least 3 corners"],
+    ["place_position_valid", "CK", "latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180"],
+    ["place_dwell_sensible / place_speed_sensible", "CK", "dwell_alert_min ≥ 0; speed_limit_kmph BETWEEN 5 AND 150"],
+  ]);
+
+  tableHeader(d, "shipment_import", [
+    ["Purpose", "One row per uploaded shipment file (Excel, CSV or the smart_truck tta_trips layout): what it changed and the problems found."],
+    ["Created in", "V9"],
+    ["Written by / read by", "ShipmentImportService / Transporter → Shipments → Upload, import history"],
+  ]);
+  columns(d, "shipment_import columns", [
+    ["id", "bigint identity", "N", "generated", "Surrogate key."],
+    ["file_name / file_sha256 / format", "varchar", "N", "", "The file, its hash (an identical file is recognised), XLSX, CSV or SMART_TRUCK."],
+    ["uploaded_by / uploaded_role / tenant_id", "varchar / varchar / uuid", "N / N / Y", "", "Who uploaded it, as what, for which company."],
+    ["rows_total, rows_created, rows_updated, rows_unchanged, rows_failed", "integer", "N", "", "What the upload did."],
+    ["problems / column_mapping", "jsonb", "N", "'[]' / '{}'", "Row problems; the column mapping used."],
+    ["uploaded_at", "timestamptz", "N", "now()", "When."],
+  ]);
+
+  tableHeader(d, "shipment", [
+    ["Purpose", "One trip of one truck carrying one consigner's goods, as the transporter's file describes it (the smart_truck tta_trips layout), plus what the GPS says about it."],
+    ["Created in", "V9"],
+    ["Identity", "(transporter_tenant_id, trip_no): the same row uploaded again updates its shipment, so a file uploaded twice cannot duplicate."],
+    ["Written by / read by", "ShipmentImportService; GPS columns by module shipment-tracking (always the earliest reading that proves them) / portals, RoutePlanService (a plan per open shipment)"],
+  ]);
+  columns(d, "shipment columns", [
+    ["id / trip_no / source", "bigint / varchar(60) / varchar(12)", "N", "", "Key; trip number in the file; where it came from."],
+    ["transporter_tenant_id / consigner_tenant_id", "uuid", "N / Y", "", "FK tenant: the truck company and the goods owner."],
+    ["transporter_code, consigner_code, consigner_unit, consignee_name, consignee_address", "varchar", "Y", "", "As written in the file."],
+    ["vehicle_registration_no / device_imei", "varchar(50)", "N / Y", "", "The truck; the device named in the file (the mapped device wins)."],
+    ["origin_name / destination_name / load_plant", "varchar(255)", "Y", "", "Names from the file."],
+    ["origin_place_id / destination_place_id", "bigint", "Y", "", "FK place: the geofences found for those names."],
+    ["booked_at / dispatched_at / eta_at", "timestamptz", "Y / N / Y", "", "Booking, gate-out, the TMS's ETA."],
+    ["reported_ata_at / reported_end_at / source_status / close_reason", "timestamptz / varchar", "Y", "", "What the TMS reported later."],
+    ["invoice_no, shipment_ref, gate_entry_no, card_id, route_id, material, quantity, driver_name, driver_mobile, vehicle_type, trip_class, trip_type", "varchar / numeric", "Y", "", "Further columns of the file."],
+    ["left_origin_at / outside_destination_at / arrived_at", "timestamptz", "Y", "", "GPS: cleared the origin fence; last outside the destination; entered it."],
+    ["last_reading_at, last_latitude, last_longitude, last_speed_kmph", "timestamptz / double / integer", "Y", "", "GPS: the truck's latest reading during the trip."],
+    ["closed_at / closed_reason", "timestamptz / varchar(60)", "Y", "", "Closed (arrived, a later trip of the truck, by hand)."],
+    ["row_hash / import_id", "varchar(64) / bigint", "N / Y", "", "Hash of the file row (unchanged rows are skipped); FK shipment_import."],
+    ["created_at / updated_at", "timestamptz", "N", "now()", "Created; last change."],
+  ]);
+  constraints(d, "shipment constraints", [
+    ["shipment_pkey", "PK", "(id)"],
+    ["shipment_trip_once_per_transporter", "UK", "(transporter_tenant_id, trip_no)"],
+  ]);
+  indexes(d, "shipment indexes", [
+    ["shipment_vehicle_dispatch / shipment_device_dispatch", "(vehicle_registration_no | device_imei, dispatched_at DESC)", "Shipments of a reading's truck (module shipment-tracking)"],
+    ["shipment_consigner / shipment_transporter", "(… _tenant_id, dispatched_at DESC)", "Portal lists"],
+  ]);
+
+  tableHeader(d, "geofence_visit", [
+    ["Purpose", "Every visit to and drive-through of a geofence, as the geofence module finds it live: the source of the live board, the entry & exit log and the day-wise geofence report."],
+    ["Created in", "V10"],
+    ["Identity", "(imei, place_id, kind, entered_at): a visit found twice (a redelivery, a replay) is one row."],
+    ["Stamps", "entered_at = first reading inside, exited_at = last reading inside; the gaps to the readings outside are their uncertainty."],
+    ["No foreign key", "place_id is logical and code, name and role are copied, so a fence deleted later keeps its history."],
+  ]);
+  columns(d, "geofence_visit columns", [
+    ["id", "bigint identity", "N", "generated", "Surrogate key."],
+    ["imei / vehicle_registration_no / tenant_code", "varchar", "N / Y / Y", "", "The device and its truck and company at the time."],
+    ["place_id, place_code, place_name, place_role", "bigint / varchar", "N", "", "The fence as it was."],
+    ["kind", "varchar(6)", "N", "", "VISIT (inside 15 min: believed) or PASS (through, or over it between two readings)."],
+    ["entered_at / exited_at", "timestamptz", "N / Y", "", "Null exited_at = inside now."],
+    ["entry_gap_s / exit_gap_s", "bigint", "Y", "", "Seconds to the reading outside: uncertainty of each stamp."],
+    ["entry_latitude, entry_longitude, exit_latitude, exit_longitude", "double precision", "N / Y", "", "Where."],
+    ["dwell_alert_at / dwell_limit_min", "timestamptz / integer", "Y", "", "When GEOFENCE_DWELL was raised, against which limit."],
+    ["inferred / exit_reason", "boolean / varchar(20)", "N / Y", "false", "A pass worked out between two readings; HELD, ESCAPED, FENCE_REMOVED, REPLAY_CUT."],
+    ["created_at / updated_at", "timestamptz", "N", "now()", "Created; last change."],
+  ]);
+  constraints(d, "geofence_visit constraints", [
+    ["geofence_visit_once", "UK", "(imei, place_id, kind, entered_at)"],
+    ["geofence_visit_kind_values", "CK", "kind IN ('VISIT','PASS')"],
+    ["geofence_visit_period_valid", "CK", "exited_at IS NULL OR exited_at >= entered_at"],
+  ]);
+  indexes(d, "geofence_visit indexes", [
+    ["geofence_visit_open", "(place_id) WHERE exited_at IS NULL", "Who is inside which fence now"],
+    ["geofence_visit_time / _place_time / _vehicle_time / _imei_time", "(… , entered_at DESC)", "Day report; logs per fence, truck or device"],
+  ]);
+
+  tableHeader(d, "route_plan", [
+    ["Purpose", "One trip of one truck along a planned road route: the line from the routing engine (Valhalla on the HP; GraphHopper on this laptop as fallback), its per-instruction timings, and the live numbers the route-deviation module writes when they change."],
+    ["Created in", "V11"],
+    ["Made by", "RoutePlanService: every open shipment with an origin and a destination geofence (within 30 s), or by hand (Plan a route). A new plan closes the truck's other active plan."],
+    ["Versions", "version 1 is the dispatch plan; a ROUTE_ALTERNATE (another road about as good) replaces the line from where the truck was: version + 1, offset_m = distance already done; first_shape keeps the original."],
+    ["Read by", "RoutePlanDirectory (active plans in memory, reloaded within 30 s of a change), RouteLiveService (strips, trip map), portals"],
+  ]);
+  columns(d, "route_plan columns", [
+    ["id", "bigint identity", "N", "generated", "Surrogate key; the episode scope of the plan's events."],
+    ["shipment_id", "bigint", "Y", "", "FK shipment (ON DELETE CASCADE); null for a plan made by hand. One plan per shipment."],
+    ["imei / vehicle_registration_no / tenant_code", "varchar", "Y / N / Y", "", "The truck followed."],
+    ["source / status", "varchar(12)", "N", "– / 'ACTIVE'", "SHIPMENT or MANUAL; ACTIVE, ARRIVED, CANCELLED, CLOSED."],
+    ["origin_name, origin_place_id, origin_lat, origin_lon", "varchar / bigint / double", "Y / Y / N / N", "", "Start (FK place when a geofence)."],
+    ["destination_name, destination_place_id, destination_lat, destination_lon, destination_radius_m", "varchar / bigint / double", "Y / Y / N / N / N", "", "Destination; arrival = a reading inside its geofence, or within the radius of a point."],
+    ["engine / costing", "varchar(20)", "N", "", "valhalla or graphhopper; truck."],
+    ["version / reason", "integer / varchar(20)", "N", "1 / –", "DISPATCH, MANUAL or ALTERNATE."],
+    ["shape / timings", "text / jsonb", "N", "– / '[]'", "Current line (encoded polyline, precision 6); [[from vertex, to vertex, seconds], …] of the engine's instructions."],
+    ["length_m / planned_s / offset_m", "double precision", "N", "– / – / 0", "Current line's length and planned driving time; distance done before this version."],
+    ["first_shape / first_length_m / first_planned_s", "text / double", "N", "", "The dispatch plan, kept after re-plans."],
+    ["initial_pace", "double precision", "N", "", "Actual / planned driving time to start with: the lane's median of 3+ arrived trips, else 1.0."],
+    ["planned_start_at", "timestamptz", "N", "", "Dispatch time (shipment) or when planned."],
+    ["route_status", "varchar(12)", "N", "'WAITING'", "WAITING, ON_ROUTE, SUSPECT, OFF_ROUTE, ARRIVED."],
+    ["departed_at / promised_eta_at / eta_at / arrived_at", "timestamptz", "Y", "", "Left the origin; ETA at departure; latest shown ETA; arrival."],
+    ["pace, chainage_m, cross_track_m", "double precision", "Y", "", "Live pace; progress along the line; distance from it."],
+    ["last_reading_at, last_lat, last_lon", "timestamptz / double", "Y", "", "Latest reading applied."],
+    ["deviations, deviation_km, deviation_minutes, wrong_ways, alternates", "integer / double", "N", "0", "Trip totals."],
+    ["created_by / created_at / updated_at", "varchar / timestamptz", "Y / N / N", "– / now()", "Who planned it; created; last change."],
+  ]);
+  constraints(d, "route_plan constraints", [
+    ["route_plan_pkey", "PK", "(id)"],
+    ["route_plan_status_values / _source_values / _route_status_values", "CK", "The value sets of Section 6."],
+    ["route_plan_positive", "CK", "length_m > 0 AND planned_s > 0 AND destination_radius_m > 0"],
+    ["route_plan_one_per_shipment", "UK (partial)", "(shipment_id) WHERE shipment_id IS NOT NULL"],
+  ]);
+  indexes(d, "route_plan indexes", [
+    ["route_plan_active_vehicle / route_plan_active_imei", "(vehicle_registration_no | imei) WHERE status = 'ACTIVE'", "A reading's plan (directory reload)"],
+    ["route_plan_recent", "(planned_start_at DESC)", "Live strips of the last hours"],
+    ["route_plan_lane", "(origin_place_id, destination_place_id) WHERE status = 'ARRIVED'", "The lane's pace history"],
+  ]);
+
+  tableHeader(d, "route_stop", [
+    ["Purpose", "The stops of a route plan, in the order the line meets them: waypoints planned by hand (MANUAL) and the geofences the planned line crosses (FENCE)."],
+    ["Created in", "V11"],
+    ["Written by", "RoutePlanService (made with the plan; after a re-plan, FENCE stops not reached are found again) and module waypoints (status)"],
+  ]);
+  columns(d, "route_stop columns", [
+    ["id / plan_id / seq", "bigint / bigint / integer", "N", "", "Key; FK route_plan (ON DELETE CASCADE); order within the plan."],
+    ["kind / place_id / name", "varchar(10) / bigint / varchar(255)", "N / Y / N", "", "MANUAL or FENCE; FK place when a geofence."],
+    ["latitude, longitude, radius_m", "double precision", "N", "", "The stop's area when it is not a geofence."],
+    ["chainage_m", "double precision", "N", "", "Distance along the current line; -1 when the line does not pass it."],
+    ["stay_min", "integer", "N", "0", "Planned stay (counted in the ETA)."],
+    ["status", "varchar(10)", "N", "'PENDING'", "PENDING, INSIDE, ARRIVED, DEPARTED, PASSED, MISSED."],
+    ["arrived_at / departed_at / missed_at / minutes_inside / out_of_order", "timestamptz / integer / boolean", "Y (out_of_order N)", "out_of_order false", "What the truck did there."],
+    ["updated_at", "timestamptz", "N", "now()", "Last change."],
+  ]);
+  constraints(d, "route_stop constraints", [
+    ["route_stop_once", "UK", "(plan_id, seq)"],
+    ["route_stop_kind_values / route_stop_status_values", "CK", "The value sets of Section 6."],
+  ]);
+
   // ---------------------------------------------------------------------------------------------- 5
   d.h1("Relationships and Referential Integrity");
   d.table("Relationships", [
@@ -547,6 +759,12 @@ function build() {
     ["vehicle (registration_no)", "telemetry tables (vehicle_registration_no)", "1 : N", "Logical", "Copied at the reading's time (BR-004)."],
     ["device_assignment", "vehicle_motion_state.assignment_id", "1 : N", "Logical", "A change of assignment closes the open trip."],
     ["gps_trip", "gps_trip_late_reading.trip_start_recorded_at", "1 : N", "Logical (imei + start)", "Late readings of a trip."],
+    ["tenant", "app_user, shipment (transporter, consigner)", "1 : N", "FK", "A business user belongs to one company."],
+    ["place", "shipment (origin, destination), route_plan (origin, destination), route_stop", "1 : N", "FK", "A place in use is deactivated, not deleted."],
+    ["place", "geofence_visit", "1 : N", "Logical (place_id + copied name)", "History outlives the fence."],
+    ["shipment_import", "shipment", "1 : N", "FK", "The upload that last wrote the row."],
+    ["shipment", "route_plan", "1 : 0..1", "FK + partial UK, cascade", "One plan per shipment."],
+    ["route_plan", "route_stop", "1 : N", "FK, cascade", "Stops are deleted with their plan."],
   ], { size: 16 });
   d.p("Logical references are deliberate (SRS DR-002). The application guarantees them as follows: tenant and vehicle are resolved from device_assignment for every reading (or left null with a WARN log); codes and registration numbers are never reused; master-data rows are never deleted while telemetry refers to them.");
 
@@ -558,10 +776,18 @@ function build() {
     ["gps_position.movement_status", "MOVING, STOPPED", "CK"],
     ["gps_position.distance_source", "FIRST_READING, GPS, DEVICE_ODOMETER, JITTER_FILTERED, JUMP_FILTERED, OUT_OF_ORDER", "Application (enum)"],
     ["gps_trip.status, gps_stop.status, vehicle_event.status", "OPEN, CLOSED", "CK"],
-    ["vehicle_event.event_type", "OVERSPEED, SPEED_SENSOR_MISMATCH, STOPPAGE, PARKED, IDLING, IGNITION_ON, IGNITION_OFF, HARSH_ACCELERATION, HARSH_BRAKING", "Application (enum)"],
+    ["vehicle_event.event_type", "OVERSPEED, SPEED_SENSOR_MISMATCH, STOPPAGE, PARKED, IDLING, IGNITION_ON, IGNITION_OFF, HARSH_ACCELERATION, HARSH_BRAKING, SHIPMENT_DEPARTED, SHIPMENT_ARRIVED, SHIPMENT_DELAYED, GEOFENCE_ENTER, GEOFENCE_EXIT, GEOFENCE_PASS, GEOFENCE_DWELL, ROUTE_DEVIATION, ROUTE_ALTERNATE, WRONG_DIRECTION, ETA_CHANGED, DESTINATION_REACHED, WAYPOINT_ARRIVED, WAYPOINT_DEPARTED, WAYPOINT_MISSED", "Application (enum)"],
     ["vehicle_event.severity", "INFO, LOW, MEDIUM, HIGH, CRITICAL", "Application (enum)"],
     ["dead_letter.status", "PARKED, REPLAYED, DISCARDED", "CK"],
     ["connection_setting.name", "redis, valhalla", "Application"],
+    ["tenant.kind", "GPS_PROVIDER, TRANSPORTER, CONSIGNER", "CK"],
+    ["app_user.role", "DEVELOPER, TRANSPORTER, CONSIGNER", "CK"],
+    ["place.role / place.shape", "ORIGIN, DESTINATION, YARD, CHECKPOINT, ZONE / CIRCLE, POLYGON", "CK"],
+    ["geofence_visit.kind", "VISIT, PASS", "CK"],
+    ["route_plan.status", "ACTIVE, ARRIVED, CANCELLED, CLOSED", "CK"],
+    ["route_plan.route_status", "WAITING, ON_ROUTE, SUSPECT, OFF_ROUTE, ARRIVED", "CK"],
+    ["route_plan.source / reason", "SHIPMENT, MANUAL / DISPATCH, MANUAL, ALTERNATE", "CK / Application"],
+    ["route_stop.kind / status", "MANUAL, FENCE / PENDING, INSIDE, ARRIVED, DEPARTED, PASSED, MISSED", "CK"],
   ]);
   d.note("event_type, severity and distance_source are checked only by the application. Adding CHECK constraints for them is recommended in a future migration (open issue DB-OI-02).");
 
@@ -579,6 +805,10 @@ function build() {
     ["Newest events, events of a type or a vehicle", "vehicle_event_recent, _type_time, _imei_time", "Console polling (2 s)"],
     ["Parked dead letters; oldest parked of a topic", "dead_letter_status_time, dead_letter_topic_time", "Console, replay"],
     ["Month of one vehicle", "vehicle_day_summary_vehicle", "Reports"],
+    ["Shipments of a reading's truck", "shipment_vehicle_dispatch, shipment_device_dispatch", "Every reading (shipment-tracking)"],
+    ["Who is inside a fence now; visits overlapping a day", "geofence_visit_open; geofence_visit_*_time", "Live board 5 s; day report"],
+    ["Active plans (directory reload)", "route_plan_active_vehicle, route_plan_active_imei", "Within 30 s of a change"],
+    ["Plans of the last hours; the lane's pace", "route_plan_recent; route_plan_lane", "Live strips 5 s; each new plan"],
   ]);
   d.code([
     "-- Assignment valid at a reading's time (served by the exclusion-constraint gist index)",
@@ -598,6 +828,9 @@ function build() {
   ], [
     ["gps_position", "(imei, recorded_at)", "Existence check first; unique key as the last line of defence"],
     ["gps_trip, gps_stop", "(imei, start_recorded_at)", "Upsert updates the same row"],
+    ["geofence_visit", "(imei, place_id, kind, entered_at)", "Upsert; a replay first cuts the visits after its start"],
+    ["route_plan", "(shipment_id) partial unique", "A shipment is planned once; live columns are overwritten"],
+    ["route_stop", "(plan_id, seq)", "Status update of the same row"],
     ["vehicle_motion_state", "imei + guard last_recorded_at < :recordedAt", "0 rows updated → transaction rolled back"],
     ["gps_trip_late_reading", "(imei, recorded_at)", "Insert … ON CONFLICT DO NOTHING; late_reading_count not raised twice"],
     ["vehicle_event", "event_key", "Upsert (OPEN then CLOSED)"],
