@@ -290,7 +290,10 @@ export const SECTIONS: Section[] = [
     groups: [
       {
         title: "Overview",
-        items: [{ href: "/roads", label: "Road Intelligence", icon: LayoutGrid, feed: "live" }],
+        items: [
+          { href: "/roads", label: "Road Intelligence", icon: LayoutGrid, feed: "live" },
+          { href: "/roads/replay", label: "Trip replay (live)", icon: Play, feed: "live" },
+        ],
       },
       {
         title: "Know the roads",
