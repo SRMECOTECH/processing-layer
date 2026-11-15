@@ -30,9 +30,9 @@ public class RoadMatcher {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoadMatcher.class);
 
-    /** What matching one drive found. */
-    public record Result(List<RoadSegment> roads, int pieces, int failedPieces, int pointsSent, int unmatchedPoints, long millis,
-                         String problem) {
+    /** What matching one drive found; details holds each road piece's extra attributes, by its key. */
+    public record Result(List<RoadSegment> roads, Map<String, RoadDetails> details, int pieces, int failedPieces, int pointsSent,
+                         int unmatchedPoints, long millis, String problem) {
     }
 
     /** Valhalla did not answer at all: try again later. */
@@ -59,6 +59,7 @@ public class RoadMatcher {
     public Result match(List<double[]> points) throws ValhallaUnavailable, InterruptedException {
         List<double[]> thinned = thin(points, properties.minMoveMetersOrDefault());
         Map<String, RoadSegment> roads = new LinkedHashMap<>();
+        Map<String, RoadDetails> details = new LinkedHashMap<>();
         int pieces = 0;
         int failed = 0;
         int unmatched = 0;
@@ -70,7 +71,7 @@ public class RoadMatcher {
                 ValhallaClient.Trace trace = trace(piece);
                 millis += trace.millis();
                 unmatched += trace.unmatchedPoints();
-                add(roads, trace);
+                add(roads, details, trace);
             } catch (ValhallaUnavailable down) {
                 throw down;
             } catch (IOException refused) {
@@ -81,7 +82,7 @@ public class RoadMatcher {
                         ValhallaClient.Trace trace = trace(half);
                         millis += trace.millis();
                         unmatched += trace.unmatchedPoints();
-                        add(roads, trace);
+                        add(roads, details, trace);
                         anyHalf = true;
                     } catch (ValhallaUnavailable down) {
                         throw down;
@@ -96,7 +97,7 @@ public class RoadMatcher {
                 }
             }
         }
-        return new Result(new ArrayList<>(roads.values()), pieces, failed, thinned.size(), unmatched, millis, problem);
+        return new Result(new ArrayList<>(roads.values()), details, pieces, failed, thinned.size(), unmatched, millis, problem);
     }
 
     private ValhallaClient.Trace trace(List<double[]> piece) throws IOException, InterruptedException {
@@ -113,7 +114,7 @@ public class RoadMatcher {
         }
     }
 
-    private static void add(Map<String, RoadSegment> roads, ValhallaClient.Trace trace) {
+    private static void add(Map<String, RoadSegment> roads, Map<String, RoadDetails> details, ValhallaClient.Trace trace) {
         List<double[]> shape = trace.shape().isEmpty() ? List.of() : Polyline6.decode(trace.shape());
         for (ValhallaClient.TraceEdge edge : trace.edges()) {
             int from = Math.max(0, edge.beginShapeIndex());
@@ -126,6 +127,7 @@ public class RoadMatcher {
             roads.putIfAbsent(key, new RoadSegment(0, key, edge.wayId(), RoadSegment.nameOf(edge.names()),
                     RoadSegment.refOf(edge.names()), edge.roadClass(), edge.density(), edge.laneCount(), edge.stateCode(),
                     edge.speedLimitKmph(), null, edge.lengthKm() * 1000, line));
+            details.putIfAbsent(key, RoadDetails.of(edge.raw()));
         }
     }
 

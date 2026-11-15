@@ -52,9 +52,11 @@ public class ValhallaClient {
      * @param speedLimitKmph  OpenStreetMap's maxspeed, or null when the edge has none
      * @param density         Valhalla's road density, 0..15 (higher = more built-up)
      * @param stateCode       the state of the edge's end node (admins list), or null
+     * @param raw             the whole edge as Valhalla sent it (bridge, tunnel, curvature, speed, traversability ...)
      */
     public record TraceEdge(long wayId, List<String> names, String roadClass, Integer speedLimitKmph, double lengthKm, String use,
-                            int density, int laneCount, String stateCode, int beginShapeIndex, int endShapeIndex) {
+                            int density, int laneCount, String stateCode, int beginShapeIndex, int endShapeIndex,
+                            Map<String, Object> raw) {
     }
 
     /** A map-matched drive: its edges and the matched line (encoded polyline, precision 6). */
@@ -64,6 +66,10 @@ public class ValhallaClient {
     private static final List<String> TRACE_ATTRIBUTES = List.of(
             "edge.way_id", "edge.names", "edge.road_class", "edge.speed_limit", "edge.length", "edge.use", "edge.density",
             "edge.lane_count", "edge.begin_shape_index", "edge.end_shape_index", "edge.end_node.admin_index",
+            // details kept for analysis (road_segment, V13)
+            "edge.traversability", "edge.bridge", "edge.tunnel", "edge.roundabout", "edge.toll", "edge.curvature", "edge.speed",
+            "edge.speed_type", "edge.truck_route", "edge.surface", "edge.unpaved", "edge.begin_heading", "edge.end_heading",
+            "edge.internal_intersection", "edge.max_upward_grade", "edge.weighted_grade",
             "admin.state_code", "admin.country_code", "matched.type", "shape");
 
     private final JsonHttp http;
@@ -189,9 +195,11 @@ public class ValhallaClient {
         Map<String, Object> body = answer.body();
 
         List<String> states = new ArrayList<>();
+        List<String> countries = new ArrayList<>();
         if (body.get("admins") instanceof List<?> admins) {
             for (Object admin : admins) {
                 states.add(admin instanceof Map<?, ?> m && m.get("state_code") instanceof String code && !code.isBlank() ? code : null);
+                countries.add(admin instanceof Map<?, ?> m && m.get("country_code") instanceof String code && !code.isBlank() ? code : null);
             }
         }
         List<TraceEdge> edges = new ArrayList<>();
@@ -213,7 +221,7 @@ public class ValhallaClient {
                 edges.add(new TraceEdge(e.get("way_id") instanceof Number w ? w.longValue() : 0, names,
                         e.get("road_class") instanceof String rc ? rc : null, limit, number(e.get("length")),
                         e.get("use") instanceof String u ? u : null, (int) number(e.get("density")), (int) number(e.get("lane_count")),
-                        state, (int) number(e.get("begin_shape_index")), (int) number(e.get("end_shape_index"))));
+                        state, (int) number(e.get("begin_shape_index")), (int) number(e.get("end_shape_index")), raw(e, countries)));
             }
         }
         int matched = 0;
@@ -229,6 +237,22 @@ public class ValhallaClient {
         }
         String matchedShape = body.get("shape") instanceof String text ? text : "";
         return new Trace(edges, matchedShape, matched, unmatched, answer.millis());
+    }
+
+    /** The edge's attributes as sent, plus country_code from the admins list (the shape indexes are left out). */
+    private static Map<String, Object> raw(Map<?, ?> edge, List<String> countries) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        edge.forEach((k, v) -> {
+            String key = String.valueOf(k);
+            if (!key.endsWith("shape_index")) {
+                raw.put(key, v);
+            }
+        });
+        if (edge.get("end_node") instanceof Map<?, ?> node && node.get("admin_index") instanceof Number index
+                && index.intValue() >= 0 && index.intValue() < countries.size() && countries.get(index.intValue()) != null) {
+            raw.put("country_code", countries.get(index.intValue()));
+        }
+        return raw;
     }
 
     private static double number(Object value) {

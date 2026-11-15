@@ -111,20 +111,24 @@ public class TripReplayController {
         body.put("matchedUntil", matchedUntil == null ? null : matchedUntil.toInstant());
 
         List<Object[]> rows = jdbc.query("""
-                SELECT latitude, longitude, speed_kmph, recorded_at FROM gps_position
+                SELECT latitude, longitude, speed_kmph, recorded_at, road_segment_id FROM gps_position
                 WHERE imei = :imei ORDER BY recorded_at
                 """, new MapSqlParameterSource("imei", imei),
                 (rs, n) -> new Object[]{rs.getDouble("latitude"), rs.getDouble("longitude"), rs.getObject("speed_kmph"),
-                        rs.getTimestamp("recorded_at")});
+                        rs.getTimestamp("recorded_at"), rs.getObject("road_segment_id")});
         int total = rows.size();
         int thinFrom = Math.max(0, total - NEWEST_KEPT);
         int step = thinFrom == 0 ? 1 : Math.max(1, (int) Math.ceil(thinFrom / (double) Math.max(1, MAX_POINTS - NEWEST_KEPT)));
         List<Map<String, Object>> readings = new ArrayList<>();
         int onRoad = 0;
         int withLimit = 0;
+        int saved = 0;
         for (int i = 0; i < total; i++) {
             Object[] r = rows.get(i);
             RoadLibrary.RoadAt road = library.locate((double) r[0], (double) r[1]);
+            if (r[4] != null) {
+                saved++;
+            }
             if (road != null) {
                 onRoad++;
                 if (road.limit() != null) {
@@ -141,6 +145,8 @@ public class TripReplayController {
             p.put("speed", r[2] instanceof Number n ? Math.round(n.doubleValue()) : null);
             p.put("at", at.toInstant());
             p.put("sent", matchedUntil != null && !at.after(matchedUntil));
+            // the road saved on the reading by the live matching (V13), null until it has covered the reading
+            p.put("savedRoadId", r[4]);
             if (road != null) {
                 p.put("roadId", road.road().id());
                 p.put("road", road.road().label());
@@ -155,6 +161,7 @@ public class TripReplayController {
         body.put("total", total);
         body.put("onRoad", onRoad);
         body.put("withLimit", withLimit);
+        body.put("withSavedRoad", saved);
         body.put("readings", readings);
         body.put("events", jdbc.queryForList("""
                 SELECT event_type AS type, severity, status, started_at AS "startedAt", latitude AS lat, longitude AS lon,

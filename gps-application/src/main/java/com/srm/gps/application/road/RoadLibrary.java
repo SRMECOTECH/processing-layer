@@ -1,6 +1,7 @@
 package com.srm.gps.application.road;
 
 import com.srm.gps.processing.road.RoadIndex;
+import com.srm.gps.processing.road.RoadPasses;
 import com.srm.gps.processing.road.RoadSegment;
 import com.srm.gps.processing.road.RoadSpeedTable;
 import com.srm.gps.processing.route.Polyline6;
@@ -39,13 +40,30 @@ public class RoadLibrary {
             """;
     private static final String UPSERT = """
             INSERT INTO road_segment (segment_key, way_id, road_name, road_ref, road_class, density, lane_count, state_code,
-                                      osm_limit_kmph, length_m, shape, min_lat, max_lat, min_lon, max_lon)
+                                      osm_limit_kmph, length_m, shape, min_lat, max_lat, min_lon, max_lon, road_use,
+                                      traversability, bridge, tunnel, roundabout, toll, curvature, valhalla_speed_kmph,
+                                      speed_type, truck_route, surface, begin_heading, end_heading, country_code, attributes)
             VALUES (:key, :way, :name, :ref, :class, :density, :lanes, :state, :osm, :length, :shape, :minLat, :maxLat,
-                    :minLon, :maxLon)
+                    :minLon, :maxLon, :use, :traversability, :bridge, :tunnel, :roundabout, :toll, :curvature, :vspeed,
+                    :speedType, :truckRoute, :surface, :beginHeading, :endHeading, :country, CAST(:attributes AS jsonb))
             ON CONFLICT (segment_key) DO UPDATE SET
                 road_name = EXCLUDED.road_name, road_ref = EXCLUDED.road_ref, road_class = EXCLUDED.road_class,
                 density = EXCLUDED.density, lane_count = EXCLUDED.lane_count, state_code = EXCLUDED.state_code,
-                osm_limit_kmph = EXCLUDED.osm_limit_kmph, times_matched = road_segment.times_matched + 1, updated_at = now()
+                osm_limit_kmph = EXCLUDED.osm_limit_kmph,
+                road_use = coalesce(EXCLUDED.road_use, road_segment.road_use),
+                traversability = coalesce(EXCLUDED.traversability, road_segment.traversability),
+                bridge = coalesce(EXCLUDED.bridge, road_segment.bridge), tunnel = coalesce(EXCLUDED.tunnel, road_segment.tunnel),
+                roundabout = coalesce(EXCLUDED.roundabout, road_segment.roundabout), toll = coalesce(EXCLUDED.toll, road_segment.toll),
+                curvature = coalesce(EXCLUDED.curvature, road_segment.curvature),
+                valhalla_speed_kmph = coalesce(EXCLUDED.valhalla_speed_kmph, road_segment.valhalla_speed_kmph),
+                speed_type = coalesce(EXCLUDED.speed_type, road_segment.speed_type),
+                truck_route = coalesce(EXCLUDED.truck_route, road_segment.truck_route),
+                surface = coalesce(EXCLUDED.surface, road_segment.surface),
+                begin_heading = coalesce(EXCLUDED.begin_heading, road_segment.begin_heading),
+                end_heading = coalesce(EXCLUDED.end_heading, road_segment.end_heading),
+                country_code = coalesce(EXCLUDED.country_code, road_segment.country_code),
+                attributes = coalesce(EXCLUDED.attributes, road_segment.attributes),
+                times_matched = road_segment.times_matched + 1, updated_at = now()
             RETURNING (xmax = 0) AS inserted
             """;
 
@@ -123,8 +141,16 @@ public class RoadLibrary {
         }
     }
 
-    /** Stores the pieces (new ones inserted, known ones refreshed; a hand-set limit is kept). Returns how many were new. */
+    /** Stores the pieces without details (see {@link #store(List, Map)}). */
     public int store(List<RoadSegment> pieces) {
+        return store(pieces, Map.of());
+    }
+
+    /**
+     * Stores the pieces (new ones inserted, known ones refreshed; a hand-set limit is kept) with the extra details Valhalla
+     * gave for each (by piece key; a detail it did not send keeps the stored value). Returns how many were new.
+     */
+    public int store(List<RoadSegment> pieces, Map<String, RoadDetails> details) {
         int added = 0;
         for (RoadSegment piece : pieces) {
             double minLat = Double.MAX_VALUE;
@@ -144,6 +170,15 @@ public class RoadLibrary {
                     .addValue("state", cut(piece.stateCode(), 10)).addValue("osm", piece.osmLimitKmph())
                     .addValue("length", piece.lengthMeters()).addValue("shape", Polyline6.encode(piece.points()))
                     .addValue("minLat", minLat).addValue("maxLat", maxLat).addValue("minLon", minLon).addValue("maxLon", maxLon);
+            RoadDetails d = details.get(piece.key());
+            params.addValue("use", d == null ? null : d.use()).addValue("traversability", d == null ? null : d.traversability())
+                    .addValue("bridge", d == null ? null : d.bridge()).addValue("tunnel", d == null ? null : d.tunnel())
+                    .addValue("roundabout", d == null ? null : d.roundabout()).addValue("toll", d == null ? null : d.toll())
+                    .addValue("curvature", d == null ? null : d.curvature()).addValue("vspeed", d == null ? null : d.valhallaSpeed())
+                    .addValue("speedType", d == null ? null : d.speedType()).addValue("truckRoute", d == null ? null : d.truckRoute())
+                    .addValue("surface", d == null ? null : d.surface()).addValue("beginHeading", d == null ? null : d.beginHeading())
+                    .addValue("endHeading", d == null ? null : d.endHeading()).addValue("country", d == null ? null : d.countryCode())
+                    .addValue("attributes", d == null ? null : d.attributes());
             Boolean inserted = jdbc.queryForObject(UPSERT, params, Boolean.class);
             if (Boolean.TRUE.equals(inserted)) {
                 added++;
@@ -308,6 +343,21 @@ public class RoadLibrary {
                     rows.add(row);
                 });
         return rows;
+    }
+
+    /** The stored pieces with these ids, with what a road pass adds up from them (Valhalla's speed, bridge, curvature). */
+    public Map<Long, RoadPasses.Piece> passPieces(java.util.Collection<Long> ids) {
+        Map<Long, RoadPasses.Piece> pieces = new java.util.HashMap<>();
+        if (ids.isEmpty()) {
+            return pieces;
+        }
+        jdbc.query(SELECT.replace("FROM road_segment", ", valhalla_speed_kmph, bridge, curvature FROM road_segment")
+                + " WHERE id IN (:ids)", new MapSqlParameterSource("ids", ids), rs -> {
+            RoadSegment road = map(rs);
+            pieces.put(road.id(), new RoadPasses.Piece(road, (Integer) rs.getObject("valhalla_speed_kmph"),
+                    Boolean.TRUE.equals(rs.getObject("bridge")), (Integer) rs.getObject("curvature")));
+        });
+        return pieces;
     }
 
     private static RoadSegment map(ResultSet rs) throws SQLException {
