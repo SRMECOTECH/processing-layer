@@ -70,6 +70,8 @@ public class TripReplayController {
         int roadsDeleted = 0;
         if (forgetRoads) {
             roadsDeleted = jdbc.update("DELETE FROM road_segment WHERE manual_limit_kmph IS NULL", new MapSqlParameterSource());
+            // the points on those roads are learned again with them
+            jdbc.update("DELETE FROM road_point", new MapSqlParameterSource());
             library.reload();
         }
         learning.forgetCursors();

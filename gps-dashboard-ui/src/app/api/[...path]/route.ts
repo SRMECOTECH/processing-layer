@@ -49,6 +49,8 @@ async function forward(request: Request, context: Context): Promise<Response> {
         accept: request.headers.get("accept") ?? "application/json",
         ...(body && body.byteLength > 0 ? { "content-type": request.headers.get("content-type") ?? "application/json" } : {}),
         ...(portal ? { authorization: `Bearer ${session.token}` } : {}),
+        // who is signed in, for the service's change histories (e.g. road speed limits)
+        "x-dashboard-user": (session.name ? `${session.user} (${session.name})` : session.user).replace(/[^ -~]/g, "?"),
       },
       body: body && body.byteLength > 0 ? body : undefined,
       cache: "no-store",

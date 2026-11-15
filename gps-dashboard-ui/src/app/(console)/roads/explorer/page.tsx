@@ -7,6 +7,7 @@ import { StatusTag } from "@/components/roads/module-card";
 import { moduleByKey } from "@/lib/road-intelligence";
 import { RoadAttributesSection } from "@/components/roads/road-attributes";
 import { RoadPieceDetailsView } from "@/components/roads/road-details";
+import { RoadEventsCard, RoadPointsSection } from "@/components/roads/road-records";
 import { SOURCE_LABEL, classLabel, type KnownRoad, type LimitSource, type RoadPieceDetails } from "@/lib/roads";
 import { usePoll } from "@/lib/use-poll";
 
@@ -103,6 +104,8 @@ export default function RoadExplorerPage() {
       </div>
 
       <RoadAttributesSection />
+      <RoadPointsSection />
+      <RoadEventsCard />
 
       <Card
         title="Roads"
