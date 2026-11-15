@@ -8,7 +8,7 @@ import java.util.List;
  * What the platform needs to know to run a module and show it in the registry.
  *
  * @param id             short lower-case name: the switch is gps.modules.{id}.enabled, the API is /api/modules/{id}
- * @param name           shown in the console ("Speed violation")
+ * @param name           shown in the console ("Road intelligence")
  * @param summary        one sentence on what it finds
  * @param consumerGroup  the module's Kafka consumer group: its bookmark on gps.processed-positions. Never rename it
  *                       once it has run - a new name starts again from the oldest reading Kafka holds

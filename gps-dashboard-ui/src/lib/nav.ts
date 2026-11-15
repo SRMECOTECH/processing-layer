@@ -160,7 +160,7 @@ export const SECTIONS: Section[] = [
         items: [
           {
             href: "/processing/speed",
-            label: "Speed violation",
+            label: "Road intelligence",
             icon: Gauge,
             feed: "live",
             children: [

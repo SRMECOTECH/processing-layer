@@ -17,7 +17,7 @@ const KEYS: [string, string, string, string][] = [
   ["gps:live:positions", "geo", "Live location", "Every device's latest point, for “who is near X?” and geofencing"],
   ["gps:state:vehicle:{imei}", "hash", "Vehicle state", "Position, heading, acceleration, odometer, Kalman filter, counters"],
   ["gps:history:{imei}", "stream", "Vehicle state", "Recent readings (capped): the historical context"],
-  ["gps:state:speed:{imei}", "hash", "Speed violation", "Phase, episode start, ping count, max speed, verification"],
+  ["gps:state:speed:{imei}", "hash", "Road intelligence", "Phase, episode start, ping count, max speed, verification"],
   ["gps:state:ignition:{imei}", "hash", "Ignition", "On/off, source, engine seconds, idling"],
   ["gps:state:stoppage:{imei}", "hash", "Stoppage", "Phase, anchor, centroid, start, classification"],
   ["gps:events:{imei}", "list", "All processors", "The vehicle's latest events, newest first (capped)"],

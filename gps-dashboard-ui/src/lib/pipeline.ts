@@ -25,7 +25,7 @@ export const STAGE_NAME: Record<string, string> = {
   REJECTED_FRAME_LOGGER: "Rejected frame archive",
   DIRECT_PROCESSING: "Direct flow",
   VEHICLE_EVENT_PRODUCER: "Vehicle events",
-  SPEED_VIOLATION: "Speed violation",
+  SPEED_VIOLATION: "Road intelligence",
   VEHICLE_STATE: "Vehicle state",
   STOPPAGE_DETECTION: "Stoppage detection",
   IGNITION: "Ignition",

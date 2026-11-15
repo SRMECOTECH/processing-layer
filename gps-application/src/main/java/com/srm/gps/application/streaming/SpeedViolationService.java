@@ -47,7 +47,7 @@ public class SpeedViolationService implements GpsModule {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpeedViolationService.class);
 
-    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("speed-violation", "Speed violation",
+    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("speed-violation", "Road intelligence",
             "Sustained over-speed against each road's limit, each entity's rule and each geofence's limit, speedometer cross-checked against GPS.",
             KafkaConsumerGroupNames.SPEED_VIOLATION, PipelineStage.SPEED_VIOLATION, 30,
             List.of("OVERSPEED", "SPEED_SENSOR_MISMATCH"), List.of("gps:state:speed:*"));

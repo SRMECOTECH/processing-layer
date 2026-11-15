@@ -23,7 +23,7 @@ export default function SpeedEpisodesPage() {
     <div className="stack">
       <ModuleHeader
         module={SPEED}
-        title="Speed violation · live episodes"
+        title="Road intelligence · live episodes"
         actions={
           <Link href="/processing/speed/rules" className="btn soft">
             Edit rules
