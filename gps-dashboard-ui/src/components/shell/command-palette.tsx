@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Car, Crosshair, Search } from "@/components/icons";
 import type { IconComponent } from "@/components/icons";
 import { allPages } from "@/lib/nav";
+import { useSections, useViewer } from "@/lib/viewer";
 
 type Result = { href: string; title: string; trail: string; icon: IconComponent; planned?: boolean };
 
@@ -43,6 +44,8 @@ function Palette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const sections = useSections();
+  const viewer = useViewer();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +55,7 @@ function Palette({ onClose }: { onClose: () => void }) {
 
   const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
-    const pages = allPages()
+    const pages = allPages(sections)
       .filter((p) => !q || `${p.label} ${p.parent ?? ""} ${p.section}`.toLowerCase().includes(q))
       .map((p) => ({
         href: p.href,
@@ -61,14 +64,14 @@ function Palette({ onClose }: { onClose: () => void }) {
         icon: p.icon,
         planned: p.feed === "planned",
       }));
-    if (/^\d{3,}$/.test(q)) {
+    if (viewer.role === "DEVELOPER" && /^\d{3,}$/.test(q)) {
       pages.unshift(
         { href: `/live/inspector?imei=${q}`, title: `Inspect vehicle ${q}`, trail: "Live › Vehicle inspector", icon: Crosshair, planned: false },
         { href: `/live/vehicles?imei=${q}`, title: `Vehicles with IMEI containing ${q}`, trail: "Live › Vehicle list", icon: Car, planned: false },
       );
     }
     return pages.slice(0, 40);
-  }, [query]);
+  }, [query, sections, viewer.role]);
 
   useEffect(() => {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });

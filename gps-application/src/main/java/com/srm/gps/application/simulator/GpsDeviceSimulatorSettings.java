@@ -23,6 +23,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param devicesWithIgnition        share (0..1) of devices that report an ignition wire; the rest get virtual ignition
  * @param devicesWithOdometer        share (0..1) of devices that report an odometer; the rest are measured by GPS
  * @param idlingDevices              share (0..1) of devices whose drivers leave the engine running while standing
+ * @param tripNumbers                replay exactly these smart_truck trips (all of their pings) instead of the newest trip of
+ *                                   vehicleCount devices - one long trip is the test bed for every module. With faithful
+ *                                   timing the replay then starts early enough for the whole trip to lie in the past.
  */
 @ConfigurationProperties(prefix = "gps.simulator")
 public record GpsDeviceSimulatorSettings(
@@ -38,7 +41,15 @@ public record GpsDeviceSimulatorSettings(
         Integer catchUpSpeedFactor,
         Double devicesWithIgnition,
         Double devicesWithOdometer,
-        Double idlingDevices) {
+        Double idlingDevices,
+        java.util.List<Long> tripNumbers) {
+
+    /** Every ping of a pinned trip is replayed: a long trip has far more than pingsPerVehicle. */
+    public static final int ALL_PINGS_OF_A_PINNED_TRIP = 1_000_000;
+
+    public boolean tripsPinned() {
+        return tripNumbers != null && !tripNumbers.isEmpty();
+    }
 
     public boolean faithfulTiming() {
         return timing == null || timing.isBlank() || "faithful".equalsIgnoreCase(timing);

@@ -9,6 +9,8 @@ import { useOverview } from "@/lib/overview-context";
 import { ingress, isKafkaFlow } from "@/lib/pipeline";
 import { usePreferences, type Accent, type Background, type Density, type Theme } from "@/lib/preferences";
 import { Switch } from "@/components/ops/kit";
+import { HOME } from "@/lib/session";
+import { useViewer } from "@/lib/viewer";
 import { SearchButton } from "./command-palette";
 import { Popover } from "./popover";
 import { SectionTabs } from "./section-tabs";
@@ -19,6 +21,8 @@ import { SectionTabs } from "./section-tabs";
  */
 export function AppHeader({ user }: { user: string }) {
   const { setDrawerOpen } = usePreferences();
+  const viewer = useViewer();
+  const developer = viewer.role === "DEVELOPER";
 
   return (
     <header className="topbar">
@@ -26,7 +30,7 @@ export function AppHeader({ user }: { user: string }) {
         <button type="button" className="icon-button menu-button" aria-label="Open this section's pages" onClick={() => setDrawerOpen(true)}>
           <Menu size={20} />
         </button>
-        <Link href="/live" className="brand" aria-label="PulseStream home">
+        <Link href={HOME[viewer.role]} className="brand" aria-label="PulseStream home">
           <span className="brand-mark">
             <Waves size={17} />
           </span>
@@ -38,7 +42,7 @@ export function AppHeader({ user }: { user: string }) {
 
       <div className="topbar-end">
         <SearchButton />
-        <LivePill />
+        {developer && <LivePill />}
         <NotificationBell />
         <AppearanceMenu />
         <UserMenu user={user} />
@@ -225,8 +229,12 @@ function AppearanceMenu() {
   );
 }
 
+const ROLE_NAME = { DEVELOPER: "GPS provider", TRANSPORTER: "Transporter", CONSIGNER: "Consigner" } as const;
+
 function UserMenu({ user }: { user: string }) {
   const { data: o } = useOverview();
+  const viewer = useViewer();
+  const developer = viewer.role === "DEVELOPER";
   return (
     <Popover label="Account and environment" width={280} button={<CircleUser size={19} strokeWidth={1.7} />} buttonClassName="icon-button avatar-button">
       {() => (
@@ -234,10 +242,14 @@ function UserMenu({ user }: { user: string }) {
           <div className="user-card">
             <span className="user-avatar">{user.slice(0, 2).toUpperCase()}</span>
             <span>
-              <span className="notice-heading">{user}</span>
-              <span className="notice-sub">Signed in to this console</span>
+              <span className="notice-heading">{viewer.name ?? user}</span>
+              <span className="notice-sub">
+                {ROLE_NAME[viewer.role]}
+                {viewer.tenantName ? ` · ${viewer.tenantName}` : ""} · user id {user}
+              </span>
             </span>
           </div>
+          {developer && (
           <dl className="kv compact">
             <div className="kv-row">
               <dt>Processing flow</dt>
@@ -252,6 +264,7 @@ function UserMenu({ user }: { user: string }) {
               <dd>{o ? formatAgo(o.generatedAt) : "–"}</dd>
             </div>
           </dl>
+          )}
           <div className="shortcut-list">
             <span>
               <kbd>Ctrl K</kbd> Search

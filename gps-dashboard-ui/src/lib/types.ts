@@ -325,7 +325,22 @@ export type VehicleEventView = {
     | "IGNITION_ON"
     | "IGNITION_OFF"
     | "HARSH_ACCELERATION"
-    | "HARSH_BRAKING";
+    | "HARSH_BRAKING"
+    | "SHIPMENT_DEPARTED"
+    | "SHIPMENT_ARRIVED"
+    | "SHIPMENT_DELAYED"
+    | "GEOFENCE_ENTER"
+    | "GEOFENCE_EXIT"
+    | "GEOFENCE_PASS"
+    | "GEOFENCE_DWELL"
+    | "ROUTE_DEVIATION"
+    | "ROUTE_ALTERNATE"
+    | "WRONG_DIRECTION"
+    | "ETA_CHANGED"
+    | "DESTINATION_REACHED"
+    | "WAYPOINT_ARRIVED"
+    | "WAYPOINT_DEPARTED"
+    | "WAYPOINT_MISSED";
   severity: "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   status: "OPEN" | "CLOSED";
   startedAt: string;

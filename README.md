@@ -630,6 +630,26 @@ ki positions, `recorded_at` index se). Poori detail: [docs/REPORTS_GUIDE.md](doc
 
 ---
 
+## 15e. TMS – teen login, shipments, device ↔ gaadi mapping (UI: TMS, /transporter, /consigner)
+
+> Poori kahani English mein: [docs/TMS_GUIDE.md](docs/TMS_GUIDE.md). Naya module jodna: [docs/MODULE_PLUGIN_GUIDE.md](docs/MODULE_PLUGIN_GUIDE.md).
+
+**Desi version:** hum GPS wale hain 📡. Truck company (**transporter**) ke trucks mein humara device laga hai, aur Tata Steel jaisi company (**consigner**) apna maal (steel) un trucks se **consignee** tak bhejti hai. Teeno ko alag cheez dekhni hai, to login pe teen option:
+
+| Login (role) | Kya dikhta hai |
+|---|---|
+| **GPS provider** (`DEVELOPER`) | Sab kuch + engine: devices, device ↔ gaadi mapping, companies & users, places (geofence), module registry + replay |
+| **Transporter** | Apne trucks (live), jo shipments woh le ja raha hai, detention, on-time %, alerts |
+| **Consigner** | Apne shipments plant se consignee tak, ETA, delay, transporter scorecard, plant detention. Truck **sirf tab** dikhta hai jab us pe uska maal hai |
+
+Demo login: teeno role ke liye `abc` / `abc` (`gps.auth.demo-accounts`). Token service sign karti hai; transporter URL badal ke doosre ka data nahi dekh sakta.
+
+- **Shipment file** = smart_truck ka `tta_trips` (44 column). Excel, CSV ya seedha copy kiye rows (`'754710', '540', ... NULL`) – header ho to naam se, na ho to column order se. Pehle **preview** (kuch nahi likhta), phir import. Same file dobara = "N unchanged" (trip no + transporter = ek shipment).
+- **Shipment ↔ GPS**: gaadi number → `device_assignment` (mapping, dropdown se) → IMEI → readings. Origin/destination naam se **place** (geofence) milta hai – smart_truck ke 87 geofence migration V9 mein aa gaye.
+- **Shipment tracking module**: plant fence se bahar = departure, destination fence ke andar = arrival, ETA ke baad = delayed. Hamesha **sabse pehli** reading jo saabit kare – late ya replay reading se jawab nahi badalta.
+- **Modules plug-in**: speed, vehicle state, stoppage, ignition, shipment tracking – sab `GpsModule` (gps-module-api). Naya module = ek class + `gps.modules.<id>.enabled`; apna consumer group, retry/DLQ, replay platform deta hai.
+
+
 ## 16. Engine dashboard aur REST APIs
 
 **Dashboard** (http://localhost:8080) har 2 second refresh:
@@ -881,7 +901,7 @@ gps.processed-positions → ★ Vehicle State Keeper (Redis state + Kafka compac
 | Phase | Kya | Done kab |
 |---|---|---|
 | 0 | Current base live data ke saath perfect chale | 150 trucks end to end |
-| 1 | Module framework + State Keeper + enriched topic + Redis config ladder (default → tenant → vehicle) + dead-letter (✅ `gps.dead-letters`) + **ignition aur odometer** frame mein | Dummy module 1 config line se jud jaye |
+| 1 | Module framework (✅ `gps-module-api`: `GpsModule` + `gps.modules.<id>.enabled`, replay – section 15e) + State Keeper + enriched topic + Redis config ladder (default → tenant → vehicle) + dead-letter (✅ `gps.dead-letters`) + **ignition aur odometer** frame mein | Dummy module 1 config line se jud jaye |
 | 2 | Storage gate: schema validation + PostgreSQL (7 din) + **ClickHouse** | Pings dono DB mein |
 | 3 | **Speed violation** – 1 min lagatar > 60 km/h, device speed vs lat/lon se calculated speed cross-check, alert ek baar | 60 nahi, 1 alert |
 | 4 | **Stoppage** – ignition ON + < 2-3 km/h; ignition OFF → points neutralise (fake km nahi) | Khadi gaadi 0 km jode |

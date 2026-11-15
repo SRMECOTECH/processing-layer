@@ -9,6 +9,7 @@ import { NotificationsProvider } from "@/lib/notifications";
 import { OverviewProvider } from "@/lib/overview-context";
 import { APPLY_SAVED_THEME, PreferencesProvider } from "@/lib/preferences";
 import { SESSION_COOKIE, readSession } from "@/lib/session";
+import { ViewerProvider } from "@/lib/viewer";
 import "./globals.css";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -50,8 +51,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script dangerouslySetInnerHTML={{ __html: APPLY_SAVED_THEME }} />
       </head>
       <body>
+        <ViewerProvider
+          viewer={{ user: session.user, role: session.role, name: session.name, tenant: session.tenant, tenantName: session.tenantName }}
+        >
         <PreferencesProvider>
-          <OverviewProvider>
+          <OverviewProvider enabled={session.role === "DEVELOPER"}>
             <NotificationsProvider>
               <div className="frame">
                 <AppHeader user={session.user} />
@@ -66,6 +70,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             </NotificationsProvider>
           </OverviewProvider>
         </PreferencesProvider>
+        </ViewerProvider>
       </body>
     </html>
   );

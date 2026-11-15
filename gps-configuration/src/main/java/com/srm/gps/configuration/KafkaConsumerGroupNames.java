@@ -44,6 +44,18 @@ public final class KafkaConsumerGroupNames {
     /** Reads processed positions and tracks ignition, engine hours and idling. */
     public static final String IGNITION = "gps-ignition-service";
 
+    /** Reads processed positions and follows each shipment: departure from the plant, arrival, delay. */
+    public static final String SHIPMENT_TRACKING = "gps-shipment-tracking-service";
+
+    /** Reads processed positions and tracks every vehicle against every geofence: entries, exits, passes, dwell. */
+    public static final String GEOFENCE = "gps-geofence-service";
+
+    /** Reads processed positions and follows each planned trip's stops: arrived, departed, passed, missed. */
+    public static final String WAYPOINTS = "gps-waypoint-service";
+
+    /** Reads processed positions and follows each planned trip: deviation, wrong direction, live ETA, destination. */
+    public static final String ROUTE_DEVIATION = "gps-route-deviation-service";
+
     /** Reads rejected frames, archives them in PostgreSQL (rejected_frame) and writes them to the service log. */
     public static final String REJECTED_FRAME_LOGGER = "gps-rejected-frame-logger";
 

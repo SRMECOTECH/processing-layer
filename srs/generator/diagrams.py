@@ -211,6 +211,38 @@ def er_diagram(out):
     save(fig, out, "er-diagram.png")
 
 
+def tms_er_diagram(out):
+    """V9 to V11: transport management, geofencing and route plans."""
+    fig, ax = canvas(13, 7.6)
+    table_box(ax, 0.2, 7.5, 2.8, "tenant (V9 adds)", ["kind (GPS_PROVIDER|TRANSPORTER|CONSIGNER)", "external_code (UK per kind)"], GREEN)
+    table_box(ax, 0.2, 6.6, 2.8, "app_user", ["PK id uuid", "role (DEVELOPER|TRANSPORTER|CONSIGNER)", "UK (role, lower(username))", "FK tenant_id -> tenant",
+                                              "password_hash (PBKDF2)", "active, last_login_at"], GREEN)
+    table_box(ax, 0.2, 4.95, 2.8, "auth_key", ["PK id = 1 (single row)", "secret (signs sign-in tokens)"], PALE)
+    table_box(ax, 3.4, 7.5, 3.1, "place (geofence master)", ["PK id bigint identity", "UK (code, role)", "role (ORIGIN|DESTINATION|YARD|", "      CHECKPOINT|ZONE)",
+                                                             "shape (CIRCLE|POLYGON), polygon jsonb", "latitude, longitude, radius_m", "dwell_alert_min, speed_limit_kmph",
+                                                             "source, external_ref, active"], GREEN)
+    table_box(ax, 6.9, 7.5, 2.9, "shipment_import", ["PK id bigint identity", "file_name, file_sha256", "rows created/updated/failed", "problems jsonb, uploaded_by"], AMBER)
+    table_box(ax, 6.9, 6.3, 2.9, "shipment", ["PK id bigint identity", "UK (transporter_tenant_id, trip_no)", "FK transporter / consigner -> tenant", "FK origin / destination_place_id -> place",
+                                              "vehicle_registration_no, device_imei", "dispatched_at, eta_at", "left_origin_at, arrived_at (GPS)", "FK import_id -> shipment_import"], AMBER)
+    table_box(ax, 10.2, 7.5, 2.6, "geofence_visit", ["PK id bigint identity", "UK (imei, place_id, kind, entered_at)", "place_id (logical) + code, name", "kind (VISIT|PASS)",
+                                                    "entered_at, exited_at", "entry/exit gaps, dwell_alert_at", "inferred, exit_reason"], LIGHT)
+    table_box(ax, 3.4, 4.6, 3.1, "route_plan", ["PK id bigint identity", "FK shipment_id -> shipment (UK)", "imei, vehicle_registration_no", "FK origin / destination_place_id -> place",
+                                                "engine, costing, version, reason", "shape polyline6, timings jsonb", "length_m, planned_s, offset_m", "status, route_status, eta_at,",
+                                                "      promised_eta_at, pace, deviations"], LIGHT)
+    table_box(ax, 6.9, 3.6, 2.9, "route_stop", ["PK id bigint identity", "FK plan_id -> route_plan", "UK (plan_id, seq)", "kind (MANUAL|FENCE), place_id",
+                                                "chainage_m, stay_min", "status (PENDING..MISSED)", "arrived_at, departed_at"], LIGHT)
+    arrow(ax, 1.6, 6.6, 1.6, 7.26, color=NAVY)
+    arrow(ax, 6.9, 6.9, 6.5, 6.9, color=NAVY)
+    arrow(ax, 8.35, 6.3, 8.35, 6.64, color=NAVY)
+    arrow(ax, 6.5, 4.4, 6.9, 5.3, color=NAVY)
+    arrow(ax, 4.95, 4.6, 4.95, 5.6, color=NAVY)
+    arrow(ax, 6.9, 3.0, 6.5, 3.4, color=NAVY)
+    ax.text(6.5, 0.7, "Green = master data, amber = shipments, blue = what the modules write (geofence, waypoints, route-deviation),\n"
+                      "grey = security. geofence_visit names its fence logically (code and name copied), so a deleted fence keeps its history.",
+            ha="center", fontsize=7, color="#262626", bbox=dict(facecolor="#FAFAFA", edgecolor=GREY, pad=4))
+    save(fig, out, "er-tms-routes.png")
+
+
 if __name__ == "__main__":
     target = Path(sys.argv[1] if len(sys.argv) > 1 else "figures")
     target.mkdir(parents=True, exist_ok=True)
@@ -219,4 +251,5 @@ if __name__ == "__main__":
     trip_state_machine(target)
     dead_letter_lifecycle(target)
     er_diagram(target)
+    tms_er_diagram(target)
     print("figures written to", target.resolve())

@@ -8,6 +8,7 @@ import { useState, type ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { Words } from "@/components/words";
 import { formatNumber } from "@/lib/format";
+import { useSections } from "@/lib/viewer";
 import { trailFor, type Feed } from "@/lib/nav";
 import { useOverview } from "@/lib/overview-context";
 
@@ -51,7 +52,7 @@ type HeaderProps = {
 /** Breadcrumb from the menu, title, description, actions on the right and a row of facts. */
 export function PageHeader({ title, description, actions, badges, meta }: HeaderProps) {
   const pathname = usePathname();
-  const trail = trailFor(pathname);
+  const trail = trailFor(pathname, useSections());
   const crumbs: [string, string | undefined][] = [[trail.section.label, trail.section.href]];
   if (trail.group) crumbs.push([trail.group.title, undefined]);
   if (trail.leaf && trail.item) crumbs.push([trail.item.label, trail.item.href]);

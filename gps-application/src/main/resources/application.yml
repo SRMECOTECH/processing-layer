@@ -109,6 +109,9 @@ gps:
     # compressed: the old way - one ping of every vehicle every delay-between-rounds-millis, stamped now.
     timing: faithful
     catch-up-minutes: 120
+    # Replay exactly these smart_truck trips (all their pings), e.g. 28860462 = Jamshedpur -> Ghaziabad. Empty = the
+    # newest trip of vehicle-count devices. Pinned trips start far enough in the past to be replayed end to end.
+    trip-numbers:
     catch-up-speed-factor: 30
     delay-between-rounds-millis: 2000
     # smart_truck has no ignition or odometer, so the simulator adds them for a share of the devices
@@ -122,6 +125,106 @@ gps:
     jitter-max-speed-kmph: 5
     max-implied-speed-kmph: 200
     min-jump-meters: 500
+  # Processing modules after Kafka (gps-module-api): each is a GpsModule bean with its own consumer group on
+  # gps.processed-positions. One line switches a module off (it is on unless set to false); GET /api/modules lists
+  # them, POST /api/modules/{id}/replay?from=... hands one of them the readings since that moment again.
+  modules:
+    ignition:
+      enabled: true
+    vehicle-state:
+      enabled: true
+    speed-violation:
+      enabled: true
+    stoppage:
+      enabled: true
+    shipment-tracking:
+      enabled: true
+    # Live geofencing against the place table (consumer group gps-geofence-service). The confirmation and escape rules
+    # are smart_truck's (detection.py), so live visits agree with its tta_trip_geofence_events:
+    #   confirm-minutes           a new side of a border is believed after this long on it (GPS scatter at a gate)
+    #   escape-factor             ... or at once for an exit, beyond this many radii from the centre
+    #   pass-min-travel-meters    a short stay that never held is a pass-through if the truck moved this far meanwhile
+    #   crossing-max-gap-minutes  fences jumped between two readings are inferred only up to this gap
+    #   dwell-alert-minutes(-role) GEOFENCE_DWELL after this long inside (a fence's own dwell_alert_min wins); 0 = off
+    geofence:
+      enabled: true
+      confirm-minutes: 15
+      escape-factor: 2.0
+      pass-min-travel-meters: 300
+      crossing-max-gap-minutes: 30
+      crossing-min-move-meters: 200
+      dwell-alert-minutes: 360
+      dwell-alert-minutes-origin: 720
+      dwell-alert-minutes-destination: 360
+      dwell-alert-minutes-yard: 240
+    # Route deviation, wrong direction and live ETA against each trip's road route (consumer group
+    # gps-route-deviation-service; docs/ROUTE_DEVIATION_ETA_DESIGN.md). Corridor: half-width around the planned line,
+    # wider where the engine plans highway speed. Off the corridor for suspect-readings AND suspect-minutes AND
+    # suspect-off-meters driven (or far-off-meters at once) -> re-plan from where the truck is: within
+    # alternate-time-factor of the planned remaining time (or + alternate-extra-minutes) is ROUTE_ALTERNATE, otherwise
+    # ROUTE_DEVIATION (HIGH over high-added-minutes, CRITICAL over critical-added-minutes). Back inside for
+    # rejoin-readings closes it. Pace = moving time / planned time, learned over pace-horizon-minutes.
+    route-deviation:
+      enabled: true
+      corridor-highway-meters: 150
+      corridor-town-meters: 80
+      suspect-readings: 3
+      suspect-minutes: 5
+      suspect-off-meters: 1000
+      far-off-meters: 2000
+      rejoin-readings: 3
+      alternate-time-factor: 1.10
+      alternate-extra-minutes: 15
+      high-added-minutes: 30
+      critical-added-minutes: 90
+      wrong-way-back-meters: 1000
+      initial-pace: 1.0
+      pace-horizon-minutes: 60
+      rest-after-driving-hours: 4.5
+      rest-minutes: 30
+      pace-prior-minutes: 60
+      eta-announce-minutes: 30
+      eta-announce-percent: 10
+    # The planned stops of each trip (consumer group gps-waypoint-service): arrival after waypoint-min-stay-minutes
+    # inside, missed once the truck is waypoint-miss-meters past the stop along the plan.
+    waypoints:
+      enabled: true
+      waypoint-min-stay-minutes: 2
+      waypoint-miss-meters: 2000
+      waypoint-radius-meters: 300
+  # Road routing for the route plans: Valhalla first (gps.connections.valhalla-url, changed on Developer -> Connections),
+  # GraphHopper on this laptop when Valhalla does not answer (compose profile "routing"; blank = no fallback).
+  # Every open shipment with an origin and a destination geofence is planned within plan-every.
+  routing:
+    costing: truck
+    graphhopper-url: ${GPS_GRAPHHOPPER_URL:}
+    timeout: PT20S
+    plan-shipments: true
+    plan-every: PT30S
+  # Road speed limits (docs/ROAD_SPEED_GUIDE.md): Valhalla map-matches the readings into a road library; the speed check
+  # judges each reading by the limit of the road under it (hand-set > OpenStreetMap > table by road class and area).
+  roads:
+    live-matching: ${GPS_ROADS_LIVE_MATCHING:true}
+    match-every: 2m
+    match-meters: 35
+    search-radius: 50
+    piece-points: 300
+    piece-km: 80
+    min-move-meters: 15
+    min-live-points: 20
+    max-live-wait-minutes: 15
+    costing: truck
+    max-gap-seconds: 600
+    # Valhalla road density 0..15 from which a road counts as in a town (town rows of the limit table)
+    town-density-from: ${GPS_ROADS_TOWN_DENSITY_FROM:9}
+  # Sign-in for the three roles (GPS provider = DEVELOPER, TRANSPORTER, CONSIGNER). Demo users "abc" with this
+  # password are created when a role has no user yet; switch it off on a real installation.
+  auth:
+    demo-accounts: ${GPS_DEMO_ACCOUNTS:true}
+    demo-password: ${GPS_DEMO_PASSWORD:abc}
+  # Transport management: times in shipment files without a zone are in this zone (the smart_truck TMS writes IST).
+  tms:
+    time-zone: Asia/Kolkata
   # The four stream consumers after Kafka (speed violation, vehicle state, stoppage, ignition).
   # Speed rules are NOT here: they live in Redis (gps:config:speed-rule:*) and are edited from the UI or
   # PUT /api/speed/rules/{scope}; the default rule is created on first start.

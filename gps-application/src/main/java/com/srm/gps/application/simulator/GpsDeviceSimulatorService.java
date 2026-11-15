@@ -63,6 +63,16 @@ public class GpsDeviceSimulatorService {
     private volatile int roundsPerDrive;
     private volatile int driveNumber;
     private volatile String lastMessage = "Not started yet";
+    /** The trips being driven with faithful timing, for the demo shipments: empty in compressed timing. */
+    private volatile List<ReplayedTrip> replayedTrips = List.of();
+
+    /**
+     * One smart_truck trip as the simulator replays it: its first ping is sent at {@code replayedFrom} instead of
+     * {@code originalFrom}, and every later ping keeps its real gap - so the trip's own times shifted by the same amount
+     * are the times of the replay.
+     */
+    public record ReplayedTrip(long tripNumber, String imei, String vehicleRegistration, Instant originalFrom, Instant replayedFrom) {
+    }
 
     public GpsDeviceSimulatorService(SmartTruckGpsReader smartTruckGpsReader,
                                      RawGpsFrameSender rawGpsFrameSender,
@@ -91,7 +101,9 @@ public class GpsDeviceSimulatorService {
         framesSent.set(0);
         round = 0;
         driveNumber = 0;
-        lastMessage = "Starting: picking " + requestedVehicleCount + " vehicles from smart_truck";
+        lastMessage = settings.tripsPinned()
+                ? "Starting: replaying smart_truck trip(s) " + settings.tripNumbers()
+                : "Starting: picking " + requestedVehicleCount + " vehicles from smart_truck";
         simulatorThread.submit(() -> driveFleet(requestedVehicleCount, pingsPerVehicle));
         return currentStatus();
     }
@@ -146,10 +158,13 @@ public class GpsDeviceSimulatorService {
     }
 
     private List<List<SmartTruckGpsPing>> readTrips(int requestedVehicleCount, int pingsPerVehicle) {
-        List<Long> tripNumbers = smartTruckGpsReader.findLatestTripOfDistinctDevices(requestedVehicleCount, settings.minimumPingsPerTrip());
+        boolean pinned = settings.tripsPinned();
+        List<Long> tripNumbers = pinned ? settings.tripNumbers()
+                : smartTruckGpsReader.findLatestTripOfDistinctDevices(requestedVehicleCount, settings.minimumPingsPerTrip());
+        int maximumPings = pinned ? GpsDeviceSimulatorSettings.ALL_PINGS_OF_A_PINNED_TRIP : pingsPerVehicle;
         List<List<SmartTruckGpsPing>> trips = new ArrayList<>();
         for (Long tripNumber : tripNumbers) {
-            List<SmartTruckGpsPing> pings = smartTruckGpsReader.readPingsOfTrip(tripNumber, pingsPerVehicle);
+            List<SmartTruckGpsPing> pings = smartTruckGpsReader.readPingsOfTrip(tripNumber, maximumPings);
             if (pings.size() >= 2) {
                 trips.add(pings);
             }
@@ -161,7 +176,7 @@ public class GpsDeviceSimulatorService {
 
     private void driveFaithfully(List<List<SmartTruckGpsPing>> trips) throws InterruptedException {
         Instant wallStart = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-        Instant replayStart = wallStart.minus(Duration.ofMinutes(settings.catchUpMinutesOrDefault()));
+        Instant replayStart = wallStart.minus(Duration.ofMinutes(catchUpMinutes(trips)));
         // Never replay into time already stored: those readings would all count as late. After "Empty DB" the
         // database is empty again and the full catch-up runs.
         Instant newestStored = newestStoredReading();
@@ -178,8 +193,10 @@ public class GpsDeviceSimulatorService {
                     share(imei, "odometer") < settings.devicesWithOdometerOrDefault(),
                     share(imei, "idler") < settings.idlingDevicesOrDefault()));
         }
+        replayedTrips = trips.stream().map(trip -> new ReplayedTrip(trip.getFirst().tripNumber(), trip.getFirst().deviceImei(),
+                trip.getFirst().vehicleRegistration(), trip.getFirst().recordedAt(), replayStartOf(vehicles, trip.getFirst().deviceImei()))).toList();
         LOG.info("Simulator (faithful timing): {} vehicles, replay starts {} min in the past at {}x until it catches up",
-                vehicles.size(), settings.catchUpMinutesOrDefault(), speedFactor);
+                vehicles.size(), catchUpMinutes(trips), speedFactor);
 
         boolean anyDriving = true;
         while (running.get() && anyDriving) {
@@ -213,6 +230,30 @@ public class GpsDeviceSimulatorService {
                     + " min behind, " + speedFactor + "x)";
             Thread.sleep(TICK_MILLIS);
         }
+    }
+
+    /**
+     * How far in the past the replay starts. Pinned trips start early enough to lie wholly in the past (plus a minute),
+     * so a week-long trip is replayed end to end at the catch-up speed instead of in real time.
+     */
+    private long catchUpMinutes(List<List<SmartTruckGpsPing>> trips) {
+        long configured = settings.catchUpMinutesOrDefault();
+        if (!settings.tripsPinned()) {
+            return configured;
+        }
+        long longest = trips.stream()
+                .mapToLong(t -> Duration.between(t.getFirst().recordedAt(), t.getLast().recordedAt()).toMinutes())
+                .max().orElse(0);
+        return Math.max(configured, longest + 1);
+    }
+
+    /** The trips the running fleet replays (faithful timing), for loading them as shipments. */
+    public List<ReplayedTrip> replayedTrips() {
+        return running.get() ? replayedTrips : List.of();
+    }
+
+    private static Instant replayStartOf(List<SimulatedVehicle> vehicles, String imei) {
+        return vehicles.stream().filter(v -> v.imei().equals(imei)).findFirst().map(SimulatedVehicle::firstDriveStart).orElseThrow();
     }
 
     private Instant newestStoredReading() {

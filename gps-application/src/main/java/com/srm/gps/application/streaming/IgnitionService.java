@@ -1,31 +1,40 @@
 package com.srm.gps.application.streaming;
 
 import com.srm.gps.application.events.VehicleEventRecorder;
+import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.RedisKeyNames;
 import com.srm.gps.configuration.message.EventSeverity;
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.VehicleEvent;
 import com.srm.gps.configuration.message.VehicleEventType;
-import com.srm.gps.connectivity.kafka.StreamConsumerHandlers.IgnitionHandler;
 import com.srm.gps.connectivity.redis.RedisStateStore;
 import com.srm.gps.processing.ignition.IgnitionFinding;
 import com.srm.gps.processing.ignition.IgnitionProcessor;
 import com.srm.gps.processing.ignition.IgnitionReading;
 import com.srm.gps.processing.ignition.IgnitionSettings;
 import com.srm.gps.processing.ignition.IgnitionState;
+import com.srm.gps.module.GpsModule;
+import com.srm.gps.module.ModuleContext;
+import com.srm.gps.module.ModuleDescriptor;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Consumer group gps-ignition-service (Kafka flow) or called directly (direct flow).
+ * Module (gps-module-api), consumer group gps-ignition-service (Kafka flow) or called directly (direct flow).
  * Ignition (device wire, or virtual from motion), engine seconds and idling, state in Redis gps:state:ignition:{imei}.
  * The stoppage consumer reads this state when a frame carries no ignition of its own.
  */
 @Service
-public class IgnitionService implements IgnitionHandler {
+public class IgnitionService implements GpsModule {
+
+    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("ignition", "Ignition",
+            "Ignition from the wire or from motion, engine hours and idling.",
+            KafkaConsumerGroupNames.IGNITION, PipelineStage.IGNITION, 10,
+            List.of("IGNITION_ON", "IGNITION_OFF", "IDLING"), List.of("gps:state:ignition:*"));
 
     private final RedisStateStore redis;
     private final VehicleContext vehicles;
@@ -40,6 +49,15 @@ public class IgnitionService implements IgnitionHandler {
     }
 
     @Override
+    public ModuleDescriptor descriptor() {
+        return DESCRIPTOR;
+    }
+
+    @Override
+    public void onPosition(ProcessedGpsPosition position, ModuleContext context) {
+        handle(position);
+    }
+
     public void handle(ProcessedGpsPosition position) {
         String key = RedisKeyNames.ignitionState(position.imei());
         IgnitionState state = StateCodecs.ignition(redis.readHash(key));

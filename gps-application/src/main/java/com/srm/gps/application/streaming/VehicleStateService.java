@@ -1,6 +1,7 @@
 package com.srm.gps.application.streaming;
 
 import com.srm.gps.application.events.VehicleEventRecorder;
+import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.RedisKeyNames;
 import com.srm.gps.configuration.message.EventSeverity;
@@ -8,18 +9,21 @@ import com.srm.gps.configuration.message.MovementStatus;
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.VehicleEvent;
 import com.srm.gps.configuration.message.VehicleEventType;
-import com.srm.gps.connectivity.kafka.StreamConsumerHandlers.VehicleStateHandler;
 import com.srm.gps.connectivity.redis.RedisStateStore;
 import com.srm.gps.processing.state.VehicleReading;
 import com.srm.gps.processing.state.VehicleState;
 import com.srm.gps.processing.state.VehicleStateProcessor;
+import com.srm.gps.module.GpsModule;
+import com.srm.gps.module.ModuleContext;
+import com.srm.gps.module.ModuleDescriptor;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Consumer group gps-vehicle-state-service (Kafka flow) or called directly (direct flow).
+ * Module (gps-module-api), consumer group gps-vehicle-state-service (Kafka flow) or called directly (direct flow).
  *
  * Keeps two things per vehicle in Redis:
  *   gps:state:vehicle:{imei}  the vehicle's full state ({@link VehicleStateProcessor}: heading, acceleration,
@@ -29,7 +33,12 @@ import java.util.Map;
  * Kafka keeps the full history for replay (retention 7 days); PostgreSQL keeps every position for good.
  */
 @Service
-public class VehicleStateService implements VehicleStateHandler {
+public class VehicleStateService implements GpsModule {
+
+    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("vehicle-state", "Vehicle state",
+            "Each vehicle's state and history: heading, acceleration, harsh driving, Kalman-smoothed distance.",
+            KafkaConsumerGroupNames.VEHICLE_STATE, PipelineStage.VEHICLE_STATE, 20,
+            List.of("HARSH_ACCELERATION", "HARSH_BRAKING"), List.of("gps:state:vehicle:*", "gps:history:*"));
 
     private final RedisStateStore redis;
     private final VehicleContext vehicles;
@@ -46,6 +55,15 @@ public class VehicleStateService implements VehicleStateHandler {
     }
 
     @Override
+    public ModuleDescriptor descriptor() {
+        return DESCRIPTOR;
+    }
+
+    @Override
+    public void onPosition(ProcessedGpsPosition position, ModuleContext context) {
+        handle(position);
+    }
+
     public void handle(ProcessedGpsPosition position) {
         VehicleContext.Vehicle vehicle = vehicles.of(position);
         String key = RedisKeyNames.vehicleState(position.imei());

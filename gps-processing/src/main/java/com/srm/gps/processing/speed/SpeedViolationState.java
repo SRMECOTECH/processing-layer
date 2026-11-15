@@ -22,6 +22,11 @@ import java.util.List;
  * @param window            the last few readings, for the GPS speed (oldest first)
  * @param lastGpsSpeedKmph  GPS speed at the newest reading, or null
  * @param lastVerdict       verification of the newest reading
+ * @param peakExcessKmph    the most the episode went over the limit in force at that reading (the limit can change during
+ *                          an episode, for example from a 60 km/h highway into a 40 km/h town)
+ * @param peakLimitKmph     the limit at that reading (0 = not known: a state written before peaks were kept)
+ * @param peakLatitude      where it happened
+ * @param peakLongitude     where it happened
  */
 public record SpeedViolationState(
         Phase phase,
@@ -42,7 +47,11 @@ public record SpeedViolationState(
         Instant lastOverAt,
         List<WindowPoint> window,
         Double lastGpsSpeedKmph,
-        Verdict lastVerdict) {
+        Verdict lastVerdict,
+        double peakExcessKmph,
+        double peakLimitKmph,
+        double peakLatitude,
+        double peakLongitude) {
 
     public enum Phase { NORMAL, CANDIDATE, VIOLATING }
 
@@ -66,7 +75,7 @@ public record SpeedViolationState(
 
     public static SpeedViolationState initial() {
         return new SpeedViolationState(Phase.NORMAL, null, null, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, null,
-                List.of(), null, Verdict.UNVERIFIED);
+                List.of(), null, Verdict.UNVERIFIED, 0, 0, 0, 0);
     }
 
     public double averageSpeedKmph() {

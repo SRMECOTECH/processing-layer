@@ -78,10 +78,10 @@ public final class SpeedViolationProcessor {
         boolean belowBand = speed < rule.limitKmph() - rule.hysteresisKmph();
 
         SpeedViolationState next = switch (current.phase()) {
-            case NORMAL -> over ? startEpisode(current, reading, verdict, gpsSpeed) : current;
+            case NORMAL -> over ? startEpisode(current, reading, verdict, gpsSpeed, rule.limitKmph()) : current;
             case CANDIDATE -> {
                 if (over) {
-                    SpeedViolationState counted = count(current, reading, verdict, gpsSpeed, true);
+                    SpeedViolationState counted = count(current, reading, verdict, gpsSpeed, true, rule.limitKmph());
                     if (counted.overPings() >= rule.minConsecutivePings()
                             && Duration.between(counted.episodeStartedAt(), reading.recordedAt()).getSeconds() >= rule.minDurationSeconds()) {
                         SpeedViolationState violating = withPhase(counted, Phase.VIOLATING);
@@ -90,14 +90,14 @@ public final class SpeedViolationProcessor {
                     }
                     yield counted;
                 }
-                yield belowBand ? reset(current) : count(current, reading, verdict, gpsSpeed, false);
+                yield belowBand ? reset(current) : count(current, reading, verdict, gpsSpeed, false, rule.limitKmph());
             }
             case VIOLATING -> {
                 if (belowBand) {
                     findings.add(ended(current, rule, "SPEED_DROPPED"));
                     yield reset(current);
                 }
-                yield count(current, reading, verdict, gpsSpeed, over);
+                yield count(current, reading, verdict, gpsSpeed, over, rule.limitKmph());
             }
         };
 
@@ -105,7 +105,8 @@ public final class SpeedViolationProcessor {
                 next.episodeLatitude(), next.episodeLongitude(), next.overPings(), next.readings(), next.maxSpeedKmph(),
                 next.speedSumKmph(), next.maxGpsSpeedKmph(), next.gpsAgreedPings(), next.sensorHighPings(),
                 next.gpsHighPings() + (verdict == Verdict.GPS_HIGH ? 1 : 0), mismatchStreak, mismatchReported,
-                next.lastOverAt(), window, gpsSpeed, verdict), findings);
+                next.lastOverAt(), window, gpsSpeed, verdict, next.peakExcessKmph(), next.peakLimitKmph(), next.peakLatitude(),
+                next.peakLongitude()), findings);
     }
 
     /**
@@ -168,14 +169,19 @@ public final class SpeedViolationProcessor {
         return List.copyOf(next);
     }
 
-    private static SpeedViolationState startEpisode(SpeedViolationState s, SpeedReading r, Verdict verdict, Double gpsSpeed) {
+    private static SpeedViolationState startEpisode(SpeedViolationState s, SpeedReading r, Verdict verdict, Double gpsSpeed,
+                                                    double limitKmph) {
         SpeedViolationState started = new SpeedViolationState(Phase.CANDIDATE, s.lastRecordedAt(), r.recordedAt(),
                 r.latitude(), r.longitude(), 0, 0, 0, 0, 0, 0, 0, s.gpsHighPings(), s.mismatchStreak(),
-                s.mismatchReported(), null, s.window(), s.lastGpsSpeedKmph(), s.lastVerdict());
-        return count(started, r, verdict, gpsSpeed, true);
+                s.mismatchReported(), null, s.window(), s.lastGpsSpeedKmph(), s.lastVerdict(), 0, 0, 0, 0);
+        return count(started, r, verdict, gpsSpeed, true, limitKmph);
     }
 
-    private static SpeedViolationState count(SpeedViolationState s, SpeedReading r, Verdict verdict, Double gpsSpeed, boolean over) {
+    /** Counts a reading into the episode; an over-limit reading that beats the episode's excess becomes its peak. */
+    private static SpeedViolationState count(SpeedViolationState s, SpeedReading r, Verdict verdict, Double gpsSpeed, boolean over,
+                                             double limitKmph) {
+        double excess = r.speedKmph() - limitKmph;
+        boolean peak = over && (s.peakLimitKmph() <= 0 || excess > s.peakExcessKmph());
         return new SpeedViolationState(s.phase(), s.lastRecordedAt(), s.episodeStartedAt(), s.episodeLatitude(),
                 s.episodeLongitude(),
                 s.overPings() + (over ? 1 : 0),
@@ -187,19 +193,23 @@ public final class SpeedViolationProcessor {
                 s.sensorHighPings() + (over && verdict == Verdict.SENSOR_HIGH ? 1 : 0),
                 s.gpsHighPings(), s.mismatchStreak(), s.mismatchReported(),
                 over ? r.recordedAt() : s.lastOverAt(),
-                s.window(), s.lastGpsSpeedKmph(), s.lastVerdict());
+                s.window(), s.lastGpsSpeedKmph(), s.lastVerdict(),
+                peak ? excess : s.peakExcessKmph(), peak ? limitKmph : s.peakLimitKmph(),
+                peak ? r.latitude() : s.peakLatitude(), peak ? r.longitude() : s.peakLongitude());
     }
 
     private static SpeedViolationState withPhase(SpeedViolationState s, Phase phase) {
         return new SpeedViolationState(phase, s.lastRecordedAt(), s.episodeStartedAt(), s.episodeLatitude(),
                 s.episodeLongitude(), s.overPings(), s.readings(), s.maxSpeedKmph(), s.speedSumKmph(), s.maxGpsSpeedKmph(),
                 s.gpsAgreedPings(), s.sensorHighPings(), s.gpsHighPings(), s.mismatchStreak(), s.mismatchReported(),
-                s.lastOverAt(), s.window(), s.lastGpsSpeedKmph(), s.lastVerdict());
+                s.lastOverAt(), s.window(), s.lastGpsSpeedKmph(), s.lastVerdict(), s.peakExcessKmph(), s.peakLimitKmph(),
+                s.peakLatitude(), s.peakLongitude());
     }
 
     private static SpeedViolationState reset(SpeedViolationState s) {
         return new SpeedViolationState(Phase.NORMAL, s.lastRecordedAt(), null, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                s.gpsHighPings(), s.mismatchStreak(), s.mismatchReported(), null, s.window(), s.lastGpsSpeedKmph(), s.lastVerdict());
+                s.gpsHighPings(), s.mismatchStreak(), s.mismatchReported(), null, s.window(), s.lastGpsSpeedKmph(), s.lastVerdict(),
+                0, 0, 0, 0);
     }
 
     /** GPS_VERIFIED, SENSOR_SUSPECT or UNVERIFIED for the whole episode. */
@@ -213,14 +223,14 @@ public final class SpeedViolationProcessor {
 
     private static SpeedFinding confirmed(SpeedViolationState s, SpeedRule rule, Instant now) {
         return new SpeedFinding(SpeedFinding.Kind.VIOLATION_CONFIRMED, s.episodeStartedAt(), null,
-                s.episodeLatitude(), s.episodeLongitude(), s.maxSpeedKmph() - rule.limitKmph(), episodeVerdict(s),
+                s.episodeLatitude(), s.episodeLongitude(), peakExcess(s, rule), episodeVerdict(s),
                 details(s, rule, Duration.between(s.episodeStartedAt(), now).getSeconds(), null));
     }
 
     private static SpeedFinding ended(SpeedViolationState s, SpeedRule rule, String reason) {
         Instant end = s.lastOverAt() != null ? s.lastOverAt() : s.lastRecordedAt();
         return new SpeedFinding(SpeedFinding.Kind.VIOLATION_ENDED, s.episodeStartedAt(), end,
-                s.episodeLatitude(), s.episodeLongitude(), s.maxSpeedKmph() - rule.limitKmph(), episodeVerdict(s),
+                s.episodeLatitude(), s.episodeLongitude(), peakExcess(s, rule), episodeVerdict(s),
                 details(s, rule, Duration.between(s.episodeStartedAt(), end).getSeconds(), reason));
     }
 
@@ -236,9 +246,21 @@ public final class SpeedViolationProcessor {
                 r.longitude(), 0, r.speedKmph() > gpsSpeed ? "SPEEDOMETER_HIGH" : "SPEEDOMETER_LOW", details);
     }
 
+    /** How far over its limit the episode went: at its peak reading (a state from before peaks were kept: top speed). */
+    private static double peakExcess(SpeedViolationState s, SpeedRule rule) {
+        return s.peakLimitKmph() > 0 ? s.peakExcessKmph() : s.maxSpeedKmph() - rule.limitKmph();
+    }
+
     private static Map<String, Object> details(SpeedViolationState s, SpeedRule rule, long durationSeconds, String endReason) {
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("limitKmph", rule.limitKmph());
+        // the limit where the episode peaked; limitNowKmph is the one in force at the reading that raised the finding
+        details.put("limitKmph", s.peakLimitKmph() > 0 ? s.peakLimitKmph() : rule.limitKmph());
+        details.put("limitNowKmph", rule.limitKmph());
+        details.put("excessKmph", round1(peakExcess(s, rule)));
+        if (s.peakLimitKmph() > 0) {
+            details.put("peakLatitude", s.peakLatitude());
+            details.put("peakLongitude", s.peakLongitude());
+        }
         details.put("ruleScope", rule.scope());
         details.put("durationSeconds", durationSeconds);
         details.put("overLimitReadings", s.overPings());

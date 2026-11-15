@@ -29,6 +29,7 @@ final class SimulatedVehicle {
 
     private final String imei;
     private final List<SmartTruckGpsPing> trip;
+    private final Instant firstDriveStart;
     private final boolean reportsIgnition;
     private final boolean reportsOdometer;
     private final boolean idler;
@@ -49,7 +50,17 @@ final class SimulatedVehicle {
         this.odometerMeters = 40_000_000L + Math.floorMod(imei.hashCode(), 50_000_000);
         this.driveNumber = 1;
         this.driveStart = firstDriveStart;
+        this.firstDriveStart = firstDriveStart;
         this.steps = plan(trip, false, idler);
+    }
+
+    String imei() {
+        return imei;
+    }
+
+    /** When the first ping of the first drive is sent: the trip's first ping, moved to the replay clock. */
+    Instant firstDriveStart() {
+        return firstDriveStart;
     }
 
     /** When the next ping is due on the replay clock, or null when this drive is over. */

@@ -22,6 +22,8 @@
           gps-configuration : topic names, consumer group names, message formats (no framework code)
           gps-connectivity  : every connection to the outside world (MySQL source, Kafka, PostgreSQL entities)
           gps-processing    : the processing logic: validation + movement calculation (plain Java)
+          gps-module-api    : the plug-in contract for processing modules after Kafka (plain Java): implement
+                              GpsModule, switch it on with gps.modules.<id>.enabled - no Kafka code of its own
           gps-streams       : the Kafka Streams layer: normalization with exactly-once state, vehicle table, windows (no Spring)
           gps-application   : the runnable Spring Boot service that wires the modules into the Kafka or the direct flow
           gps-route-service : a second runnable service - route planning on the India road map (GraphHopper),
@@ -31,6 +33,7 @@
         <module>gps-configuration</module>
         <module>gps-connectivity</module>
         <module>gps-processing</module>
+        <module>gps-module-api</module>
         <module>gps-streams</module>
         <module>gps-application</module>
         <module>gps-route-service</module>
@@ -59,8 +62,19 @@
             </dependency>
             <dependency>
                 <groupId>com.srm.gps</groupId>
+                <artifactId>gps-module-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.srm.gps</groupId>
                 <artifactId>gps-streams</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <!-- Reads the transporters' shipment Excel files (.xlsx) on the server; the dashboard only uploads them -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>5.4.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

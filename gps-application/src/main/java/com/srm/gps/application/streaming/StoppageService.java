@@ -1,13 +1,13 @@
 package com.srm.gps.application.streaming;
 
 import com.srm.gps.application.events.VehicleEventRecorder;
+import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.RedisKeyNames;
 import com.srm.gps.configuration.message.EventSeverity;
 import com.srm.gps.configuration.message.ProcessedGpsPosition;
 import com.srm.gps.configuration.message.VehicleEvent;
 import com.srm.gps.configuration.message.VehicleEventType;
-import com.srm.gps.connectivity.kafka.StreamConsumerHandlers.StoppageHandler;
 import com.srm.gps.connectivity.redis.RedisStateStore;
 import com.srm.gps.processing.ignition.IgnitionState;
 import com.srm.gps.processing.stoppage.StopFinding;
@@ -15,13 +15,17 @@ import com.srm.gps.processing.stoppage.StoppageDetector;
 import com.srm.gps.processing.stoppage.StoppageReading;
 import com.srm.gps.processing.stoppage.StoppageSettings;
 import com.srm.gps.processing.stoppage.StoppageState;
+import com.srm.gps.module.GpsModule;
+import com.srm.gps.module.ModuleContext;
+import com.srm.gps.module.ModuleDescriptor;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Consumer group gps-stoppage-service (Kafka flow) or called directly (direct flow).
+ * Module (gps-module-api), consumer group gps-stoppage-service (Kafka flow) or called directly (direct flow).
  *
  * Ignition for each reading: the frame's own ignition wire when it has one; otherwise the ignition consumer's
  * (virtual) ignition from Redis gps:state:ignition:{imei}; otherwise unknown.
@@ -29,7 +33,12 @@ import java.util.Map;
  * a PARKED stop (engine off) is recorded as INFO, marked neutralised.
  */
 @Service
-public class StoppageService implements StoppageHandler {
+public class StoppageService implements GpsModule {
+
+    private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("stoppage", "Stoppage & ignition",
+            "Stoppages with the engine on (checked against traffic and weather) and parking with it off.",
+            KafkaConsumerGroupNames.STOPPAGE, PipelineStage.STOPPAGE_DETECTION, 40,
+            List.of("STOPPAGE", "PARKED"), List.of("gps:state:stoppage:*"));
 
     private final RedisStateStore redis;
     private final VehicleContext vehicles;
@@ -47,6 +56,15 @@ public class StoppageService implements StoppageHandler {
     }
 
     @Override
+    public ModuleDescriptor descriptor() {
+        return DESCRIPTOR;
+    }
+
+    @Override
+    public void onPosition(ProcessedGpsPosition position, ModuleContext context) {
+        handle(position);
+    }
+
     public void handle(ProcessedGpsPosition position) {
         String key = RedisKeyNames.stoppageState(position.imei());
         StoppageState state = StateCodecs.stoppage(redis.readHash(key));

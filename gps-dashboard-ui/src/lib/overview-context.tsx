@@ -6,9 +6,12 @@ import { usePoll, type Poll } from "./use-poll";
 
 const OverviewContext = createContext<Poll<EngineOverview> | null>(null);
 
-/** One shared poll of /api/engine/overview for the header and every page. */
-export function OverviewProvider({ children }: { children: ReactNode }) {
-  const overview = usePoll<EngineOverview>("/api/engine/overview", 2000);
+/**
+ * One shared poll of /api/engine/overview for the header and every page. Off (enabled = false) for transporters and
+ * consigners: the engine is the GPS provider's business, and its API is not theirs to call.
+ */
+export function OverviewProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
+  const overview = usePoll<EngineOverview>(enabled ? "/api/engine/overview" : null, 2000);
   return <OverviewContext.Provider value={overview}>{children}</OverviewContext.Provider>;
 }
 
