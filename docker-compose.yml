@@ -27,9 +27,9 @@
 #   Stop:         docker compose down          (data is kept in the named volumes)
 #   Wipe data:    docker compose down -v
 #
-# Every service has restart: always, so after the first "up" the whole platform starts by itself whenever
-# Docker Desktop starts. Stopping it (Docker Desktop's stop button or docker compose stop) holds until you
-# start it again or Docker Desktop restarts; "docker compose down" removes it for good.
+# Every service has restart: "no": nothing starts by itself when the PC or Docker Desktop starts. Start the
+# platform when you want it (the Run button on the project in Docker Desktop, or docker compose start / up -d),
+# and it stays stopped after Stop until you start it again. "docker compose down" removes the containers for good.
 #
 # Inside the compose network the containers find each other by service name (postgres, kafka, redis).
 # The Windows-side ports differ from the Windows installs (5432, 9092, 6379) so both can run side by side.
@@ -37,7 +37,7 @@
 #
 # Memory: every service has a limit (deploy.resources.limits.memory) with headroom over what it uses today, so one runaway
 # container cannot take all of Docker's memory. The Java services size their heap from the limit (MaxRAMPercentage).
-# A container that hits its limit is killed (exit 137, OOMKilled in docker inspect) and restarted.
+# A container that hits its limit is killed (exit 137, OOMKilled in docker inspect) and stays stopped until you start it again.
 
 name: gps-streaming-platform
 
@@ -45,7 +45,7 @@ services:
 
   postgres:
     image: postgres:14.22
-    restart: always
+    restart: "no"
     deploy:
       resources:
         limits:
@@ -66,7 +66,7 @@ services:
 
   kafka:
     image: apache/kafka:4.3.1
-    restart: always
+    restart: "no"
     # The image starts Kafka with a fixed 1 GB heap (-Xmx1G -Xms1G); the rest is off-heap and page cache.
     deploy:
       resources:
@@ -116,7 +116,7 @@ services:
 
   redis:
     image: redis/redis-stack:7.4.0-v8
-    restart: always
+    restart: "no"
     # Redis keeps at most 512 MB of data (REDIS_ARGS); RedisInsight runs in the same container.
     deploy:
       resources:
@@ -140,7 +140,7 @@ services:
     build: .
     # Built locally with --build, or pulled ready-made from Docker Hub: docker compose pull gps-service
     image: ${GPS_SERVICE_IMAGE:-srmecotech/processing-layer:latest}
-    restart: always
+    restart: "no"
     # Uses about 1 GB today with 150 vehicles; the heap is 70% of the limit (1.4 GB).
     deploy:
       resources:
@@ -201,7 +201,7 @@ services:
   dashboard:
     build: ./gps-dashboard-ui
     image: ${GPS_DASHBOARD_IMAGE:-srmecotech/processing-layer-dashboard:latest}
-    restart: always
+    restart: "no"
     deploy:
       resources:
         limits:
@@ -229,7 +229,7 @@ services:
     profiles: ["routing"]
     build: ./infrastructure/routing/graphhopper
     image: ${GPS_ROUTING_ENGINE_IMAGE:-srmecotech/processing-layer-graphhopper:11.1}
-    restart: always
+    restart: "no"
     # Room for the one-time import (7 GB heap + graph buffers); serving needs far less. Raise both together.
     deploy:
       resources:
@@ -259,7 +259,7 @@ services:
       context: .
       target: route-service
     image: ${GPS_ROUTE_SERVICE_IMAGE:-srmecotech/processing-layer-route:latest}
-    restart: always
+    restart: "no"
     deploy:
       resources:
         limits:
