@@ -225,7 +225,7 @@ gps:
   # Transport management: times in shipment files without a zone are in this zone (the smart_truck TMS writes IST).
   tms:
     time-zone: Asia/Kolkata
-  # The four stream consumers after Kafka (speed violation, vehicle state, stoppage, ignition).
+  # The four stream consumers after Kafka (road intelligence = speed violation, vehicle state, stoppage, ignition).
   # Speed rules are NOT here: they live in Redis (gps:config:speed-rule:*) and are edited from the UI or
   # PUT /api/speed/rules/{scope}; the default rule is created on first start.
   stream:

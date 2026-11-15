@@ -31,8 +31,8 @@ export const EVENTS_TOPIC = "gps.vehicle-events";
 export const PROCESSORS: PipelineModule[] = [
   {
     id: "speed",
-    name: "Speed violation",
-    summary: "Sustained over-speed against each entity's own rule, with the speedometer cross-checked against distance over time.",
+    name: "Road intelligence",
+    summary: "Sustained over-speed judged by the limit of the road under each reading (Valhalla road library), each entity's rule and each geofence, with the speedometer cross-checked against distance over time.",
     href: "/processing/speed",
     icon: Gauge,
     status: "live",
@@ -43,11 +43,12 @@ export const PROCESSORS: PipelineModule[] = [
     config: "Redis · gps:config:speed-rule:{scope}",
     emits: ["OVERSPEED", "SPEED_SENSOR_MISMATCH"],
     logic: [
-      "Find the rule for the reading: vehicle:{registration}, then tenant:{company}, then default. Rules live in Redis and can differ per entity.",
+      "Find the rule for the reading: vehicle:{registration}, then tenant:{company}, then default. Rules live in Redis and can differ per entity; the rule's limit is the company's cap.",
+      "Find the road under the reading in the road library (nearest piece within 35 m) and its limit for a goods vehicle: hand-set, else OpenStreetMap when stricter, else the table by road class and area. The lowest of road, rule, geofence and night limit applies.",
       "Keep the last few pings of the vehicle in state; a ping counts when its speedometer value is over the limit.",
       "Work out speed from latitude and longitude over the last 2–3 pings (haversine distance ÷ elapsed time) and compare it with the speedometer.",
       "Confirm a violation only when the vehicle stays over the limit continuously for the rule's duration (default 1 minute) and minimum pings.",
-      "End the episode when speed drops below the limit minus the hysteresis; repeated disagreement between the two speeds raises a sensor mismatch.",
+      "End the episode when speed drops below the limit minus the hysteresis; it is graded at the reading where it went furthest over its limit, and carries that road. Repeated disagreement between the two speeds raises a sensor mismatch.",
     ],
   },
   {

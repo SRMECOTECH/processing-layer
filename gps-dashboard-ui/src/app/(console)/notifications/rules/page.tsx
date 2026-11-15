@@ -6,8 +6,8 @@ import { Card, DemoButton, PageHeader, Tag } from "@/components/ops/kit";
 
 const CHANNELS = ["In-app", "Email", "SMS", "Push", "Webhook"];
 const RULES: { alert: string; source: string; severity: string; on: boolean[] }[] = [
-  { alert: "Over-speed, GPS verified", source: "Speed violation", severity: "HIGH", on: [true, true, false, true, true] },
-  { alert: "Speedometer suspect", source: "Speed violation", severity: "MEDIUM", on: [true, true, false, false, false] },
+  { alert: "Over-speed, GPS verified", source: "Road intelligence", severity: "HIGH", on: [true, true, false, true, true] },
+  { alert: "Speedometer suspect", source: "Road intelligence", severity: "MEDIUM", on: [true, true, false, false, false] },
   { alert: "Unexplained stoppage", source: "Stoppage & ignition", severity: "HIGH", on: [true, false, true, false, true] },
   { alert: "Idling over 5 min", source: "Stoppage & ignition", severity: "LOW", on: [true, false, false, true, false] },
   { alert: "Geofence dwell", source: "Nested geofencing", severity: "MEDIUM", on: [true, true, false, false, false] },

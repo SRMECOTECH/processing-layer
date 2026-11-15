@@ -315,7 +315,7 @@ export function ColumnGuide({ a }: { a: FuelAssumptions }) {
         result="h min"
       />
       <Formula label="Max speed" how="highest speed reported by the device that day" result="km/h" />
-      <Formula label="Over-speed" how="over-speed episodes that started that day (speed rules of Processing → Speed violation)" result="count" />
+      <Formula label="Over-speed" how="over-speed episodes that started that day (road limits and speed rules of Processing → Road intelligence)" result="count" />
       <Formula label="Fuel" how={`distance ÷ ${a.mileageKmPerLitre} km/L + idling h × ${a.idleLitresPerHour} L/h + fast-driving extra`} result="L" />
       <Formula label="Cost" how={`fuel × ₹${a.pricePerLitre}/L (${a.fuelType})`} result="₹" />
       <Formula label="Could save" how="(idling fuel + fast-driving extra) × price: what switching off and steadier driving save" result="₹" />
