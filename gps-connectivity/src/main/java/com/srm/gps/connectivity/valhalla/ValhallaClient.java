@@ -70,6 +70,9 @@ public class ValhallaClient {
             "edge.traversability", "edge.bridge", "edge.tunnel", "edge.roundabout", "edge.toll", "edge.curvature", "edge.speed",
             "edge.speed_type", "edge.truck_route", "edge.surface", "edge.unpaved", "edge.begin_heading", "edge.end_heading",
             "edge.internal_intersection", "edge.max_upward_grade", "edge.weighted_grade",
+            // the end node of each edge: junctions, toll booths, gates, borders (road_point, V14)
+            "node.type", "node.traffic_signal", "node.fork", "node.intersecting_edge.road_class",
+            "node.intersecting_edge.begin_heading", "node.intersecting_edge.driveability",
             "admin.state_code", "admin.country_code", "matched.type", "shape");
 
     private final JsonHttp http;

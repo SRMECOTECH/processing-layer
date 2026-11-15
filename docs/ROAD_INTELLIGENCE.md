@@ -107,3 +107,16 @@ country comes back, so those columns stay empty until the map is rebuilt. Consol
 a point, "What Valhalla tells us about these roads", bridges and sharp bends) and Trip replay (road passes, the road
 saved on each reading, bridges on the map). API: `GET /api/roads/attributes`, `/api/roads/pieces/{id}`,
 `/api/roads/passes?imei=`.
+
+### V14 (2026-11-15): points, events, limit history, run log
+
+| Where | What | Filled by |
+|---|---|---|
+| `road_point` | the end node of every matched edge: `node_type` (street_intersection, toll_booth, gate, border_control …), `traffic_signal`, `fork`, `side_roads` + `side_road_classes` + `intersecting` (jsonb), the piece driven into it, `times_seen` | the same `/trace_attributes` call (`node.*` attributes) |
+| `vehicle_event.road_segment_id`, `road_label`, `road_class` | the road of every event (stoppage, over-speed, ignition, geofence, deviation …): the road saved on the reading at or up to 10 min before its start | after each live matching run (`RoadRecords.linkEvents`); the modules are untouched |
+| `road_limit_change` | every change of a hand-set limit (piece or whole road) or of the limit table: who (`X-Dashboard-User`, sent by the dashboard), when, old → new, note | the limit endpoints |
+| `road_match_run` | every map-matching run: LIVE (device) or TRIP, points sent / matched / unmatched, calls, failed pieces, pieces matched / new, points found, Valhalla time, outcome (OK, PARTLY, DOWN, FAILED), Valhalla version and map date | `RoadLearningService` |
+
+Console: explorer (points on the road, events by road), road limits (limit change history), trip replay (toll booths and
+junctions on the map, events of the run by road, Valhalla runs). API: `/api/roads/points`, `/points/map`,
+`/events-by-road`, `/match-runs`, `/limit-changes`.

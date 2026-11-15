@@ -107,6 +107,143 @@ public class RoadAnalysisQueries {
         return flags;
     }
 
+    /** The points on the road (V14): counts by type, the toll booths, gates and borders, the busiest junctions. */
+    public Map<String, Object> points() {
+        MapSqlParameterSource none = new MapSqlParameterSource();
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("totals", jdbc.queryForMap("""
+                SELECT count(*) AS points,
+                       count(*) FILTER (WHERE node_type = 'street_intersection' AND side_roads > 0) AS junctions,
+                       count(*) FILTER (WHERE side_roads >= 2) AS "bigJunctions",
+                       count(*) FILTER (WHERE node_type = 'toll_booth') AS "tollBooths",
+                       count(*) FILTER (WHERE node_type = 'gate') AS gates,
+                       count(*) FILTER (WHERE node_type = 'border_control') AS borders,
+                       count(*) FILTER (WHERE traffic_signal) AS signals,
+                       count(*) FILTER (WHERE fork) AS forks
+                FROM road_point
+                """, none));
+        answer.put("types", jdbc.queryForList("""
+                SELECT node_type AS type, count(*) AS points FROM road_point GROUP BY 1 ORDER BY 2 DESC
+                """, none));
+        answer.put("special", jdbc.queryForList("""
+                SELECT p.id, p.node_type AS type, round(p.latitude::numeric, 5) AS lat, round(p.longitude::numeric, 5) AS lon,
+                       p.times_seen AS "timesSeen", p.traffic_signal AS signal, p.side_road_classes AS "sideRoadClasses",
+                       coalesce(s.road_ref || ' ' || s.road_name, s.road_ref, s.road_name, 'unnamed ' || s.road_class) AS road
+                FROM road_point p LEFT JOIN road_segment s ON s.segment_key = p.segment_key
+                WHERE p.node_type <> 'street_intersection' OR p.traffic_signal
+                ORDER BY p.node_type, p.first_seen_at LIMIT 100
+                """, none));
+        answer.put("junctions", jdbc.queryForList("""
+                SELECT p.id, round(p.latitude::numeric, 5) AS lat, round(p.longitude::numeric, 5) AS lon, p.side_roads AS "sideRoads",
+                       p.side_road_classes AS "sideRoadClasses", p.times_seen AS "timesSeen", p.fork,
+                       coalesce(s.road_ref || ' ' || s.road_name, s.road_ref, s.road_name, 'unnamed ' || s.road_class) AS road
+                FROM road_point p LEFT JOIN road_segment s ON s.segment_key = p.segment_key
+                WHERE p.side_roads >= 2 ORDER BY p.side_roads DESC, p.times_seen DESC LIMIT 50
+                """, none));
+        return answer;
+    }
+
+    /** The points to draw on a map: toll booths, gates, borders, signals and junctions with side roads. */
+    public List<Map<String, Object>> mapPoints() {
+        return jdbc.queryForList("""
+                SELECT id, node_type AS type, round(latitude::numeric, 5) AS lat, round(longitude::numeric, 5) AS lon,
+                       side_roads AS "sideRoads", traffic_signal AS signal
+                FROM road_point WHERE node_type <> 'street_intersection' OR traffic_signal OR side_roads > 0
+                """, new MapSqlParameterSource());
+    }
+
+    /** Vehicle events by road (V14): the roads with most events, and counts per event type. */
+    public Map<String, Object> eventsByRoad(String imei) {
+        String filter = imei == null ? "" : " AND imei = :imei";
+        MapSqlParameterSource params = new MapSqlParameterSource("imei", imei);
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("coverage", jdbc.queryForMap("""
+                SELECT count(*) AS events, count(road_segment_id) AS "withRoad" FROM vehicle_event WHERE true""" + filter, params));
+        answer.put("roads", jdbc.queryForList("""
+                SELECT road_label AS road, road_class AS "roadClass", count(*) AS events,
+                       count(DISTINCT imei) AS vehicles,
+                       count(*) FILTER (WHERE event_type = 'OVERSPEED') AS overspeed,
+                       count(*) FILTER (WHERE event_type IN ('STOPPAGE', 'PARKED')) AS stops,
+                       count(*) FILTER (WHERE event_type LIKE 'HARSH%') AS harsh,
+                       count(*) FILTER (WHERE event_type LIKE 'ROUTE%' OR event_type = 'WRONG_DIRECTION') AS route,
+                       count(*) FILTER (WHERE event_type LIKE 'IGNITION%') AS ignition,
+                       count(*) FILTER (WHERE event_type LIKE 'GEOFENCE%') AS geofence,
+                       count(*) FILTER (WHERE event_type NOT IN ('OVERSPEED', 'STOPPAGE', 'PARKED') AND event_type NOT LIKE 'HARSH%'
+                           AND event_type NOT LIKE 'ROUTE%' AND event_type <> 'WRONG_DIRECTION' AND event_type NOT LIKE 'IGNITION%'
+                           AND event_type NOT LIKE 'GEOFENCE%') AS other
+                FROM vehicle_event WHERE road_label IS NOT NULL""" + filter + """
+                 GROUP BY road_label, road_class ORDER BY events DESC LIMIT 50
+                """, params));
+        answer.put("types", jdbc.queryForList("""
+                SELECT event_type AS type, count(*) AS events, count(road_segment_id) AS "withRoad"
+                FROM vehicle_event WHERE true""" + filter + " GROUP BY 1 ORDER BY 2 DESC", params));
+        return answer;
+    }
+
+    /** The newest map-matching runs, and how the last day went (V14). */
+    public Map<String, Object> matchRuns(int limit) {
+        MapSqlParameterSource params = new MapSqlParameterSource("limit", limit);
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("day", jdbc.queryForMap("""
+                SELECT count(*) AS runs, count(*) FILTER (WHERE outcome = 'OK') AS ok,
+                       count(*) FILTER (WHERE outcome = 'PARTLY') AS partly, count(*) FILTER (WHERE outcome = 'DOWN') AS down,
+                       count(*) FILTER (WHERE outcome = 'FAILED') AS failed, coalesce(sum(points_sent), 0) AS "pointsSent",
+                       coalesce(sum(matched_points), 0) AS "matchedPoints", coalesce(sum(unmatched_points), 0) AS "unmatchedPoints",
+                       coalesce(sum(pieces_added), 0) AS "piecesAdded",
+                       round(avg(valhalla_ms) FILTER (WHERE outcome IN ('OK', 'PARTLY'))) AS "avgMs",
+                       max(valhalla_ms) AS "maxMs", max(valhalla_version) AS version, max(tiles_built_at) AS "tilesBuiltAt"
+                FROM road_match_run WHERE started_at > now() - interval '1 day'
+                """, params));
+        answer.put("runs", jdbc.queryForList("""
+                SELECT id, started_at AS "startedAt", finished_at AS "finishedAt", kind, imei, trip_number AS "tripNumber",
+                       readings_from AS "readingsFrom", readings_until AS "readingsUntil", points_sent AS "pointsSent",
+                       matched_points AS "matchedPoints", unmatched_points AS "unmatchedPoints", calls,
+                       failed_pieces AS "failedPieces", pieces_matched AS "piecesMatched", pieces_added AS "piecesAdded",
+                       points_found AS "pointsFound", valhalla_ms AS "valhallaMs", outcome, message
+                FROM road_match_run ORDER BY started_at DESC LIMIT :limit
+                """, params));
+        return answer;
+    }
+
+    /** The history of speed-limit changes, newest first (V14). */
+    public List<Map<String, Object>> limitChanges(int limit) {
+        return jdbc.queryForList("""
+                SELECT id, changed_at AS "changedAt", changed_by AS "changedBy", scope, target, pieces,
+                       old_limit_kmph AS "oldLimitKmph", new_limit_kmph AS "newLimitKmph",
+                       old_multi_lane_limit_kmph AS "oldMultiLaneKmph", new_multi_lane_limit_kmph AS "newMultiLaneKmph", note
+                FROM road_limit_change ORDER BY changed_at DESC LIMIT :limit
+                """, new MapSqlParameterSource("limit", limit));
+    }
+
+    /** A piece's hand-set limit and label before a change. */
+    public Map<String, Object> pieceLimit(long id) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT manual_limit_kmph AS "limit",
+                       coalesce(road_ref || ' ' || road_name, road_ref, road_name, 'unnamed ' || road_class) AS label
+                FROM road_segment WHERE id = :id
+                """, new MapSqlParameterSource("id", id));
+        return rows.isEmpty() ? new HashMap<>() : rows.getFirst();
+    }
+
+    /** A road's hand-set limit before a change: the one value its pieces share, or null (none, or mixed). */
+    public Integer roadLimit(String ref, String name) {
+        List<Integer> limits = jdbc.queryForList("""
+                SELECT DISTINCT manual_limit_kmph FROM road_segment
+                WHERE coalesce(road_ref, '') = coalesce(:ref, '') AND coalesce(road_name, '') = coalesce(:name, '')
+                """, new MapSqlParameterSource("ref", ref).addValue("name", name), Integer.class);
+        return limits.size() == 1 ? limits.getFirst() : null;
+    }
+
+    /** A row of the limit table before a change: {limit, multi-lane limit}, nulls when it did not exist. */
+    public Integer[] tableRow(String roadClass, String area, String stateCode) {
+        List<Integer[]> rows = jdbc.query("""
+                SELECT limit_kmph, multi_lane_limit_kmph FROM road_speed_limit
+                WHERE road_class = :class AND area = :area AND state_code = :state
+                """, new MapSqlParameterSource("class", roadClass).addValue("area", area).addValue("state", stateCode),
+                (rs, n) -> new Integer[]{(Integer) rs.getObject("limit_kmph"), (Integer) rs.getObject("multi_lane_limit_kmph")});
+        return rows.isEmpty() ? new Integer[]{null, null} : rows.getFirst();
+    }
+
     /** A vehicle's road passes, newest first (imei null: every vehicle). */
     public List<Map<String, Object>> passes(String imei, int limit) {
         String filter = imei == null || imei.isBlank() ? "" : " WHERE imei = :imei";

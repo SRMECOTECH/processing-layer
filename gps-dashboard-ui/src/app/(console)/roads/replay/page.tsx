@@ -6,6 +6,7 @@ import { Callout, Card, Empty, KeyValues, PageHeader, Segmented, Stats, Switch, 
 import { Gauge, Map as MapIcon, Play, RotateCcw, Route, X } from "@/components/icons";
 import { formatTime } from "@/lib/format";
 import { RoadPassesTable } from "@/components/roads/road-passes";
+import { MatchRunsCard, RoadEventsCard, pointLabel } from "@/components/roads/road-records";
 import { SOURCE_LABEL, classLabel, type LearningRun, type LimitSource, type RoadPass } from "@/lib/roads";
 import { post, usePoll } from "@/lib/use-poll";
 import styles from "./page.module.css";
@@ -106,6 +107,7 @@ const LIMIT_LEGEND: [string, number | null][] = [
 export default function TripReplayPage() {
   const live = usePoll<Live>("/api/roads/replay/live", 3_000);
   const network = usePoll<Piece[]>("/api/roads/network", 10_000);
+  const roadPoints = usePoll<MapPoint[]>("/api/roads/points/map", 10_000);
   const [view, setView] = useState<View>("follow");
   const [matching, setMatching] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -245,7 +247,7 @@ export default function TripReplayPage() {
             <Empty>{live.error ?? "Loading the replay…"}</Empty>
           ) : (
             <>
-              <ReplayMap readings={readings} pieces={network.data ?? []} view={view} />
+              <ReplayMap readings={readings} pieces={network.data ?? []} points={roadPoints.data ?? []} view={view} />
               <div className={styles.legend}>
                 {LIMIT_LEGEND.map(([text, limit]) => (
                   <span key={text} className={styles.legendItem}>
@@ -256,6 +258,12 @@ export default function TripReplayPage() {
                 ))}
                 <span className={styles.legendItem}>
                   <span className={styles.swatch} style={{ background: "#ca8a04", boxShadow: "0 0 0 2px rgba(15,23,42,.55)" }} /> bridge
+                </span>
+                <span className={styles.legendItem}>
+                  <span className={styles.swatch} style={{ width: 9, height: 9, background: "#7c3aed", transform: "rotate(45deg)" }} /> toll booth
+                </span>
+                <span className={styles.legendItem}>
+                  <span className={styles.dot} style={{ color: "#475569", width: 7, height: 7, borderWidth: 1.5 }} /> junction (close-up)
                 </span>
                 <span className={styles.legendItem}>
                   <span className={styles.dot} style={{ color: "#0f172a", background: "#0f172a" }} /> reading on a road
@@ -302,6 +310,11 @@ export default function TripReplayPage() {
       >
         <RoadPassesTable passes={passes.data} empty={passes.error ?? "No pass yet: the first ones appear after the first Valhalla run."} />
       </Card>
+
+      <div className="grid-2">
+        <RoadEventsCard imei={d?.imei} title="Events of this run by road" />
+        <MatchRunsCard limit={30} />
+      </div>
 
       <div className="grid-2">
         <Card title="Readings as they arrive" subtitle="Newest first: what the live speed check sees for every reading." flush>
@@ -445,7 +458,10 @@ type View = "follow" | "area" | "trip";
 const WINDOW_KM: Record<Exclude<View, "trip">, number> = { follow: 9, area: 30 };
 const AUTO_MATCH_MS = 5_000;
 
-function ReplayMap({ readings, pieces, view }: { readings: Reading[]; pieces: Piece[]; view: View }) {
+/** A point on the road (V14): toll booth, gate, border, signal, or a junction with side roads. */
+type MapPoint = { id: number; type: string; lat: number; lon: number; sideRoads: number; signal: boolean };
+
+function ReplayMap({ readings, pieces, points, view }: { readings: Reading[]; pieces: Piece[]; points: MapPoint[]; view: View }) {
   const W = 1000;
   const last = readings.at(-1);
 
@@ -523,6 +539,33 @@ function ReplayMap({ readings, pieces, view }: { readings: Reading[]; pieces: Pi
             </g>
           );
         })}
+        {points
+          .filter((pt) => frame.inside(pt.lat, pt.lon) && (pt.type !== "street_intersection" || pt.signal || (follow && pt.sideRoads > 0)))
+          .map((pt) => {
+            const cx = frame.x(pt.lon);
+            const cy = frame.y(pt.lat);
+            const special = pt.type !== "street_intersection";
+            const size = special ? (follow ? 9 : 6) : 3;
+            return special || pt.signal ? (
+              <rect
+                key={`pt-${pt.id}`}
+                x={cx - size / 2}
+                y={cy - size / 2}
+                width={size}
+                height={size}
+                transform={`rotate(45 ${cx} ${cy})`}
+                fill={pt.type === "toll_booth" ? "#7c3aed" : pt.signal ? "#dc2626" : "#0f172a"}
+                stroke="#fff"
+                strokeWidth={1.5}
+              >
+                <title>{`${pointLabel(pt.type)}${pt.signal ? " · traffic signal" : ""}${pt.sideRoads ? ` · ${pt.sideRoads} side road(s)` : ""}`}</title>
+              </rect>
+            ) : (
+              <circle key={`pt-${pt.id}`} cx={cx} cy={cy} r={size} fill="#fff" stroke="#475569" strokeWidth={1.2}>
+                <title>{`junction · ${pt.sideRoads} side road(s)`}</title>
+              </circle>
+            );
+          })}
         {visibleReadings.length > 1 && (
           <polyline
             points={visibleReadings.map((r) => `${frame.x(r.lon).toFixed(1)},${frame.y(r.lat).toFixed(1)}`).join(" ")}

@@ -48,6 +48,7 @@ public class RoadLearningService {
     private final NamedParameterJdbcTemplate jdbc;
     private final RoadProperties properties;
     private final RoadPassService passes;
+    private final RoadRecords records;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "road-learning");
         thread.setDaemon(true);
@@ -58,13 +59,15 @@ public class RoadLearningService {
     private volatile Status lastLiveRun;
 
     public RoadLearningService(RoadMatcher matcher, RoadLibrary library, SmartTruckGpsReader smartTruck,
-                               NamedParameterJdbcTemplate jdbc, RoadProperties properties, RoadPassService passes) {
+                               NamedParameterJdbcTemplate jdbc, RoadProperties properties, RoadPassService passes,
+                               RoadRecords records) {
         this.matcher = matcher;
         this.library = library;
         this.smartTruck = smartTruck;
         this.jdbc = jdbc;
         this.properties = properties;
         this.passes = passes;
+        this.records = records;
     }
 
     public Map<String, Object> status() {
@@ -100,11 +103,13 @@ public class RoadLearningService {
                 }
                 lastRun = new Status(true, "smart_truck trip " + tripNumber, started, null, points.size(), 0, 0, 0, 0, 0, 0,
                         "Map matching " + points.size() + " pings on Valhalla");
-                lastRun = learn("smart_truck trip " + tripNumber, started, points);
+                lastRun = learn("smart_truck trip " + tripNumber, tripNumber, started, points);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             } catch (Exception problem) {
                 LOG.warn("Learning the roads of trip {} failed: {}", tripNumber, problem.getMessage());
+                records.runFinished(new RoadRecords.Run("TRIP", null, tripNumber, null, null, started, null, 0,
+                        problem instanceof RoadMatcher.ValhallaUnavailable ? "DOWN" : "FAILED", problem.getMessage()));
                 lastRun = new Status(false, "smart_truck trip " + tripNumber, started, Instant.now(), 0, 0, 0, 0, 0, 0, 0,
                         "Failed: " + problem.getMessage());
             } finally {
@@ -114,13 +119,17 @@ public class RoadLearningService {
         return true;
     }
 
-    private Status learn(String what, Instant started, List<double[]> points) throws RoadMatcher.ValhallaUnavailable, InterruptedException {
+    private Status learn(String what, long tripNumber, Instant started, List<double[]> points)
+            throws RoadMatcher.ValhallaUnavailable, InterruptedException {
         RoadMatcher.Result result = matcher.match(points);
         int added = library.store(result.roads(), result.details());
         library.reload();
+        records.storePoints(result.points().values());
         String message = "Matched " + result.roads().size() + " road pieces (" + added + " new) in " + result.pieces() + " calls"
                 + (result.failedPieces() > 0 ? ", " + result.failedPieces() + " pieces not matchable: " + result.problem() : "");
         LOG.info("Roads of {}: {}", what, message);
+        records.runFinished(new RoadRecords.Run("TRIP", null, tripNumber, null, null, started, result, added,
+                result.failedPieces() > 0 ? "PARTLY" : "OK", message));
         return new Status(false, what, started, Instant.now(), result.pointsSent(), result.pieces(), result.failedPieces(),
                 result.roads().size(), added, result.unmatchedPoints(), result.millis(), message);
     }
@@ -156,14 +165,26 @@ public class RoadLearningService {
                     for (Object[] r : readings) {
                         line.add(new double[]{(double) r[0], (double) r[1]});
                     }
-                    RoadMatcher.Result result = matcher.match(line);
+                    Instant deviceStarted = Instant.now();
+                    Instant last = (Instant) readings.getLast()[2];
+                    RoadMatcher.Result result;
+                    try {
+                        result = matcher.match(line);
+                    } catch (RoadMatcher.ValhallaUnavailable down) {
+                        records.runFinished(new RoadRecords.Run("LIVE", imei, null, from, last, deviceStarted, null, 0, "DOWN",
+                                down.getMessage()));
+                        throw down;
+                    }
                     int newHere = library.store(result.roads(), result.details());
                     added += newHere;
                     if (newHere > 0) {
                         library.reload();
                     }
+                    records.storePoints(result.points().values());
                     matched += result.roads().size();
-                    keepForAnalysis(imei, from, (Instant) readings.getLast()[2]);
+                    keepForAnalysis(imei, from, last);
+                    records.runFinished(new RoadRecords.Run("LIVE", imei, null, from, last, deviceStarted, result, newHere,
+                            result.failedPieces() > 0 ? "PARTLY" : "OK", result.failedPieces() > 0 ? result.problem() : null));
                     points += result.pointsSent();
                     devices++;
                     // the last reading stays as the start of the next piece, so the line has no hole between runs
@@ -199,6 +220,7 @@ public class RoadLearningService {
         try {
             passes.assignRoads(imei, from, until);
             passes.rebuildPasses(imei, from, until);
+            records.linkEvents(imei, from, until);
         } catch (RuntimeException problem) {
             LOG.warn("Road passes of {} not updated: {}", imei, problem.getMessage());
         }

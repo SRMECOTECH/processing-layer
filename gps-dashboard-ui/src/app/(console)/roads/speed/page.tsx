@@ -6,6 +6,7 @@ import { Map as MapIcon, RotateCcw, Route, Save, Search } from "@/components/ico
 import { formatAgo } from "@/lib/format";
 import { SOURCE_LABEL, classLabel, type KnownRoad, type LimitRow, type RoadStatus } from "@/lib/roads";
 import { post, sendJson, usePoll } from "@/lib/use-poll";
+import { LimitChangesCard } from "@/components/roads/road-records";
 
 const TEST_TRIP = "28860462";
 
@@ -137,6 +138,8 @@ export default function RoadLimitsPage() {
           </div>
         )}
       </Card>
+
+      <LimitChangesCard />
     </div>
   );
 }
