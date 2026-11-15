@@ -93,3 +93,17 @@ Re-ordered priority:
 
 Constraint to keep in mind: the dashboard may not use third-party UI libraries, so maps are drawn in-house (the
 explorer draws the learned roads as SVG, to scale, without map tiles).
+
+## 5. Data we keep for analysis (V13, 2026-11-15)
+
+| Where | What | Filled by |
+|---|---|---|
+| `road_segment` new columns | `road_use` (road, ramp, service road …), `traversability` (one-way / two-way), `bridge`, `tunnel`, `roundabout`, `toll`, `curvature` (0–15), `valhalla_speed_kmph` + `speed_type`, `truck_route`, `surface`, `begin_heading` / `end_heading`, `country_code`, and `attributes` (the whole Valhalla edge as JSON) | every map-matching run (`/trace_attributes`); a piece learned earlier gets them when matched again |
+| `gps_position.road_segment_id`, `road_off_m` | the road piece under each reading and how far it was from the line | live matching, right after a device's readings were matched (`RoadPassService.assignRoads`) |
+| `trip_road_pass` | each time a vehicle drove a road (label + class + limit): entered/left, km, driving and standing time, average/max speed, Valhalla's expected speed on those pieces, minutes above the limit, bridges, sharpest bend, the trip (`gps_trip`) | rebuilt after every live matching run from the pass still open (`RoadPasses`, unit-tested) |
+
+Checked on the HP: surface is always `paved_smooth` (untagged), grades are empty (no elevation tiles), and no state or
+country comes back, so those columns stay empty until the map is rebuilt. Console: Road network explorer (details under
+a point, "What Valhalla tells us about these roads", bridges and sharp bends) and Trip replay (road passes, the road
+saved on each reading, bridges on the map). API: `GET /api/roads/attributes`, `/api/roads/pieces/{id}`,
+`/api/roads/passes?imei=`.

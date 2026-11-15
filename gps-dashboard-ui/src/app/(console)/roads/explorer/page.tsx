@@ -5,11 +5,13 @@ import { Callout, Card, Empty, KeyValues, PageHeader, Tag } from "@/components/o
 import { Search } from "@/components/icons";
 import { StatusTag } from "@/components/roads/module-card";
 import { moduleByKey } from "@/lib/road-intelligence";
-import { SOURCE_LABEL, classLabel, type KnownRoad, type LimitSource } from "@/lib/roads";
+import { RoadAttributesSection } from "@/components/roads/road-attributes";
+import { RoadPieceDetailsView } from "@/components/roads/road-details";
+import { SOURCE_LABEL, classLabel, type KnownRoad, type LimitSource, type RoadPieceDetails } from "@/lib/roads";
 import { usePoll } from "@/lib/use-poll";
 
-type Piece = { id: number; label: string; roadClass: string; lanes: number; limitKmph: number | null; limitSource: LimitSource | null; points: [number, number][] };
-type Located = { found: boolean; id?: number; label?: string; roadClass?: string; lanes?: number; density?: number; distanceM?: number; limitKmph?: number; limitSource?: LimitSource; area?: string };
+type Piece = { id: number; label: string; roadClass: string; lanes: number; limitKmph: number | null; limitSource: LimitSource | null; points: [number, number][]; bridge?: boolean; oneWay?: boolean; curvature?: number | null };
+type Located = { found: boolean; id?: number; label?: string; roadClass?: string; lanes?: number; density?: number; distanceM?: number; limitKmph?: number; limitSource?: LimitSource; area?: string; details?: RoadPieceDetails };
 
 /** Valhalla road classes, most important first, with their line colour and width on the map. */
 const CLASS_STYLE: Record<string, { color: string; width: number }> = {
@@ -84,6 +86,7 @@ export default function RoadExplorerPage() {
             ) : (
               <p className="muted">No learned road within 35 m.</p>
             ))}
+          {located?.found && <RoadPieceDetailsView details={located.details} />}
         </Card>
         <Card title="Legend">
           <div className="stack">
@@ -98,6 +101,8 @@ export default function RoadExplorerPage() {
           </div>
         </Card>
       </div>
+
+      <RoadAttributesSection />
 
       <Card
         title="Roads"
@@ -194,7 +199,7 @@ function RoadMap({ pieces, highlight }: { pieces: Piece[]; highlight: string }) 
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <title>{`${p.label} · ${classLabel(p.roadClass)} · ${p.lanes} lane(s) · ${p.limitKmph ?? "–"} km/h`}</title>
+            <title>{`${p.label} · ${classLabel(p.roadClass)} · ${p.lanes} lane(s) · ${p.limitKmph ?? "–"} km/h${p.oneWay ? " · one-way" : ""}${p.bridge ? " · bridge" : ""}${p.curvature != null && p.curvature >= 5 ? ` · sharp bend (${p.curvature})` : ""}`}</title>
           </polyline>
         );
       })}

@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { Callout, Card, Empty, KeyValues, PageHeader, Segmented, Stats, Switch, Tag, Tile } from "@/components/ops/kit";
 import { Gauge, Map as MapIcon, Play, RotateCcw, Route, X } from "@/components/icons";
 import { formatTime } from "@/lib/format";
-import { SOURCE_LABEL, classLabel, type LearningRun, type LimitSource } from "@/lib/roads";
+import { RoadPassesTable } from "@/components/roads/road-passes";
+import { SOURCE_LABEL, classLabel, type LearningRun, type LimitSource, type RoadPass } from "@/lib/roads";
 import { post, usePoll } from "@/lib/use-poll";
 import styles from "./page.module.css";
 
@@ -24,6 +25,8 @@ type Reading = {
   limit?: number | null;
   source?: LimitSource | null;
   area?: "TOWN" | "OPEN" | null;
+  /** The road saved on the reading by the live matching (V13); null until it has covered the reading. */
+  savedRoadId?: number | null;
 };
 
 type SpeedEvent = {
@@ -50,11 +53,23 @@ type Live = {
   total?: number;
   onRoad?: number;
   withLimit?: number;
+  withSavedRoad?: number;
   readings: Reading[];
   events: SpeedEvent[];
 };
 
-type Piece = { id: number; label: string; roadClass: string; lanes: number; limitKmph: number | null; limitSource: LimitSource | null; points: [number, number][] };
+type Piece = {
+  id: number;
+  label: string;
+  roadClass: string;
+  lanes: number;
+  limitKmph: number | null;
+  limitSource: LimitSource | null;
+  points: [number, number][];
+  bridge?: boolean;
+  oneWay?: boolean;
+  curvature?: number | null;
+};
 
 /** Jamshedpur and Ghaziabad: the "whole trip" view always spans both ends, even before any road is known. */
 const TRIP_ENDS: [number, number][] = [
@@ -98,6 +113,7 @@ export default function TripReplayPage() {
 
   const d = live.data;
   const replaying = d?.fleet.running ?? false;
+  const passes = usePoll<RoadPass[]>(d?.imei ? `/api/roads/passes?imei=${encodeURIComponent(d.imei)}&limit=300` : null, 10_000);
 
   // At 120x the service's own run (every 2 minutes) lags ~4 hours of trip behind the truck: while this page is open,
   // ask Valhalla every 5 s so the roads and their limits appear just behind the truck.
@@ -174,7 +190,7 @@ export default function TripReplayPage() {
           document.body,
         )}
 
-      <Stats columns={5}>
+      <Stats columns={3}>
         <Tile
           label="Replay"
           icon={Play}
@@ -197,6 +213,13 @@ export default function TripReplayPage() {
           value={d ? waiting : null}
           tone={waiting > 0 ? "warn" : undefined}
           foot={d?.learning.busy ? "a matching run is going now" : lastRun?.finishedAt ? `last run ${formatTime(lastRun.finishedAt)}` : "no run yet"}
+        />
+        <Tile
+          label="Road saved on readings"
+          icon={Route}
+          value={d?.total ? `${Math.round(((d.withSavedRoad ?? 0) / d.total) * 100)}%` : null}
+          progress={d?.total ? (d.withSavedRoad ?? 0) / d.total : undefined}
+          foot={d?.total ? `${d.withSavedRoad ?? 0} of ${d.total} readings carry their road in gps_position` : undefined}
         />
       </Stats>
 
@@ -231,6 +254,9 @@ export default function TripReplayPage() {
                     {limit !== null && " km/h"}
                   </span>
                 ))}
+                <span className={styles.legendItem}>
+                  <span className={styles.swatch} style={{ background: "#ca8a04", boxShadow: "0 0 0 2px rgba(15,23,42,.55)" }} /> bridge
+                </span>
                 <span className={styles.legendItem}>
                   <span className={styles.dot} style={{ color: "#0f172a", background: "#0f172a" }} /> reading on a road
                 </span>
@@ -269,6 +295,14 @@ export default function TripReplayPage() {
         {readings.length < 2 ? <Empty>Waiting for readings…</Empty> : <SpeedChart readings={readings.slice(-300)} />}
       </Card>
 
+      <Card
+        title="Road passes of this run"
+        subtitle="Each time the truck drove a road, entered to left, rebuilt after every Valhalla run (trip_road_pass). Its speed against the road's limit and the speed Valhalla expects there."
+        flush
+      >
+        <RoadPassesTable passes={passes.data} empty={passes.error ?? "No pass yet: the first ones appear after the first Valhalla run."} />
+      </Card>
+
       <div className="grid-2">
         <Card title="Readings as they arrive" subtitle="Newest first: what the live speed check sees for every reading." flush>
           {readings.length === 0 ? (
@@ -283,6 +317,7 @@ export default function TripReplayPage() {
                     <th>Road</th>
                     <th>Limit</th>
                     <th>Off line</th>
+                    <th>Saved</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,6 +337,7 @@ export default function TripReplayPage() {
                           {r.source && <div className="muted">{SOURCE_LABEL[r.source]}</div>}
                         </td>
                         <td className="mono">{r.offM != null ? `${r.offM} m` : "–"}</td>
+                        <td>{r.savedRoadId != null ? <Tag tone="good">piece {r.savedRoadId}</Tag> : <span className="muted">not yet</span>}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -395,6 +431,7 @@ function NowCard({ reading }: { reading: Reading | undefined }) {
           ["Area", reading.area === "TOWN" ? "town" : reading.area === "OPEN" ? "open road" : "–"],
           ["Limit from", reading.source ? SOURCE_LABEL[reading.source] : "–"],
           ["Off the road line", reading.offM != null ? `${reading.offM} m` : "–"],
+          ["Saved on the reading", reading.savedRoadId != null ? `road piece ${reading.savedRoadId}` : "not yet (next Valhalla run)"],
           ["Position", <span key="p" className="mono">{`${reading.lat.toFixed(5)}, ${reading.lon.toFixed(5)}`}</span>],
         ]}
       />
@@ -472,20 +509,20 @@ function ReplayMap({ readings, pieces, view }: { readings: Reading[]; pieces: Pi
         </clipPath>
       </defs>
       <g clipPath="url(#replay-clip)">
-        {visiblePieces.map((p) => (
-          <polyline
-            key={p.id}
-            points={p.points.map(([lat, lon]) => `${frame.x(lon).toFixed(1)},${frame.y(lat).toFixed(1)}`).join(" ")}
-            fill="none"
-            stroke={limitColor(p.limitKmph)}
-            strokeWidth={roadWidth}
-            strokeOpacity={0.75}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <title>{`${p.label} · ${classLabel(p.roadClass)} · ${p.limitKmph ?? "–"} km/h${p.limitSource ? ` (${SOURCE_LABEL[p.limitSource]})` : ""}`}</title>
-          </polyline>
-        ))}
+        {visiblePieces.map((p) => {
+          const line = p.points.map(([lat, lon]) => `${frame.x(lon).toFixed(1)},${frame.y(lat).toFixed(1)}`).join(" ");
+          const extra = [p.oneWay ? "one-way" : p.oneWay === false ? "two-way" : null, p.bridge ? "bridge" : null, p.curvature != null && p.curvature >= 5 ? `sharp bend (${p.curvature})` : null]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <g key={p.id}>
+              {p.bridge && <polyline points={line} fill="none" stroke="#0f172a" strokeWidth={roadWidth + 4} strokeOpacity={0.55} strokeLinecap="butt" />}
+              <polyline points={line} fill="none" stroke={limitColor(p.limitKmph)} strokeWidth={roadWidth} strokeOpacity={0.75} strokeLinecap="round" strokeLinejoin="round">
+                <title>{`${p.label} · ${classLabel(p.roadClass)} · ${p.limitKmph ?? "–"} km/h${p.limitSource ? ` (${SOURCE_LABEL[p.limitSource]})` : ""}${extra ? ` · ${extra}` : ""}`}</title>
+              </polyline>
+            </g>
+          );
+        })}
         {visibleReadings.length > 1 && (
           <polyline
             points={visibleReadings.map((r) => `${frame.x(r.lon).toFixed(1)},${frame.y(r.lat).toFixed(1)}`).join(" ")}

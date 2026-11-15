@@ -64,7 +64,7 @@ public class DemoResetService {
     private static final List<String> TELEMETRY_TABLES = List.of("route_stop", "route_plan", "vehicle_event", "geofence_visit",
             "gps_trip_late_reading", "gps_trip", "gps_stop", "vehicle_motion_state", "gps_position", "dead_letter", "rejected_frame",
             // how far the live readings were map-matched: those readings are gone (the road library itself stays)
-            "road_match_cursor");
+            "road_match_cursor", "trip_road_pass");
     /** Days back whose report numbers are frozen before the tables are emptied (keepReports). */
     private static final int REPORT_DAYS_KEPT = 400;
 

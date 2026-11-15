@@ -47,6 +47,7 @@ public class RoadLearningService {
     private final SmartTruckGpsReader smartTruck;
     private final NamedParameterJdbcTemplate jdbc;
     private final RoadProperties properties;
+    private final RoadPassService passes;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "road-learning");
         thread.setDaemon(true);
@@ -57,12 +58,13 @@ public class RoadLearningService {
     private volatile Status lastLiveRun;
 
     public RoadLearningService(RoadMatcher matcher, RoadLibrary library, SmartTruckGpsReader smartTruck,
-                               NamedParameterJdbcTemplate jdbc, RoadProperties properties) {
+                               NamedParameterJdbcTemplate jdbc, RoadProperties properties, RoadPassService passes) {
         this.matcher = matcher;
         this.library = library;
         this.smartTruck = smartTruck;
         this.jdbc = jdbc;
         this.properties = properties;
+        this.passes = passes;
     }
 
     public Map<String, Object> status() {
@@ -114,7 +116,7 @@ public class RoadLearningService {
 
     private Status learn(String what, Instant started, List<double[]> points) throws RoadMatcher.ValhallaUnavailable, InterruptedException {
         RoadMatcher.Result result = matcher.match(points);
-        int added = library.store(result.roads());
+        int added = library.store(result.roads(), result.details());
         library.reload();
         String message = "Matched " + result.roads().size() + " road pieces (" + added + " new) in " + result.pieces() + " calls"
                 + (result.failedPieces() > 0 ? ", " + result.failedPieces() + " pieces not matchable: " + result.problem() : "");
@@ -155,8 +157,13 @@ public class RoadLearningService {
                         line.add(new double[]{(double) r[0], (double) r[1]});
                     }
                     RoadMatcher.Result result = matcher.match(line);
-                    added += library.store(result.roads());
+                    int newHere = library.store(result.roads(), result.details());
+                    added += newHere;
+                    if (newHere > 0) {
+                        library.reload();
+                    }
                     matched += result.roads().size();
+                    keepForAnalysis(imei, from, (Instant) readings.getLast()[2]);
                     points += result.pointsSent();
                     devices++;
                     // the last reading stays as the start of the next piece, so the line has no hole between runs
@@ -185,6 +192,16 @@ public class RoadLearningService {
             }
             lastLiveRun = new Status(false, "live readings", started, Instant.now(), points, 0, 0, matched, added, 0, 0, message);
         });
+    }
+
+    /** The road under each matched reading and the device's road passes (V13); a failure here never stops the matching. */
+    private void keepForAnalysis(String imei, Instant from, Instant until) {
+        try {
+            passes.assignRoads(imei, from, until);
+            passes.rebuildPasses(imei, from, until);
+        } catch (RuntimeException problem) {
+            LOG.warn("Road passes of {} not updated: {}", imei, problem.getMessage());
+        }
     }
 
     /** Devices with readings newer than their cursor (a new device starts a day back). */

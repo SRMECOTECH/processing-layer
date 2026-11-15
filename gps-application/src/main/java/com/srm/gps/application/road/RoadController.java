@@ -44,11 +44,36 @@ public class RoadController {
     private final RoadLibrary library;
     private final RoadLearningService learning;
     private final RoadDayReportService reports;
+    private final RoadAnalysisQueries analysis;
 
-    public RoadController(RoadLibrary library, RoadLearningService learning, RoadDayReportService reports) {
+    public RoadController(RoadLibrary library, RoadLearningService learning, RoadDayReportService reports,
+                          RoadAnalysisQueries analysis) {
         this.library = library;
         this.learning = learning;
         this.reports = reports;
+        this.analysis = analysis;
+    }
+
+    /** What Valhalla told us about the learned roads, in totals (V13). */
+    @GetMapping("/attributes")
+    public Map<String, Object> attributes() {
+        return analysis.attributes();
+    }
+
+    /** Everything stored about one road piece, the whole Valhalla edge included. */
+    @GetMapping("/pieces/{id}")
+    public Map<String, Object> piece(@org.springframework.web.bind.annotation.PathVariable long id) {
+        Map<String, Object> piece = analysis.piece(id);
+        if (piece.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No road piece " + id);
+        }
+        return piece;
+    }
+
+    /** Road passes, newest first: each time a vehicle drove a road (V13). */
+    @GetMapping("/passes")
+    public List<Map<String, Object>> passes(@RequestParam(required = false) String imei, @RequestParam(defaultValue = "200") int limit) {
+        return analysis.passes(blankToNull(imei), Math.max(1, Math.min(limit, 2000)));
     }
 
     @GetMapping("/status")
@@ -77,7 +102,17 @@ public class RoadController {
 
     @GetMapping("/network")
     public List<Map<String, Object>> network() {
-        return library.network();
+        List<Map<String, Object>> pieces = library.network();
+        Map<Long, Object[]> flags = analysis.mapFlags();
+        for (Map<String, Object> piece : pieces) {
+            Object[] f = flags.get((Long) piece.get("id"));
+            if (f != null) {
+                piece.put("bridge", f[0]);
+                piece.put("oneWay", f[1]);
+                piece.put("curvature", f[2]);
+            }
+        }
+        return pieces;
     }
 
     @GetMapping("/pieces")
@@ -123,6 +158,7 @@ public class RoadController {
             answer.put("limitKmph", at.limit() == null ? null : at.limit().kmph());
             answer.put("limitSource", at.limit() == null ? null : at.limit().source().name());
             answer.put("area", at.limit() == null ? null : at.limit().area().name());
+            answer.put("details", analysis.piece(at.road().id()));
         }
         return answer;
     }
