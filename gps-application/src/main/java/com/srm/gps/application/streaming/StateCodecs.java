@@ -46,6 +46,10 @@ public final class StateCodecs {
         f.put("lastOverAt", s.lastOverAt());
         f.put("lastGpsSpeedKmph", s.lastGpsSpeedKmph());
         f.put("lastVerdict", s.lastVerdict());
+        f.put("peakExcessKmph", s.peakExcessKmph());
+        f.put("peakLimitKmph", s.peakLimitKmph());
+        f.put("peakLatitude", s.peakLatitude());
+        f.put("peakLongitude", s.peakLongitude());
         f.put("window", encodeWindow(s.window()));
         f.put("ruleScope", rule.scope());
         f.put("ruleLimitKmph", rule.limitKmph());
@@ -66,7 +70,8 @@ public final class StateCodecs {
                 f.integer("gpsConfirmedReadings"), f.integer("speedometerHighReadings"), f.integer("gpsHighReadings"),
                 f.integer("mismatchStreak"), f.bool("mismatchReported"), f.instant("lastOverAt"),
                 decodeWindow(f.string("window")), f.nullableDouble("lastGpsSpeedKmph"),
-                f.enumValue("lastVerdict", SpeedViolationState.Verdict.class, SpeedViolationState.Verdict.UNVERIFIED));
+                f.enumValue("lastVerdict", SpeedViolationState.Verdict.class, SpeedViolationState.Verdict.UNVERIFIED),
+                f.dbl("peakExcessKmph"), f.dbl("peakLimitKmph"), f.dbl("peakLatitude"), f.dbl("peakLongitude"));
     }
 
     private static String encodeWindow(List<WindowPoint> window) {

@@ -2,6 +2,7 @@ package com.srm.gps.application.streaming;
 
 import com.srm.gps.application.events.VehicleEventRecorder;
 import com.srm.gps.application.geofence.GeofenceDirectory;
+import com.srm.gps.application.road.RoadLibrary;
 import com.srm.gps.configuration.KafkaConsumerGroupNames;
 import com.srm.gps.configuration.PipelineStage;
 import com.srm.gps.configuration.RedisKeyNames;
@@ -34,9 +35,10 @@ import java.util.Map;
 /**
  * Module (gps-module-api), consumer group gps-speed-violation-service (Kafka flow) or called directly (direct flow).
  *
- * Per reading: rule for the vehicle (Redis, vehicle -> company -> default), adjusted by the alert policy to the place
- * (the strictest speed limit of the geofences the reading is inside, e.g. 20 km/h in a plant) and the hour (stricter at
- * night, when switched on); state (Redis gps:state:speed:{imei}); the pure {@link SpeedViolationProcessor}; then
+ * Per reading: rule for the vehicle (Redis, vehicle -> company -> default: the company's cap), adjusted by the alert
+ * policy to the road (the limit of the road under the reading, from the road library: hand-set, OpenStreetMap, or the
+ * table by road class and area), the place (the strictest speed limit of the geofences the reading is inside, e.g.
+ * 20 km/h in a plant) and the hour (stricter at night, when switched on); state (Redis gps:state:speed:{imei}); the pure {@link SpeedViolationProcessor}; then
  * events, graded by the policy's bands; then the new state. Events are written before the state: if anything fails the
  * reading is retried, finds the same events, and the upsert by event key keeps them once.
  */
@@ -46,7 +48,7 @@ public class SpeedViolationService implements GpsModule {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedViolationService.class);
 
     private static final ModuleDescriptor DESCRIPTOR = new ModuleDescriptor("speed-violation", "Speed violation",
-            "Sustained over-speed against each entity's rule and each geofence's limit, speedometer cross-checked against GPS.",
+            "Sustained over-speed against each road's limit, each entity's rule and each geofence's limit, speedometer cross-checked against GPS.",
             KafkaConsumerGroupNames.SPEED_VIOLATION, PipelineStage.SPEED_VIOLATION, 30,
             List.of("OVERSPEED", "SPEED_SENSOR_MISMATCH"), List.of("gps:state:speed:*"));
 
@@ -54,17 +56,19 @@ public class SpeedViolationService implements GpsModule {
     private final SpeedRuleStore rules;
     private final SpeedPolicyStore policies;
     private final GeofenceDirectory geofences;
+    private final RoadLibrary roads;
     private final VehicleContext vehicles;
     private final VehicleEventRecorder recorder;
     private final ZoneId zone;
 
     public SpeedViolationService(RedisStateStore redis, SpeedRuleStore rules, SpeedPolicyStore policies, GeofenceDirectory geofences,
-                                 VehicleContext vehicles, VehicleEventRecorder recorder,
+                                 RoadLibrary roads, VehicleContext vehicles, VehicleEventRecorder recorder,
                                  @Value("${gps.reports.zone:Asia/Kolkata}") String zone) {
         this.redis = redis;
         this.rules = rules;
         this.policies = policies;
         this.geofences = geofences;
+        this.roads = roads;
         this.vehicles = vehicles;
         this.recorder = recorder;
         this.zone = ZoneId.of(zone);
@@ -84,7 +88,10 @@ public class SpeedViolationService implements GpsModule {
         VehicleContext.Vehicle vehicle = vehicles.of(position);
         SpeedPolicy policy = policies.current();
         Geofence zoneFence = strictestZone(position);
+        RoadLibrary.RoadAt road = roads.locate(position.latitude(), position.longitude());
+        Integer roadLimit = road == null || road.limit() == null ? null : road.limit().kmph();
         SpeedRule rule = policy.effective(rules.ruleFor(vehicle.registrationNo(), vehicle.tenantCode()),
+                roadLimit, road == null ? null : road.road().label(),
                 zoneFence == null ? null : zoneFence.speedLimitKmph(), zoneFence == null ? null : zoneFence.code(),
                 LocalTime.ofInstant(position.recordedAt(), zone));
         String key = RedisKeyNames.speedState(position.imei());
@@ -97,9 +104,42 @@ public class SpeedViolationService implements GpsModule {
             return;
         }
         for (SpeedFinding finding : update.findings()) {
-            recorder.record(toEvent(vehicle, finding, policy, zoneFence));
+            recorder.record(toEvent(vehicle, withRoad(finding), policy, zoneFence));
         }
         redis.writeHash(key, StateCodecs.speed(update.state(), rule));
+    }
+
+    /**
+     * The road where the episode peaked (where its limit was judged), added to the finding's details: the day-end report
+     * and the alert show which road, its class and where its limit came from.
+     */
+    private SpeedFinding withRoad(SpeedFinding finding) {
+        if (finding.kind() == SpeedFinding.Kind.SENSOR_MISMATCH) {
+            return finding;
+        }
+        Object lat = finding.details().get("peakLatitude");
+        Object lon = finding.details().get("peakLongitude");
+        double latitude = lat instanceof Number n ? n.doubleValue() : finding.latitude();
+        double longitude = lon instanceof Number n ? n.doubleValue() : finding.longitude();
+        RoadLibrary.RoadAt road = roads.locate(latitude, longitude);
+        Map<String, Object> details = new LinkedHashMap<>(finding.details());
+        if (road == null) {
+            details.put("roadLabel", null);
+            details.put("limitSource", String.valueOf(details.get("ruleScope")).contains("+zone:") ? "ZONE" : "COMPANY");
+        } else {
+            details.put("roadId", road.road().id());
+            details.put("roadLabel", road.road().label());
+            details.put("roadRef", road.road().ref());
+            details.put("roadClass", road.road().roadClass());
+            details.put("roadState", road.road().stateCode());
+            details.put("roadArea", road.limit() == null ? null : road.limit().area().name());
+            details.put("roadLimitKmph", road.limit() == null ? null : road.limit().kmph());
+            String scope = String.valueOf(details.get("ruleScope"));
+            details.put("limitSource", scope.contains("+zone:") ? "ZONE"
+                    : scope.contains("+road:") && road.limit() != null ? road.limit().source().name() : "COMPANY");
+        }
+        return new SpeedFinding(finding.kind(), finding.startedAt(), finding.endedAt(), finding.latitude(), finding.longitude(),
+                finding.excessKmph(), finding.verdict(), details);
     }
 
     /** The geofence with the lowest speed limit around the reading, or null (no index yet, or none with a limit). */

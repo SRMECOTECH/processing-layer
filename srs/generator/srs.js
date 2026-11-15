@@ -115,7 +115,7 @@ function introduction(d) {
     "Device protocol parsing (TCP/UDP listeners for vendor protocols). The interface to a future parser is specified (IFR-KAF-001).",
     "ClickHouse storage and notification delivery (SMS, e-mail, push). The console shows these as “Planned” with example data; "
       + "their requirements are listed as “Future” for traceability only.",
-    "Map matching of the real trail (Valhalla trace_attributes) and ETA confidence bands (FR-RTE-015, FR-RTE-016, Future).",
+    "Map matching of the real trail for route deviation and ETA confidence bands (FR-RTE-015, FR-RTE-016, Future); map matching is used for road speed limits (FR-SPD-007 to FR-SPD-014).",
     "Single sign-on, and roles beyond GPS provider, transporter and consigner (FR-AUTH-010).",
     "Driver management, maintenance scheduling, billing, mobile applications and map-tile hosting.",
     "Writing to the legacy smart_truck database, which is a read-only source.",
@@ -433,7 +433,15 @@ function functionalRequirements(d) {
     ["FR-SPD-004", "For each reading, the system shall compare the reported speed with the GPS speed over the last windowPings readings (path ÷ time, or odometer when available) and classify it GPS_VERIFIED or SENSOR_SUSPECT using the tolerance max(toleranceKmph, tolerancePercent × speed).", M, T, B],
     ["FR-SPD-005", "After mismatchPings consecutive SENSOR_SUSPECT readings, the system shall raise a SPEED_SENSOR_MISMATCH event.", M, T, B],
     ["FR-SPD-006", "The system shall provide GET /api/speed/rules, PUT /api/speed/rules/{scope}, DELETE /api/speed/rules/{scope} (the default rule cannot be deleted) and GET /api/speed/active, and create the default rule on first start.", M, T, B],
-  ], { objective: "OBJ-03", component: "gps-processing speed/; streaming/SpeedViolationService, SpeedRuleStore", tests: "SpeedViolationProcessorTest" });
+    ["FR-SPD-007", "The system shall keep a road library (road_segment) of the road pieces trucks drove, map-matched by Valhalla trace_attributes (costing truck): way, name, number (NH/SH/MDR), class, lanes, density, state and OpenStreetMap limit of each edge.", M, T, B],
+    ["FR-SPD-008", "The road library shall be filled on request from every ping of a smart_truck trip (POST /api/roads/learn?trip=) and, every 2 minutes, from each device's new live readings after its cursor (road_match_cursor); when Valhalla does not answer the cursors shall not move.", M, T, B],
+    ["FR-SPD-009", "The limit of a road shall be its hand-set limit, else the lower of its OpenStreetMap limit and the road_speed_limit row of its class and area (TOWN from Valhalla density 9, else OPEN), the state's row before the all-India row, the multi-lane value on divided roads with 2+ lanes each way.", M, T, B],
+    ["FR-SPD-010", "The limit of a reading shall be the lowest of the vehicle's rule limit (the company cap), the limit of the road within 35 m of the reading, the strictest geofence limit and the night reduction; the event's scope shall name the road (+road:{label}).", M, T, B],
+    ["FR-SPD-011", "An over-speed episode shall be graded by its largest excess over the limit in force at each of its readings, and its event shall carry that limit, where it happened and the road there (label, class, area, limit source MANUAL/OSM/TABLE/ZONE/COMPANY).", M, T, B],
+    ["FR-SPD-012", "The system shall rebuild vehicle_day_road (per vehicle, day and road: km, driving time, average and top speed, km, minutes and readings above the road's limit, largest excess) for today and yesterday every 5 minutes, and only for days that still have positions.", M, T, B],
+    ["FR-SPD-013", "The day-end road and speed report (GET /api/roads/report?day=&imei=, Reports → Road & speed report) shall give per vehicle totals per 100 km, every over-speed episode with its road, the roads driven, totals by road class, the roads with most episodes, night episodes and the share of readings on a known road.", M, T, B],
+    ["FR-SPD-014", "The console shall show the road library, let the operator learn a trip, edit the limit table and set or clear a hand-set limit on a whole road (Road Intelligence → H. Speed & regulations → Road limits); the Road Intelligence section shall list sub-modules A to M with their status.", S, D, B],
+  ], { objective: "OBJ-03", component: "gps-processing speed/, road/; streaming/SpeedViolationService, SpeedRuleStore; road/", tests: "SpeedViolationProcessorTest, SpeedPolicyTest, RoadSpeedTest" });
 
   d.h2("Vehicle State and History (VST)");
   d.requirements("Vehicle state requirements", [

@@ -128,6 +128,7 @@ function build() {
     ["Shipments (V9)", "shipment, shipment_import, place", "ShipmentImportService (Excel / CSV / tta_trips), module shipment-tracking"],
     ["Geofencing (V10)", "place (geofence master), geofence_visit", "Live geofences page, module geofence"],
     ["Route plans (V11)", "route_plan, route_stop", "RoutePlanService, modules route-deviation and waypoints"],
+    ["Road speed limits (V12)", "road_segment, road_speed_limit, road_match_cursor, vehicle_day_road", "RoadLibrary, RoadLearningService, module speed-violation, Road & speed report"],
   ]);
   d.p(ref("dbs-er") + " (next page) shows the tables of V1 to V8 and their relationships; " + ref("dbs-er-tms") + " those added by V9 to V11.");
   d.landscape();
@@ -746,6 +747,65 @@ function build() {
     ["route_stop_kind_values / route_stop_status_values", "CK", "The value sets of Section 6."],
   ]);
 
+  tableHeader(d, "road_segment", [
+    ["Purpose", "The road library: every road piece (one edge of Valhalla's road graph) a truck drove, with what the live speed check needs to judge a reading by its road."],
+    ["Created in", "V12"],
+    ["Made by", "RoadLearningService: a smart_truck trip on request, and each device's live readings every 2 minutes, map-matched by Valhalla trace_attributes. Upserted by segment_key; a hand-set limit is never overwritten."],
+    ["Read by", "RoadLibrary (all pieces in a 0.01-degree grid in memory, reloaded within 30 s of a change), RoadDayReportService, Road limits page"],
+  ]);
+  columns(d, "road_segment columns", [
+    ["id", "bigint identity", "N", "generated", "Surrogate key."],
+    ["segment_key", "varchar(120)", "N", "", "way_id + both ends rounded to ~1 m, sorted: both directions of a road are one piece."],
+    ["way_id", "bigint", "N", "", "OpenStreetMap way."],
+    ["road_name / road_ref", "varchar(255) / varchar(40)", "Y", "", "Name; number (NH19, SH4, MDR156)."],
+    ["road_class", "varchar(20)", "N", "", "motorway, trunk, primary, secondary, tertiary, unclassified, residential, service_other."],
+    ["density / lane_count / state_code", "integer / integer / varchar(10)", "N / N / Y", "0 / 0 / –", "Valhalla density 0..15 (town from 9); lanes in the direction of travel; state."],
+    ["osm_limit_kmph / manual_limit_kmph / manual_note", "integer / integer / varchar(255)", "Y", "", "OpenStreetMap maxspeed; limit set by hand (5..150, beats every other source)."],
+    ["length_m / shape", "double / text", "N", "", "Length; line as encoded polyline (precision 6)."],
+    ["min_lat, max_lat, min_lon, max_lon", "double precision", "N", "", "Bounding box."],
+    ["times_matched / first_seen_at / updated_at", "integer / timestamptz", "N", "1 / now()", "How often matched; first and last match."],
+  ]);
+  constraints(d, "road_segment constraints", [
+    ["road_segment_segment_key_key", "UK", "(segment_key)"],
+    ["road_segment_manual_limit_range", "CK", "manual_limit_kmph IS NULL OR 5..150"],
+  ]);
+
+  tableHeader(d, "road_speed_limit", [
+    ["Purpose", "The limit for goods vehicles by road class and area (TOWN / OPEN), for every state ('*') or one state; the multi-lane value applies on divided roads with 2+ lanes each way."],
+    ["Created in", "V12, with 16 all-India starting rows (80 on expressways and divided 4-lane highways, 60 elsewhere, lower in towns and on minor roads)"],
+    ["Read by", "RoadLibrary; edited on Processing → Speed → Road limits"],
+  ]);
+  columns(d, "road_speed_limit columns", [
+    ["road_class / area / state_code", "varchar", "N", "– / – / '*'", "The key; area TOWN or OPEN."],
+    ["limit_kmph / multi_lane_limit_kmph", "integer", "N / Y", "", "5..150; null multi-lane = limit_kmph."],
+    ["updated_at", "timestamptz", "N", "now()", "Last change."],
+  ]);
+
+  tableHeader(d, "road_match_cursor", [
+    ["Purpose", "How far each device's live readings have been map-matched; emptied by Clear database (the readings are gone, the library stays)."],
+    ["Created in", "V12"],
+  ]);
+  columns(d, "road_match_cursor columns", [
+    ["imei", "varchar(50)", "N", "", "PK."],
+    ["matched_until / updated_at", "timestamptz", "N", "– / now()", "Newest reading matched (the last one stays the start of the next piece)."],
+  ]);
+
+  tableHeader(d, "vehicle_day_road", [
+    ["Purpose", "The day-end road report: per vehicle, day and road (label + class + limit) the distance, driving time, speeds and the exposure above the road's limit."],
+    ["Created in", "V12"],
+    ["Made by", "RoadDayReportService from gps_position, today and yesterday every 5 minutes; a day is rewritten only while it has positions."],
+  ]);
+  columns(d, "vehicle_day_road columns", [
+    ["day / imei / road_key", "date / varchar(50) / varchar(400)", "N", "", "PK."],
+    ["tenant_code / vehicle_registration_no", "varchar", "Y", "", "The vehicle."],
+    ["road_label / road_ref / road_class / area / state_code", "varchar", "N / Y / N / N / Y", "", "The road; '(not on a known road)' for readings off the library."],
+    ["limit_kmph / limit_source", "integer / varchar(10)", "N", "", "Limit of the row; MANUAL, OSM, TABLE or COMPANY."],
+    ["readings / distance_m / moving_s", "integer / double / bigint", "N", "", "Readings; km and driving time (gaps over 600 s left out)."],
+    ["max_speed_kmph / avg_moving_speed_kmph", "integer / double", "N", "", "Top and average moving speed."],
+    ["over_readings / over_distance_m / over_s / max_excess_kmph", "integer / double / bigint / integer", "N", "", "Readings faster than the limit; their km and time; largest excess."],
+    ["computed_at", "timestamptz", "N", "now()", "When rebuilt."],
+  ]);
+
   // ---------------------------------------------------------------------------------------------- 5
   d.h1("Relationships and Referential Integrity");
   d.table("Relationships", [
@@ -866,6 +926,8 @@ function build() {
     ["gps_position, gps_trip, gps_stop, gps_trip_late_reading, vehicle_motion_state, vehicle_event", "Emptied (TRUNCATE … RESTART IDENTITY)", "Emptied"],
     ["dead_letter, rejected_frame", "Emptied", "Emptied"],
     ["vehicle_day_summary", "Kept; live rows frozen into a new generation first", "Emptied"],
+    ["vehicle_day_road / road_match_cursor", "Kept / emptied", "Emptied / emptied"],
+    ["road_segment, road_speed_limit", "Kept (knowledge of the roads)", "Kept"],
     ["tenant, vehicle, device, device_assignment", "Kept", "Kept"],
     ["report_setting, connection_setting", "Kept", "Kept"],
   ]);

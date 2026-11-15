@@ -6,7 +6,9 @@ import java.time.LocalTime;
  * How a speed rule is applied at one reading, and how loud a confirmed over-speed is. The rule (per vehicle / company /
  * default) decides whether there is an episode; the policy adjusts the limit to the place and the hour, and grades it.
  *
- * Limit at a reading = the rule's limit, lowered to
+ * Limit at a reading = the rule's limit (the company's cap for the vehicle), lowered to
+ *   - the limit of the road the reading is on (road speed limits: a hand-set limit, OpenStreetMap's, or the table by
+ *     road class and area), and
  *   - the speed limit of the strictest geofence the reading is inside (a plant's 20 km/h, a school zone), and
  *   - minus {@code nightStricterKmph} between {@code nightStartHour} and {@code nightEndHour} (local time).
  *
@@ -50,8 +52,23 @@ public record SpeedPolicy(double breachOverKmph, double severeOverKmph, boolean 
      * @param localTime      the reading's local time of day
      */
     public SpeedRule effective(SpeedRule rule, Integer zoneLimitKmph, String zoneCode, LocalTime localTime) {
+        return effective(rule, null, null, zoneLimitKmph, zoneCode, localTime);
+    }
+
+    /**
+     * The rule to judge this reading by, on a known road.
+     *
+     * @param roadLimitKmph  the limit of the road the reading is on, or null (road not known yet)
+     * @param roadLabel      that road's name (shown in the event's scope, e.g. "road:NH19")
+     */
+    public SpeedRule effective(SpeedRule rule, Integer roadLimitKmph, String roadLabel, Integer zoneLimitKmph, String zoneCode,
+                               LocalTime localTime) {
         double limit = rule.limitKmph();
         String scope = rule.scope();
+        if (roadLimitKmph != null && roadLimitKmph > 0 && roadLimitKmph < limit) {
+            limit = roadLimitKmph;
+            scope = scope + "+road:" + (roadLabel == null || roadLabel.isBlank() ? "unnamed" : roadLabel);
+        }
         if (zoneLimitKmph != null && zoneLimitKmph < limit) {
             limit = zoneLimitKmph;
             scope = scope + "+zone:" + zoneCode;

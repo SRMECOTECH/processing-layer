@@ -1,0 +1,181 @@
+package com.srm.gps.application.road;
+
+import com.srm.gps.processing.road.RoadSpeedTable;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Road Intelligence (docs/ROAD_INTELLIGENCE.md): the road library learned with Valhalla, road speed limits used by the
+ * speed-violation module, and the day-end road report.
+ *
+ *   GET    /api/roads/status                      library size, Valhalla address, the newest learning runs
+ *   GET    /api/roads/network                     every stored piece with its line, class and limit (the road map)
+ *   POST   /api/roads/learn?trip=28860462         map-match a smart_truck trip on Valhalla and keep its roads
+ *   POST   /api/roads/match-live                  match the live readings now instead of at the next 2-minute run
+ *   GET    /api/roads?q=NH19&limit=200            the known roads with their limit and its source
+ *   GET    /api/roads/pieces?ref=NH19&name=       every stored piece of one road
+ *   PUT    /api/roads/pieces/{id}/limit           body {limitKmph, note}: a hand-set limit on one piece (null clears it)
+ *   PUT    /api/roads/limit                       body {ref, name, limitKmph, note}: on every piece of one road
+ *   GET    /api/roads/locate?lat=&lon=            the road under a point and its limit
+ *   GET    /api/roads/limits                      the limit table by road class and area
+ *   PUT    /api/roads/limits                      body a table row: create or change it
+ *   DELETE /api/roads/limits?roadClass=&area=&stateCode=   a state's own row
+ *   GET    /api/roads/report/days                 the days of the road report
+ *   GET    /api/roads/report?day=&imei=           the day-end road and speed report
+ *   POST   /api/roads/report/rebuild?day=         rebuild a day's road rows now
+ */
+@RestController
+@RequestMapping("/api/roads")
+public class RoadController {
+
+    private final RoadLibrary library;
+    private final RoadLearningService learning;
+    private final RoadDayReportService reports;
+
+    public RoadController(RoadLibrary library, RoadLearningService learning, RoadDayReportService reports) {
+        this.library = library;
+        this.learning = learning;
+        this.reports = reports;
+    }
+
+    @GetMapping("/status")
+    public Map<String, Object> status() {
+        return learning.status();
+    }
+
+    @PostMapping("/learn")
+    public Map<String, Object> learn(@RequestParam long trip) {
+        boolean started = learning.learnSmartTruckTrip(trip);
+        Map<String, Object> answer = new LinkedHashMap<>(learning.status());
+        answer.put("started", started);
+        return answer;
+    }
+
+    @PostMapping("/match-live")
+    public Map<String, Object> matchLive() {
+        learning.matchLiveReadings();
+        return learning.status();
+    }
+
+    @GetMapping
+    public List<Map<String, Object>> roads(@RequestParam(required = false) String q, @RequestParam(defaultValue = "200") int limit) {
+        return library.roads(q, Math.max(1, Math.min(limit, 2000)));
+    }
+
+    @GetMapping("/network")
+    public List<Map<String, Object>> network() {
+        return library.network();
+    }
+
+    @GetMapping("/pieces")
+    public List<Map<String, Object>> pieces(@RequestParam(required = false) String ref, @RequestParam(required = false) String name) {
+        return library.pieces(blankToNull(ref), blankToNull(name));
+    }
+
+    public record LimitChange(String ref, String name, Integer limitKmph, String note) {
+    }
+
+    @PutMapping("/pieces/{id}/limit")
+    public Map<String, Object> pieceLimit(@org.springframework.web.bind.annotation.PathVariable long id, @RequestBody LimitChange change) {
+        checkLimit(change.limitKmph());
+        if (!library.setManualLimit(id, change.limitKmph(), change.note())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No road piece " + id);
+        }
+        return Map.of("id", id, "limitKmph", change.limitKmph() == null ? "cleared" : change.limitKmph());
+    }
+
+    @PutMapping("/limit")
+    public Map<String, Object> roadLimit(@RequestBody LimitChange change) {
+        checkLimit(change.limitKmph());
+        int pieces = library.setManualLimitForRoad(blankToNull(change.ref()), blankToNull(change.name()), change.limitKmph(), change.note());
+        if (pieces == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No stored road with that number and name");
+        }
+        return Map.of("pieces", pieces, "limitKmph", change.limitKmph() == null ? "cleared" : change.limitKmph());
+    }
+
+    @GetMapping("/locate")
+    public Map<String, Object> locate(@RequestParam double lat, @RequestParam double lon) {
+        RoadLibrary.RoadAt at = library.locate(lat, lon);
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("found", at != null);
+        if (at != null) {
+            answer.put("id", at.road().id());
+            answer.put("label", at.road().label());
+            answer.put("roadClass", at.road().roadClass());
+            answer.put("stateCode", at.road().stateCode());
+            answer.put("lanes", at.road().laneCount());
+            answer.put("density", at.road().density());
+            answer.put("distanceM", Math.round(at.distanceMeters() * 10) / 10.0);
+            answer.put("limitKmph", at.limit() == null ? null : at.limit().kmph());
+            answer.put("limitSource", at.limit() == null ? null : at.limit().source().name());
+            answer.put("area", at.limit() == null ? null : at.limit().area().name());
+        }
+        return answer;
+    }
+
+    @GetMapping("/limits")
+    public Map<String, Object> limits() {
+        RoadSpeedTable table = library.loadTable();
+        return Map.of("rows", table.rows(), "townDensityFrom", table.townDensityFrom());
+    }
+
+    @PutMapping("/limits")
+    public Map<String, Object> saveLimit(@RequestBody RoadSpeedTable.Row row) {
+        try {
+            library.saveTableRow(row);
+        } catch (IllegalArgumentException wrong) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, wrong.getMessage());
+        }
+        return limits();
+    }
+
+    @DeleteMapping("/limits")
+    public Map<String, Object> deleteLimit(@RequestParam String roadClass, @RequestParam String area, @RequestParam String stateCode) {
+        try {
+            library.deleteTableRow(roadClass, area, stateCode);
+        } catch (IllegalArgumentException wrong) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, wrong.getMessage());
+        }
+        return limits();
+    }
+
+    @GetMapping("/report/days")
+    public List<Map<String, Object>> days() {
+        return reports.days(62);
+    }
+
+    @GetMapping("/report")
+    public Map<String, Object> report(@RequestParam(required = false) LocalDate day, @RequestParam(required = false) String imei) {
+        return reports.report(day != null ? day : reports.today(), blankToNull(imei));
+    }
+
+    @PostMapping("/report/rebuild")
+    public Map<String, Object> rebuild(@RequestParam(required = false) LocalDate day) {
+        LocalDate d = day != null ? day : reports.today();
+        return Map.of("day", d, "vehicles", reports.summarize(d));
+    }
+
+    private static void checkLimit(Integer limit) {
+        if (limit != null && (limit < 5 || limit > 150)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A limit is 5 to 150 km/h");
+        }
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
+    }
+}

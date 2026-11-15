@@ -40,4 +40,14 @@ class SpeedPolicyTest {
         assertEquals(SpeedPolicy.Band.SUSPECT, policy.band(40, "SENSOR_SUSPECT"));
         assertEquals(SpeedPolicy.Band.SEVERE, new SpeedPolicy(10, 25, false, 0, 22, 5).band(40, "SENSOR_SUSPECT"));
     }
+
+    @Test
+    void aRoadLimitLowersTheCompanyCapAndAZoneLowersItFurther() {
+        SpeedPolicy policy = SpeedPolicy.defaults();
+        assertEquals(40, policy.effective(RULE, 40, "NH19", null, null, LocalTime.NOON).limitKmph());
+        assertTrue(policy.effective(RULE, 40, "NH19", null, null, LocalTime.NOON).scope().endsWith("+road:NH19"));
+        assertSame(RULE, policy.effective(RULE, 80, "NH19", null, null, LocalTime.NOON), "a road above the company cap changes nothing");
+        assertEquals(20, policy.effective(RULE, 40, "NH19", 20, "PLANT", LocalTime.NOON).limitKmph());
+        assertTrue(policy.effective(RULE, 40, "NH19", 20, "PLANT", LocalTime.NOON).scope().endsWith("+road:NH19+zone:PLANT"));
+    }
 }

@@ -109,6 +109,9 @@ gps:
     # compressed: the old way - one ping of every vehicle every delay-between-rounds-millis, stamped now.
     timing: faithful
     catch-up-minutes: 120
+    # Replay exactly these smart_truck trips (all their pings), e.g. 28860462 = Jamshedpur -> Ghaziabad. Empty = the
+    # newest trip of vehicle-count devices. Pinned trips start far enough in the past to be replayed end to end.
+    trip-numbers:
     catch-up-speed-factor: 30
     delay-between-rounds-millis: 2000
     # smart_truck has no ignition or odometer, so the simulator adds them for a share of the devices
@@ -198,6 +201,22 @@ gps:
     timeout: PT20S
     plan-shipments: true
     plan-every: PT30S
+  # Road speed limits (docs/ROAD_SPEED_GUIDE.md): Valhalla map-matches the readings into a road library; the speed check
+  # judges each reading by the limit of the road under it (hand-set > OpenStreetMap > table by road class and area).
+  roads:
+    live-matching: ${GPS_ROADS_LIVE_MATCHING:true}
+    match-every: 2m
+    match-meters: 35
+    search-radius: 50
+    piece-points: 300
+    piece-km: 80
+    min-move-meters: 15
+    min-live-points: 20
+    max-live-wait-minutes: 15
+    costing: truck
+    max-gap-seconds: 600
+    # Valhalla road density 0..15 from which a road counts as in a town (town rows of the limit table)
+    town-density-from: ${GPS_ROADS_TOWN_DENSITY_FROM:9}
   # Sign-in for the three roles (GPS provider = DEVELOPER, TRANSPORTER, CONSIGNER). Demo users "abc" with this
   # password are created when a role has no user yet; switch it off on a real installation.
   auth:

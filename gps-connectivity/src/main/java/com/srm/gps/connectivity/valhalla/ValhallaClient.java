@@ -15,6 +15,8 @@ import java.util.Map;
  *
  *   GET  /status   version, when the map tiles were built, the actions it offers
  *   POST /route    A -> B (+ waypoints): length (km), time (s), each leg's shape as an encoded polyline (precision 6)
+ *   POST /trace_attributes   map matching: the GPS points of a drive snapped onto the roads, with each road edge's class,
+ *                  names, OpenStreetMap speed limit, lanes, density and state
  *
  * Costing: auto | truck | bicycle | pedestrian | motor_scooter | bus.
  */
@@ -41,6 +43,28 @@ public class ValhallaClient {
     /** A route with everything a route plan needs: each leg's shape and maneuver timings. */
     public record Plan(double lengthKm, double timeSeconds, List<Leg> legs, long millis) {
     }
+
+    /**
+     * One road edge of a map-matched drive.
+     *
+     * @param beginShapeIndex first point of the matched shape on this edge
+     * @param endShapeIndex   last point of the matched shape on this edge
+     * @param speedLimitKmph  OpenStreetMap's maxspeed, or null when the edge has none
+     * @param density         Valhalla's road density, 0..15 (higher = more built-up)
+     * @param stateCode       the state of the edge's end node (admins list), or null
+     */
+    public record TraceEdge(long wayId, List<String> names, String roadClass, Integer speedLimitKmph, double lengthKm, String use,
+                            int density, int laneCount, String stateCode, int beginShapeIndex, int endShapeIndex) {
+    }
+
+    /** A map-matched drive: its edges and the matched line (encoded polyline, precision 6). */
+    public record Trace(List<TraceEdge> edges, String shape, int matchedPoints, int unmatchedPoints, long millis) {
+    }
+
+    private static final List<String> TRACE_ATTRIBUTES = List.of(
+            "edge.way_id", "edge.names", "edge.road_class", "edge.speed_limit", "edge.length", "edge.use", "edge.density",
+            "edge.lane_count", "edge.begin_shape_index", "edge.end_shape_index", "edge.end_node.admin_index",
+            "admin.state_code", "admin.country_code", "matched.type", "shape");
 
     private final JsonHttp http;
 
@@ -141,6 +165,70 @@ public class ValhallaClient {
             throw new IOException("Valhalla answered without route legs");
         }
         return new Plan(length.doubleValue(), time.doubleValue(), legs, answer.millis());
+    }
+
+    /**
+     * Map matching (Valhalla's Meili, hidden Markov model over the road graph): which roads the points were driven on.
+     * Valhalla refuses a drive longer than its trace limit (200 km by default), so the caller sends pieces.
+     *
+     * @param points       [latitude, longitude] in driving order
+     * @param searchRadius how far (m) from a point a road may be
+     */
+    public Trace trace(String baseUrl, List<double[]> points, String costing, int searchRadius) throws IOException, InterruptedException {
+        List<Map<String, Object>> shape = new ArrayList<>();
+        for (double[] p : points) {
+            shape.add(Map.of("lat", p[0], "lon", p[1]));
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("shape", shape);
+        request.put("costing", costing);
+        request.put("shape_match", "map_snap");
+        request.put("trace_options", Map.of("search_radius", searchRadius));
+        request.put("filters", Map.of("attributes", TRACE_ATTRIBUTES, "action", "include"));
+        JsonHttp.Answer answer = http.post(JsonHttp.baseUrl(baseUrl) + "/trace_attributes", request);
+        Map<String, Object> body = answer.body();
+
+        List<String> states = new ArrayList<>();
+        if (body.get("admins") instanceof List<?> admins) {
+            for (Object admin : admins) {
+                states.add(admin instanceof Map<?, ?> m && m.get("state_code") instanceof String code && !code.isBlank() ? code : null);
+            }
+        }
+        List<TraceEdge> edges = new ArrayList<>();
+        if (body.get("edges") instanceof List<?> list) {
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> e)) {
+                    continue;
+                }
+                List<String> names = new ArrayList<>();
+                if (e.get("names") instanceof List<?> n) {
+                    n.forEach(name -> names.add(String.valueOf(name)));
+                }
+                Integer limit = e.get("speed_limit") instanceof Number n && n.intValue() > 0 && n.intValue() < 200 ? n.intValue() : null;
+                String state = null;
+                if (e.get("end_node") instanceof Map<?, ?> node && node.get("admin_index") instanceof Number index
+                        && index.intValue() >= 0 && index.intValue() < states.size()) {
+                    state = states.get(index.intValue());
+                }
+                edges.add(new TraceEdge(e.get("way_id") instanceof Number w ? w.longValue() : 0, names,
+                        e.get("road_class") instanceof String rc ? rc : null, limit, number(e.get("length")),
+                        e.get("use") instanceof String u ? u : null, (int) number(e.get("density")), (int) number(e.get("lane_count")),
+                        state, (int) number(e.get("begin_shape_index")), (int) number(e.get("end_shape_index"))));
+            }
+        }
+        int matched = 0;
+        int unmatched = 0;
+        if (body.get("matched_points") instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> m && "unmatched".equals(m.get("type"))) {
+                    unmatched++;
+                } else {
+                    matched++;
+                }
+            }
+        }
+        String matchedShape = body.get("shape") instanceof String text ? text : "";
+        return new Trace(edges, matchedShape, matched, unmatched, answer.millis());
     }
 
     private static double number(Object value) {

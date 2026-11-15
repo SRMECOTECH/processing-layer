@@ -16,6 +16,23 @@ class SpeedViolationProcessorTest {
     private static final SpeedRule RULE = SpeedRule.defaults();   // 60 km/h, 60 s, 3 pings, hysteresis 5
 
     @Test
+    void anEpisodeIsJudgedByTheLimitWhereItWentFurthestOverNotTheLimitAtItsEnd() {
+        Run run = new Run();
+        run.drive(30, 1, 40);
+        run.drive(30, 4, 65);                       // 5 over the highway's 60
+        run.rule = new SpeedRule("default+road:town", 40, 60, 3, 5, 10, 0.15, 180, 3, false, 3);
+        run.drive(30, 3, 55);                       // into a 40 km/h town at 55: 15 over
+        run.rule = RULE;
+        run.drive(30, 2, 20);
+        SpeedFinding ended = run.of(SpeedFinding.Kind.VIOLATION_ENDED).getFirst();
+        assertEquals(15.0, ended.excessKmph(), 0.001);
+        assertEquals(40.0, ended.details().get("limitKmph"));
+        assertEquals(60.0, ended.details().get("limitNowKmph"));
+        assertEquals(65.0, ended.details().get("maxSpeedKmph"));
+        assertTrue(ended.details().containsKey("peakLatitude"));
+    }
+
+    @Test
     void aShortBurstOverTheLimitIsNotAViolation() {
         Run run = new Run();
         run.drive(0, 30, 50);    // 50 km/h every 30 s
@@ -112,6 +129,7 @@ class SpeedViolationProcessorTest {
     /** Drives along a straight line east, one reading every {@code every} seconds. */
     private static final class Run {
         SpeedViolationState state = SpeedViolationState.initial();
+        SpeedRule rule = RULE;
         final List<SpeedFinding> findings = new ArrayList<>();
         long second;
         double east;
@@ -127,7 +145,7 @@ class SpeedViolationProcessorTest {
                 east += realKmph / 3.6 * every;
                 double[] p = point(east, 0);
                 SpeedViolationProcessor.Update update = SpeedViolationProcessor.update(state,
-                        new SpeedReading(at(second), p[0], p[1], reportedKmph, null, false), RULE);
+                        new SpeedReading(at(second), p[0], p[1], reportedKmph, null, false), rule);
                 state = update.state();
                 findings.addAll(update.findings());
             }

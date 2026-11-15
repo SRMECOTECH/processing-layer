@@ -26,6 +26,7 @@ import {
   Inbox,
   Layers,
   Link2,
+  Layers3,
   LayoutGrid,
   ListChecks,
   Map,
@@ -282,6 +283,60 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    href: "/roads",
+    label: "Road Intelligence",
+    icon: Route,
+    description: "What we know about every road our trucks drive, from Valhalla's map matching: class, limits, restrictions, geometry, infrastructure, risk.",
+    groups: [
+      {
+        title: "Overview",
+        items: [{ href: "/roads", label: "Road Intelligence", icon: LayoutGrid, feed: "live" }],
+      },
+      {
+        title: "Know the roads",
+        items: [
+          { href: "/roads/explorer", label: "A. Road network explorer", icon: Map, feed: "partial" },
+          { href: "/roads/classification", label: "B. Classification & hierarchy", icon: Layers3, feed: "partial" },
+          { href: "/roads/surface", label: "D. Surface & physical", icon: Layers3, feed: "planned" },
+          { href: "/roads/infrastructure", label: "F. Bridges, tunnels & infra", icon: Network, feed: "planned" },
+        ],
+      },
+      {
+        title: "Rules for trucks",
+        items: [
+          {
+            href: "/roads/speed",
+            label: "H. Speed & regulations",
+            icon: Gauge,
+            feed: "live",
+            children: [
+              { href: "/roads/speed", label: "Road limits", feed: "live" },
+              { href: "/reports/roads", label: "Road & speed report", feed: "live" },
+            ],
+          },
+          { href: "/roads/restrictions", label: "C. Restrictions & access", icon: ShieldCheck, feed: "planned" },
+          { href: "/roads/toll", label: "I. Toll & cost", icon: Sigma, feed: "planned" },
+        ],
+      },
+      {
+        title: "Geometry, network & risk",
+        items: [
+          { href: "/roads/geometry", label: "E. Geometry & elevation", icon: ChartLine, feed: "planned" },
+          { href: "/roads/connectivity", label: "G. Connectivity & network", icon: Workflow, feed: "planned" },
+          { href: "/roads/risk", label: "J. Risk & quality score", icon: TriangleAlert, feed: "planned" },
+        ],
+      },
+      {
+        title: "Phase 2",
+        items: [
+          { href: "/roads/reachability", label: "K. Reachability", icon: Waypoints, feed: "planned" },
+          { href: "/roads/comparison", label: "L. Road comparison", icon: GitCompareArrows, feed: "planned" },
+          { href: "/roads/quality", label: "M. Road data quality", icon: ListChecks, feed: "planned" },
+        ],
+      },
+    ],
+  },
+  {
     href: "/reports",
     label: "Reports",
     icon: FileText,
@@ -294,6 +349,7 @@ export const SECTIONS: Section[] = [
           { href: "/reports/month", label: "Month report", icon: CalendarDays, feed: "live" },
           { href: "/reports/vehicle", label: "Vehicle day sheet", icon: Truck, feed: "live" },
           { href: "/reports/geofence", label: "Geofence day report", icon: MapPinned, feed: "live" },
+          { href: "/reports/roads", label: "Road & speed report", icon: Gauge, feed: "live" },
         ],
       },
       {
