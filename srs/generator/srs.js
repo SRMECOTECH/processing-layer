@@ -628,7 +628,7 @@ function nonFunctionalRequirements(d) {
   d.h2("Availability");
   d.requirements("Availability requirements", [
     ["NFR-AVL-001", "In a production deployment, the console and the ingestion path should each be available 99.5 % of each calendar month, excluding announced maintenance of at most 4 hours per month, measured by an external probe of /actuator/health every minute.", S, T, P],
-    ["NFR-AVL-002", "All containers shall restart automatically (`restart: always`) and the service shall start only after PostgreSQL, Redis and Kafka report healthy.", M, I, B],
+    ["NFR-AVL-002", "Containers shall not start by themselves (`restart: \"no\"`); an operator starts the stack, and the service shall start only after PostgreSQL, Redis and Kafka report healthy.", M, I, B],
     ["NFR-AVL-003", "/actuator/health shall expose components db, redis, kafkaStreams and dataSafety.", M, T, B],
   ], { objective: "OBJ-06", component: "docker-compose.yml, Actuator", tests: "Inspection, health test" });
 

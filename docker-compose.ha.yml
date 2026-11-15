@@ -45,7 +45,7 @@ services:
 
   kafka-2:
     image: apache/kafka:4.3.1
-    restart: always
+    restart: "no"
     environment:
       <<: *kafka-ha
       KAFKA_NODE_ID: 2
@@ -63,7 +63,7 @@ services:
 
   kafka-3:
     image: apache/kafka:4.3.1
-    restart: always
+    restart: "no"
     environment:
       <<: *kafka-ha
       KAFKA_NODE_ID: 3

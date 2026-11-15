@@ -701,7 +701,7 @@ cd gps-dashboard-ui
 npm install          # pehli baar
 npm run dev          # http://localhost:3000  (service :8080 pe chalni chahiye)
 ```
-Docker mein `docker compose up -d --build` isko `dashboard` service ke naam se khud chala deta hai. Har service pe `restart: always` hai, isliye ek baar `up` karne ke baad Docker Desktop khulte hi poora platform (dashboard bhi) apne aap chal jaata hai – http://localhost:3000.
+Docker mein `docker compose up -d --build` isko `dashboard` service ke naam se khud chala deta hai. Har service pe `restart: "no"` hai, isliye PC ya Docker Desktop start hone par kuch apne aap nahi chalta – Docker Desktop mein project pe **Run** dabao (ya `docker compose start`), tab platform (dashboard bhi) chalega – http://localhost:3000.
 
 ---
 
