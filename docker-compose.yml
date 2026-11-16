@@ -18,6 +18,7 @@
 #   graphhopper    GraphHopper 11.1     road routing on the India map      http://localhost:8989/maps/
 #   route-service  our Spring Boot app  route planning / deviation API     http://localhost:8090
 #   Start:        docker compose --profile routing up -d --build graphhopper route-service
+#   Not used for now: routing is Valhalla on the HP; GraphHopper's image and India map were deleted (rebuilt on start).
 #   First start downloads India (1.7 GB) and imports it - see docs/ROUTING_ENGINE_SETUP.md.
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
@@ -179,8 +180,9 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       HOME_SERVER_REDIS_URL: ${HOME_SERVER_REDIS_URL:-redis://192.168.137.1:6379/1}
       VALHALLA_URL: ${VALHALLA_URL:-http://192.168.137.1:8002}
-      # Route plans fall back to GraphHopper on this laptop (profile "routing") when Valhalla does not answer
-      GPS_GRAPHHOPPER_URL: ${GPS_GRAPHHOPPER_URL:-http://graphhopper:8989}
+      # Route plans use Valhalla on the HP. GraphHopper on this laptop is not used for now (blank = no fallback);
+      # to bring it back: docker compose --profile routing up -d graphhopper and GPS_GRAPHHOPPER_URL=http://graphhopper:8989
+      GPS_GRAPHHOPPER_URL: ${GPS_GRAPHHOPPER_URL:-}
       GPS_INGESTION_API_URL: ${GPS_INGESTION_API_URL:-http://192.168.137.1:8000}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SMARTTRUCK_DATABASE_URL: jdbc:mysql://host.docker.internal:3306/smart_truck
