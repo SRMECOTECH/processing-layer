@@ -34,7 +34,14 @@ public class ConnectionsConfiguration {
 
     @Bean
     SwitchableRedisConnectionFactory redisConnectionFactory(RedisTarget localRedisTarget, ConnectionSettingStore settings,
-                                                            ConnectionsProperties properties) {
+                                                            ConnectionsProperties properties,
+                                                            @Value("${gps.redis.enabled:true}") boolean redisEnabled) {
+        if (!redisEnabled) {
+            LOG.warn("Redis is SWITCHED OFF (gps.redis.enabled=false): no Redis is contacted; the processing modules and "
+                    + "live positions are paused, positions and trips are still stored in PostgreSQL");
+            return SwitchableRedisConnectionFactory.switchedOff(localRedisTarget, properties.redisCommandTimeoutOrDefault(),
+                    properties.redisConnectTimeoutOrDefault());
+        }
         Optional<ConnectionSettingStore.Saved> saved = settings.find(ConnectionSettingStore.REDIS);
         RedisTarget target = localRedisTarget;
         if (saved.isPresent()) {

@@ -17,6 +17,10 @@ import java.util.Set;
  * Every processing module on the class path (each {@link GpsModule} bean), and which of them are switched on:
  * gps.modules.{id}.enabled, on unless set to false. The Kafka flow gives each enabled module its own consumer group
  * ({@link ModuleKafkaListeners}); the direct flow calls them one after the other in {@link ModuleDescriptor#order()}.
+ *
+ * Every module keeps its per-vehicle state in Redis (ModuleContext.state()), so with Redis switched off
+ * (gps.redis.enabled=false) all of them are off: their consumer groups keep their place in Kafka and carry on from
+ * there once Redis is switched on again.
  */
 @Component
 public class ModuleRegistry {
@@ -56,6 +60,7 @@ public class ModuleRegistry {
     }
 
     public boolean enabled(GpsModule module) {
-        return environment.getProperty("gps.modules." + module.descriptor().id() + ".enabled", Boolean.class, true);
+        return environment.getProperty("gps.redis.enabled", Boolean.class, true)
+                && environment.getProperty("gps.modules." + module.descriptor().id() + ".enabled", Boolean.class, true);
     }
 }
