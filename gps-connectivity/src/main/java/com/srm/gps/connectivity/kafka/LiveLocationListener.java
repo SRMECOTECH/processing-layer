@@ -9,6 +9,7 @@ import com.srm.gps.connectivity.flow.OnlyInKafkaFlow;
 import com.srm.gps.connectivity.monitoring.PipelineLogContext;
 import com.srm.gps.connectivity.monitoring.PipelineMetrics;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +17,13 @@ import org.springframework.stereotype.Component;
  * Consumer group "gps-live-location-service": reads the SAME topic as the storage consumer,
  * with its own bookmark - so it gets every processed position too, without slowing storage down.
  * Passes each one to the {@link LiveLocationHandler}.
+ *
+ * Not created while Redis is switched off (gps.redis.enabled=false): the live position lives only in Redis. The group
+ * keeps its place in Kafka and carries on from there once Redis is switched on again.
  */
 @Component
 @OnlyInKafkaFlow
+@ConditionalOnProperty(name = "gps.redis.enabled", havingValue = "true", matchIfMissing = true)
 public class LiveLocationListener extends SkippableListener {
 
     private static final PipelineStage STAGE = PipelineStage.LIVE_LOCATION;

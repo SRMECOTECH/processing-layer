@@ -2,9 +2,13 @@
 #
 #   postgres     PostgreSQL 14         gps_tracking database              Windows: localhost:5433
 #   kafka        Apache Kafka (KRaft)  the platform's topics              Windows: localhost:29092
+#   Redis is SWITCHED OFF until production (GPS_REDIS_ENABLED=false): the service stores positions, trips and stops
+#   in PostgreSQL; live positions and the processing modules are paused. To bring it back:
+#     GPS_REDIS_ENABLED=true in .env, then  docker compose --profile redis up -d redis   and restart gps-service
+#     (or point SPRING_DATA_REDIS_HOST / Developer -> Connections at another Redis, e.g. the HP home server's).
+#   Profile "redis" (only with --profile redis):
 #   redis        Redis Stack           live positions + engine counters    Windows: localhost:6380
 #                + RedisInsight        look inside Redis                   http://localhost:8001
-#                (optional: Developer -> Connections can switch the service to the HP home server's Redis)
 #   gps-service  our Spring Boot app   engine dashboard + API              http://localhost:8080
 #                + Kafka Streams       normalizer + analytics apps         state in the gps-streams-state volume
 #                + ingest journal      frames/events kept until Kafka has  the gps-ingest-journal volume
@@ -14,13 +18,14 @@
 #   graphhopper    GraphHopper 11.1     road routing on the India map      http://localhost:8989/maps/
 #   route-service  our Spring Boot app  route planning / deviation API     http://localhost:8090
 #   Start:        docker compose --profile routing up -d --build graphhopper route-service
+#   Not used for now: routing is Valhalla on the HP; GraphHopper's image and India map were deleted (rebuilt on start).
 #   First start downloads India (1.7 GB) and imports it - see docs/ROUTING_ENGINE_SETUP.md.
 #
 #   First time:   .\infrastructure\docker\create-docker-env.ps1     (writes the git-ignored .env with passwords)
 #   Start all:    docker compose up -d --build                       (the 150-vehicle fleet starts by itself)
 #   Shadow run:   $env:GPS_STREAMS_NORMALIZATION = 'shadow'; docker compose up -d gps-service   (listener + parity)
 #   3 brokers:    docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d    (3 copies, fresh volumes)
-#   Direct flow:  docker compose up -d postgres redis
+#   Direct flow:  docker compose up -d postgres
 #                 $env:GPS_PROCESSING_FLOW = 'direct'; docker compose up -d --no-deps --build gps-service
 #   Logs:         docker compose logs -f gps-service
 #   One device:   docker compose logs gps-service | Select-String "imei=0861000000000002"
@@ -116,6 +121,8 @@ services:
 
   redis:
     image: redis/redis-stack:7.4.0-v8
+    # switched off until production: started only with --profile redis (and GPS_REDIS_ENABLED=true)
+    profiles: ["redis"]
     restart: "no"
     # Redis keeps at most 512 MB of data (REDIS_ARGS); RedisInsight runs in the same container.
     deploy:
@@ -165,14 +172,17 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/gps_tracking
       SPRING_DATASOURCE_USERNAME: gps_app
       SPRING_DATASOURCE_PASSWORD: ${GPS_DATABASE_PASSWORD}
+      # Redis off until production (see the top of this file); true = use the Redis below.
+      GPS_REDIS_ENABLED: ${GPS_REDIS_ENABLED:-false}
       # This laptop's Redis is the default; Developer -> Connections can move the service to the HP's Redis while it
       # runs (saved in PostgreSQL, kept across restarts). The HP home server is 192.168.137.1 on its hotspot.
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       HOME_SERVER_REDIS_URL: ${HOME_SERVER_REDIS_URL:-redis://192.168.137.1:6379/1}
       VALHALLA_URL: ${VALHALLA_URL:-http://192.168.137.1:8002}
-      # Route plans fall back to GraphHopper on this laptop (profile "routing") when Valhalla does not answer
-      GPS_GRAPHHOPPER_URL: ${GPS_GRAPHHOPPER_URL:-http://graphhopper:8989}
+      # Route plans use Valhalla on the HP. GraphHopper on this laptop is not used for now (blank = no fallback);
+      # to bring it back: docker compose --profile routing up -d graphhopper and GPS_GRAPHHOPPER_URL=http://graphhopper:8989
+      GPS_GRAPHHOPPER_URL: ${GPS_GRAPHHOPPER_URL:-}
       GPS_INGESTION_API_URL: ${GPS_INGESTION_API_URL:-http://192.168.137.1:8000}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SMARTTRUCK_DATABASE_URL: jdbc:mysql://host.docker.internal:3306/smart_truck
@@ -186,7 +196,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      # Spring Actuator: UP only when the app and its database and Redis connections are up.
+      # Spring Actuator: UP only when the app and its database (and Redis, when switched on) are up.
       test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 5s
@@ -195,9 +205,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-        required: false              # optional once the service uses the HP's Redis: docker compose stop redis
       kafka:
         condition: service_healthy
         required: false              # the direct flow runs without Kafka

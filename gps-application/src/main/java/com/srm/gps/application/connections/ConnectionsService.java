@@ -60,6 +60,9 @@ public class ConnectionsService {
     private static final long SMALL_REDIS_BYTES = 512L * 1024 * 1024;
     private static final long SLOW_REDIS_MILLIS = 20;
     private static final long CHECK_SECONDS = 8;
+    private static final String SWITCHED_OFF = "Redis is switched off on this service (gps.redis.enabled=false, GPS_REDIS_ENABLED "
+            + "in Docker): live positions, vehicle state, speed rules and the processing modules are paused. Another Redis can "
+            + "still be tested here; to use one, switch Redis on and restart the service.";
 
     private final SwitchableRedisConnectionFactory redis;
     private final RedisTarget localRedis;
@@ -123,6 +126,9 @@ public class ConnectionsService {
      * first, without overwriting what is there; vehicle state starts again from the next readings.
      */
     public synchronized RedisSwitch switchRedis(String url, boolean copyConfiguration) {
+        if (redis.isSwitchedOff()) {
+            throw new IllegalStateException(SWITCHED_OFF);
+        }
         RedisTarget target = RedisTarget.parse(url);
         RedisTarget current = redis.target();
         if (target.equals(current)) {
@@ -178,6 +184,9 @@ public class ConnectionsService {
     }
 
     private RedisCheck check(RedisTarget target, RedisConnectionFactory factory) {
+        if (factory == redis && redis.isSwitchedOff()) {
+            return RedisCheck.failed(target.url(), SWITCHED_OFF);
+        }
         try (RedisConnection connection = factory.getConnection()) {
             long best = Long.MAX_VALUE;
             for (int i = 0; i < 3; i++) {

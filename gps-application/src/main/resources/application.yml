@@ -82,6 +82,12 @@ gps:
   #   direct : frame -> processing -> PostgreSQL in one call, no Kafka at all                    (Kafka may be stopped)
   # Override at start-up:  --gps.processing-flow=direct
   processing-flow: kafka
+  # Redis on or off. Off (GPS_REDIS_ENABLED=false, the Docker default until production): no Redis is contacted; the
+  # processing modules (ignition, vehicle state, speed, stoppage, shipments, geofences, routes, waypoints) and the live
+  # positions are paused, pages that read Redis show no live data, and positions, trips and stops are still stored
+  # in PostgreSQL. All Redis code and the Connections settings stay: switch it on, point it at a Redis, restart.
+  redis:
+    enabled: ${GPS_REDIS_ENABLED:true}
   # The outside connections (Developer -> Connections, GET /api/connections). The HP home server is reached over its
   # Wi-Fi hotspot "SANJOY-HP 0161" and is always 192.168.137.1. What is saved in the console wins over these defaults.
   #   valhalla-url           routing engine, all-India map (route deviation will use it)
@@ -350,3 +356,7 @@ management:
     health:
       # http://localhost:8080/actuator/health also shows whether PostgreSQL ("db") is UP. Local development only.
       show-details: always
+  health:
+    redis:
+      # no Redis health check while Redis is switched off, so the service still reports UP
+      enabled: ${gps.redis.enabled}

@@ -31,25 +31,46 @@ import java.util.concurrent.TimeUnit;
  *
  * Timeouts are short on purpose: a Redis across the Wi-Fi that stops answering (the HP asleep, the hotspot off) fails a
  * call within seconds instead of a minute; the consumers treat that as infrastructure and retry, Kafka keeps the data.
+ *
+ * Switched off (gps.redis.enabled=false, {@link #switchedOff}): no Redis is contacted at all; every connection is a
+ * {@link SwitchedOffRedis} that answers "nothing there". The target is still known, for the console to show.
  */
 public class SwitchableRedisConnectionFactory implements RedisConnectionFactory, DisposableBean {
 
     private static final Logger LOG = LoggerFactory.getLogger(SwitchableRedisConnectionFactory.class);
     private static final long CLOSE_PREVIOUS_AFTER_SECONDS = 30;
 
+    /** @param factory null while Redis is switched off */
     private record Active(RedisTarget target, LettuceConnectionFactory factory, Instant since) {
     }
 
     private final Duration commandTimeout;
     private final Duration connectTimeout;
+    private final boolean switchedOff;
     // one set of I/O threads for every factory this class opens, so a test or a switch does not start new ones
     private final ClientResources resources = DefaultClientResources.create();
     private volatile Active active;
 
     public SwitchableRedisConnectionFactory(RedisTarget initial, Duration commandTimeout, Duration connectTimeout) {
+        this(initial, commandTimeout, connectTimeout, false);
+    }
+
+    private SwitchableRedisConnectionFactory(RedisTarget initial, Duration commandTimeout, Duration connectTimeout,
+                                             boolean switchedOff) {
         this.commandTimeout = commandTimeout;
         this.connectTimeout = connectTimeout;
-        this.active = new Active(initial, open(initial), Instant.now());
+        this.switchedOff = switchedOff;
+        this.active = new Active(initial, switchedOff ? null : open(initial), Instant.now());
+    }
+
+    /** Redis switched off: nothing is opened; {@code configured} is only remembered for the console. */
+    public static SwitchableRedisConnectionFactory switchedOff(RedisTarget configured, Duration commandTimeout,
+                                                               Duration connectTimeout) {
+        return new SwitchableRedisConnectionFactory(configured, commandTimeout, connectTimeout, true);
+    }
+
+    public boolean isSwitchedOff() {
+        return switchedOff;
     }
 
     public RedisTarget target() {
@@ -85,6 +106,9 @@ public class SwitchableRedisConnectionFactory implements RedisConnectionFactory,
      * Returns the Redis used until now.
      */
     public synchronized RedisTarget switchTo(RedisTarget target, LettuceConnectionFactory opened) {
+        if (switchedOff) {
+            throw new IllegalStateException("Redis is switched off (gps.redis.enabled=false): switch it on and restart first");
+        }
         Active previous = active;
         active = new Active(target, opened, Instant.now());
         CompletableFuture.delayedExecutor(CLOSE_PREVIOUS_AFTER_SECONDS, TimeUnit.SECONDS).execute(() -> close(previous));
@@ -94,27 +118,27 @@ public class SwitchableRedisConnectionFactory implements RedisConnectionFactory,
 
     @Override
     public RedisConnection getConnection() {
-        return active.factory().getConnection();
+        return switchedOff ? SwitchedOffRedis.connection() : active.factory().getConnection();
     }
 
     @Override
     public RedisClusterConnection getClusterConnection() {
-        return active.factory().getClusterConnection();
+        return openFactory().getClusterConnection();
     }
 
     @Override
     public RedisSentinelConnection getSentinelConnection() {
-        return active.factory().getSentinelConnection();
+        return openFactory().getSentinelConnection();
     }
 
     @Override
     public boolean getConvertPipelineAndTxResults() {
-        return active.factory().getConvertPipelineAndTxResults();
+        return !switchedOff && active.factory().getConvertPipelineAndTxResults();
     }
 
     @Override
     public DataAccessException translateExceptionIfPossible(RuntimeException problem) {
-        return active.factory().translateExceptionIfPossible(problem);
+        return switchedOff ? null : active.factory().translateExceptionIfPossible(problem);
     }
 
     @Override
@@ -123,7 +147,17 @@ public class SwitchableRedisConnectionFactory implements RedisConnectionFactory,
         resources.shutdown();
     }
 
+    private LettuceConnectionFactory openFactory() {
+        if (switchedOff) {
+            throw new IllegalStateException("Redis is switched off (gps.redis.enabled=false)");
+        }
+        return active.factory();
+    }
+
     private static void close(Active retired) {
+        if (retired.factory() == null) {
+            return;
+        }
         try {
             retired.factory().destroy();
         } catch (RuntimeException problem) {
